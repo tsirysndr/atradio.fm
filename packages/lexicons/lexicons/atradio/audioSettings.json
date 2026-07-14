@@ -1,0 +1,118 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.audioSettings",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The actor's audio playback settings (10-band EQ + Rockbox DSP chain), a singleton record synced across devices. Gains are integers; the crossfeed direct gain is in tenths of dB, matching the Rockbox convention.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": [
+          "updatedAt"
+        ],
+        "properties": {
+          "eqEnabled": {
+            "type": "boolean",
+            "description": "Whether the 10-band parametric EQ is enabled."
+          },
+          "eqGains": {
+            "type": "array",
+            "description": "Per-band EQ gain in dB, one entry per band (60 Hz - 20 kHz).",
+            "items": {
+              "type": "integer",
+              "maximum": 24,
+              "minimum": -24
+            }
+          },
+          "bass": {
+            "type": "integer",
+            "description": "Bass tone control in dB.",
+            "maximum": 24,
+            "minimum": -24
+          },
+          "treble": {
+            "type": "integer",
+            "description": "Treble tone control in dB.",
+            "maximum": 24,
+            "minimum": -24
+          },
+          "crossfeedMode": {
+            "type": "string",
+            "description": "Headphone crossfeed mode.",
+            "knownValues": [
+              "off",
+              "meier",
+              "custom"
+            ]
+          },
+          "crossfeedDirect": {
+            "type": "integer",
+            "description": "Crossfeed direct-path gain in tenths of dB (<= 0).",
+            "maximum": 0,
+            "minimum": -60
+          },
+          "pbe": {
+            "type": "integer",
+            "description": "Perceptual Bass Enhancement strength in percent.",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "pbePrecut": {
+            "type": "integer",
+            "description": "PBE pre-cut in dB (stored positive, applied as a cut).",
+            "maximum": 24,
+            "minimum": 0
+          },
+          "surroundDelay": {
+            "type": "integer",
+            "description": "Haas surround delay in ms (0 = off).",
+            "maximum": 30,
+            "minimum": 0
+          },
+          "surroundBalance": {
+            "type": "integer",
+            "description": "Haas surround balance in percent.",
+            "maximum": 100,
+            "minimum": 0
+          },
+          "compThreshold": {
+            "type": "integer",
+            "description": "Compressor threshold in dB (0 = off).",
+            "maximum": 0,
+            "minimum": -30
+          },
+          "compRatio": {
+            "type": "integer",
+            "description": "Compressor ratio (n:1).",
+            "maximum": 10,
+            "minimum": 2
+          },
+          "channelMode": {
+            "type": "string",
+            "description": "Channel mixing mode.",
+            "knownValues": [
+              "stereo",
+              "mono",
+              "custom",
+              "mono-left",
+              "mono-right",
+              "karaoke",
+              "swap"
+            ]
+          },
+          "stereoWidth": {
+            "type": "integer",
+            "description": "Stereo width in percent.",
+            "maximum": 255,
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

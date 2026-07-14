@@ -4,11 +4,16 @@ import { now as tidNow } from "@atcute/tid";
 import type { Did, Nsid } from "@atcute/lexicons";
 import {
   NSID,
+  AUDIO_SETTINGS_RKEY,
+  audioSettingsRecordSchema,
+  buildAudioSettingsRecord,
   buildFavoriteRecord,
   buildStationRecord,
   favoriteRecordToStation,
   stationRecordToStation,
   rkeyFromUri,
+  type AudioSettingsData,
+  type AudioSettingsRecord,
   type FavoriteRecord,
   type StationRecord,
   type Station,
@@ -118,6 +123,45 @@ export async function deleteAtradioRecord(
   await ok(
     client.post("com.atproto.repo.deleteRecord", {
       input: { repo: did, collection: collection as Nsid, rkey },
+    }),
+  );
+}
+
+/** Fetch the actor's singleton audio-settings record; null when absent
+ *  (never synced) or invalid. */
+export async function getAudioSettings(
+  client: Client,
+  did: Did,
+): Promise<AudioSettingsRecord | null> {
+  const res = await client.get("com.atproto.repo.getRecord", {
+    params: {
+      repo: did,
+      collection: NSID.audioSettings as Nsid,
+      rkey: AUDIO_SETTINGS_RKEY,
+    },
+  });
+  if (!res.ok) return null;
+  const parsed = audioSettingsRecordSchema.safeParse(res.data.value);
+  return parsed.success ? (parsed.data as AudioSettingsRecord) : null;
+}
+
+/** Write the actor's singleton audio-settings record (rkey `self`). */
+export async function putAudioSettings(
+  client: Client,
+  did: Did,
+  settings: AudioSettingsData,
+): Promise<void> {
+  await ok(
+    client.post("com.atproto.repo.putRecord", {
+      input: {
+        repo: did,
+        collection: NSID.audioSettings as Nsid,
+        rkey: AUDIO_SETTINGS_RKEY,
+        record: buildAudioSettingsRecord(settings) as unknown as Record<
+          string,
+          unknown
+        >,
+      },
     }),
   );
 }

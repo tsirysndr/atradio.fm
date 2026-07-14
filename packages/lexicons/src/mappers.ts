@@ -1,4 +1,6 @@
 import type {
+  AudioSettingsData,
+  AudioSettingsRecord,
   FavoriteRecord,
   Station,
   StationDraft,
@@ -6,7 +8,7 @@ import type {
   StationRecord,
   StrongRef,
 } from "./types";
-import { NSID } from "./types";
+import { DEFAULT_AUDIO_SETTINGS, NSID } from "./types";
 
 /** Drop `undefined` and empty-string values so records stay minimal. */
 function clean<T extends Record<string, unknown>>(obj: T): T {
@@ -117,4 +119,57 @@ export function stationRecordToStation(
     favicon: r.logo,
     tags: r.tags,
   }) as Station;
+}
+
+// ---- fm.atradio.audioSettings ----
+
+/** Build the singleton settings record. `crossfeedDirect` goes from dB to
+ *  tenths of dB; every gain is rounded to the integer the lexicon requires. */
+export function buildAudioSettingsRecord(
+  s: AudioSettingsData,
+  updatedAt?: string,
+): AudioSettingsRecord {
+  return {
+    $type: NSID.audioSettings,
+    eqEnabled: s.eqEnabled,
+    eqGains: s.eqGains.map((g) => Math.round(g)),
+    bass: Math.round(s.bass),
+    treble: Math.round(s.treble),
+    crossfeedMode: s.crossfeedMode,
+    crossfeedDirect: Math.round(s.crossfeedDirect * 10),
+    pbe: Math.round(s.pbe),
+    pbePrecut: Math.round(s.pbePrecut),
+    surroundDelay: Math.round(s.surroundDelay),
+    surroundBalance: Math.round(s.surroundBalance),
+    compThreshold: Math.round(s.compThreshold),
+    compRatio: Math.round(s.compRatio),
+    channelMode: s.channelMode,
+    stereoWidth: Math.round(s.stereoWidth),
+    updatedAt: updatedAt ?? new Date().toISOString(),
+  };
+}
+
+/** Read a settings record, filling anything missing with the defaults (so
+ *  records written by older app versions keep working). */
+export function audioSettingsRecordToData(
+  r: AudioSettingsRecord,
+): AudioSettingsData {
+  const d = DEFAULT_AUDIO_SETTINGS;
+  return {
+    eqEnabled: r.eqEnabled ?? d.eqEnabled,
+    eqGains: r.eqGains ?? [...d.eqGains],
+    bass: r.bass ?? d.bass,
+    treble: r.treble ?? d.treble,
+    crossfeedMode: r.crossfeedMode ?? d.crossfeedMode,
+    crossfeedDirect:
+      r.crossfeedDirect != null ? r.crossfeedDirect / 10 : d.crossfeedDirect,
+    pbe: r.pbe ?? d.pbe,
+    pbePrecut: r.pbePrecut ?? d.pbePrecut,
+    surroundDelay: r.surroundDelay ?? d.surroundDelay,
+    surroundBalance: r.surroundBalance ?? d.surroundBalance,
+    compThreshold: r.compThreshold ?? d.compThreshold,
+    compRatio: r.compRatio ?? d.compRatio,
+    channelMode: r.channelMode ?? d.channelMode,
+    stereoWidth: r.stereoWidth ?? d.stereoWidth,
+  };
 }

@@ -1,0 +1,104 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.audioSettings"
+defs = new Mapping<String, Record> {
+  ["main"] {
+    type = "record"
+    key = "literal:self"
+    description = "The actor's audio playback settings (10-band EQ + Rockbox DSP chain), a singleton record synced across devices. Gains are integers; the crossfeed direct gain is in tenths of dB, matching the Rockbox convention."
+    `record` {
+      type = "object"
+      required = List("updatedAt")
+      properties {
+        ["eqEnabled"] = new BooleanType {
+          type = "boolean"
+          description = "Whether the 10-band parametric EQ is enabled."
+        }
+        ["eqGains"] = new Array {
+          type = "array"
+          description = "Per-band EQ gain in dB, one entry per band (60 Hz - 20 kHz)."
+          items = new IntegerType {
+            type = "integer"
+            minimum = -24
+            maximum = 24
+          }
+        }
+        ["bass"] = new IntegerType {
+          type = "integer"
+          description = "Bass tone control in dB."
+          minimum = -24
+          maximum = 24
+        }
+        ["treble"] = new IntegerType {
+          type = "integer"
+          description = "Treble tone control in dB."
+          minimum = -24
+          maximum = 24
+        }
+        ["crossfeedMode"] = new StringType {
+          type = "string"
+          description = "Headphone crossfeed mode."
+          knownValues = List("off", "meier", "custom")
+        }
+        ["crossfeedDirect"] = new IntegerType {
+          type = "integer"
+          description = "Crossfeed direct-path gain in tenths of dB (<= 0)."
+          minimum = -60
+          maximum = 0
+        }
+        ["pbe"] = new IntegerType {
+          type = "integer"
+          description = "Perceptual Bass Enhancement strength in percent."
+          minimum = 0
+          maximum = 100
+        }
+        ["pbePrecut"] = new IntegerType {
+          type = "integer"
+          description = "PBE pre-cut in dB (stored positive, applied as a cut)."
+          minimum = 0
+          maximum = 24
+        }
+        ["surroundDelay"] = new IntegerType {
+          type = "integer"
+          description = "Haas surround delay in ms (0 = off)."
+          minimum = 0
+          maximum = 30
+        }
+        ["surroundBalance"] = new IntegerType {
+          type = "integer"
+          description = "Haas surround balance in percent."
+          minimum = 0
+          maximum = 100
+        }
+        ["compThreshold"] = new IntegerType {
+          type = "integer"
+          description = "Compressor threshold in dB (0 = off)."
+          minimum = -30
+          maximum = 0
+        }
+        ["compRatio"] = new IntegerType {
+          type = "integer"
+          description = "Compressor ratio (n:1)."
+          minimum = 2
+          maximum = 10
+        }
+        ["channelMode"] = new StringType {
+          type = "string"
+          description = "Channel mixing mode."
+          knownValues = List("stereo", "mono", "custom", "mono-left", "mono-right", "karaoke", "swap")
+        }
+        ["stereoWidth"] = new IntegerType {
+          type = "integer"
+          description = "Stereo width in percent."
+          minimum = 0
+          maximum = 255
+        }
+        ["updatedAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+}

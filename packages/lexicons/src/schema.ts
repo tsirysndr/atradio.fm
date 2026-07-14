@@ -57,3 +57,35 @@ export const stationListOutputSchema = z.object({
   total: z.number(),
   items: z.array(stationViewSchema),
 });
+
+export const crossfeedModeSchema = z.enum(["off", "meier", "custom"]);
+
+export const channelModeSchema = z.enum([
+  "stereo",
+  "mono",
+  "custom",
+  "mono-left",
+  "mono-right",
+  "karaoke",
+  "swap",
+]);
+
+export const audioSettingsRecordSchema = z.object({
+  $type: z.literal("fm.atradio.audioSettings").optional(),
+  eqEnabled: z.boolean().optional(),
+  eqGains: z.array(z.number().min(-24).max(24)).optional(),
+  bass: z.number().min(-24).max(24).optional(),
+  treble: z.number().min(-24).max(24).optional(),
+  crossfeedMode: crossfeedModeSchema.optional(),
+  /** Tenths of dB (<= 0). */
+  crossfeedDirect: z.number().min(-60).max(0).optional(),
+  pbe: z.number().min(0).max(100).optional(),
+  pbePrecut: z.number().min(0).max(24).optional(),
+  surroundDelay: z.number().min(0).max(30).optional(),
+  surroundBalance: z.number().min(0).max(100).optional(),
+  compThreshold: z.number().min(-30).max(0).optional(),
+  compRatio: z.number().min(2).max(10).optional(),
+  channelMode: channelModeSchema.optional(),
+  stereoWidth: z.number().min(0).max(255).optional(),
+  updatedAt: z.string(),
+});

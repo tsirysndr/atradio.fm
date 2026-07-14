@@ -8,6 +8,7 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { SearchPalette } from "./SearchPalette";
 import { LoginModal } from "./LoginModal";
 import { AudioSettingsModal } from "./AudioSettingsModal";
+import { AudioSettingsSync } from "./AudioSettingsSync";
 import { UserDataSync } from "./UserDataSync";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { shortcutsOpenAtom } from "@/atoms/ui";
@@ -39,6 +40,7 @@ export function Layout() {
       <SearchPalette />
       <LoginModal />
       <AudioSettingsModal />
+      <AudioSettingsSync />
       <UserDataSync />
     </div>
   );

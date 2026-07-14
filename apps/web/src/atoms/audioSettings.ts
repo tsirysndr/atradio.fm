@@ -1,49 +1,74 @@
-import { useAtomValue } from "jotai";
+import { atom, useAtomValue } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 import { RockboxPlayer, ChannelMode, CrossfeedMode } from "rockbox-wasm";
+import {
+  DEFAULT_AUDIO_SETTINGS as DEFAULTS,
+  type AudioSettingsData,
+} from "@atradio/lexicons";
 
 /** The 10 Rockbox EQ band centre frequencies (60 Hz … 20 kHz). */
 export const EQ_CUTOFFS = RockboxPlayer.EQ_BAND_CUTOFFS;
 
 // Every DSP setting persists to localStorage (atomWithStorage) so the audio
 // chain survives reloads — applyAudioSettings() pushes the whole snapshot to
-// the engine once it boots.
+// the engine once it boots. Defaults come from @atradio/lexicons so the local
+// state, the fm.atradio.audioSettings record, and other devices agree.
 
-export const eqEnabledAtom = atomWithStorage("atradio:eq.enabled", false);
-export const eqGainsAtom = atomWithStorage<number[]>(
-  "atradio:eq.gains",
-  EQ_CUTOFFS.map(() => 0),
+export const eqEnabledAtom = atomWithStorage(
+  "atradio:eq.enabled",
+  DEFAULTS.eqEnabled,
 );
+export const eqGainsAtom = atomWithStorage<number[]>("atradio:eq.gains", [
+  ...DEFAULTS.eqGains,
+]);
 
-export const bassAtom = atomWithStorage("atradio:tone.bass", 0); // dB
-export const trebleAtom = atomWithStorage("atradio:tone.treble", 0); // dB
+export const bassAtom = atomWithStorage("atradio:tone.bass", DEFAULTS.bass); // dB
+export const trebleAtom = atomWithStorage(
+  "atradio:tone.treble",
+  DEFAULTS.treble,
+); // dB
 
 export const crossfeedModeAtom = atomWithStorage<CrossfeedMode>(
   "atradio:crossfeed.mode",
-  CrossfeedMode.Off,
+  DEFAULTS.crossfeedMode as CrossfeedMode,
 );
 export const crossfeedDirectAtom = atomWithStorage(
   "atradio:crossfeed.direct",
-  -1.5,
+  DEFAULTS.crossfeedDirect,
 ); // dB (≤ 0)
 
-export const pbeAtom = atomWithStorage("atradio:pbe.strength", 0); // 0–100 %
-export const pbePrecutAtom = atomWithStorage("atradio:pbe.precut", 0); // dB cut
+export const pbeAtom = atomWithStorage("atradio:pbe.strength", DEFAULTS.pbe); // 0–100 %
+export const pbePrecutAtom = atomWithStorage(
+  "atradio:pbe.precut",
+  DEFAULTS.pbePrecut,
+); // dB cut
 
-export const surroundDelayAtom = atomWithStorage("atradio:surround.delay", 0); // ms, 0 = off
+export const surroundDelayAtom = atomWithStorage(
+  "atradio:surround.delay",
+  DEFAULTS.surroundDelay,
+); // ms, 0 = off
 export const surroundBalanceAtom = atomWithStorage(
   "atradio:surround.balance",
-  35,
+  DEFAULTS.surroundBalance,
 ); // %
 
-export const compThresholdAtom = atomWithStorage("atradio:comp.threshold", 0); // dB, 0 = off
-export const compRatioAtom = atomWithStorage("atradio:comp.ratio", 2);
+export const compThresholdAtom = atomWithStorage(
+  "atradio:comp.threshold",
+  DEFAULTS.compThreshold,
+); // dB, 0 = off
+export const compRatioAtom = atomWithStorage(
+  "atradio:comp.ratio",
+  DEFAULTS.compRatio,
+);
 
 export const channelModeAtom = atomWithStorage<ChannelMode>(
   "atradio:channel.mode",
-  ChannelMode.Stereo,
+  DEFAULTS.channelMode as ChannelMode,
 );
-export const stereoWidthAtom = atomWithStorage("atradio:channel.width", 100); // %
+export const stereoWidthAtom = atomWithStorage(
+  "atradio:channel.width",
+  DEFAULTS.stereoWidth,
+); // %
 
 export interface AudioSettings {
   eqEnabled: boolean;
@@ -95,3 +120,40 @@ export function applyAudioSettings(p: RockboxPlayer, s: AudioSettings) {
   p.setChannelMode(s.channelMode);
   p.setStereoWidth(s.stereoWidth);
 }
+
+/** Web `AudioSettings` (rockbox enums) -> lexicon `AudioSettingsData`. The
+ *  shapes are identical; only the enum nominal types differ. */
+export const toAudioSettingsData = (s: AudioSettings): AudioSettingsData => ({
+  ...s,
+  crossfeedMode: s.crossfeedMode as AudioSettingsData["crossfeedMode"],
+  channelMode: s.channelMode as AudioSettingsData["channelMode"],
+});
+
+/** Lexicon `AudioSettingsData` -> web `AudioSettings`. */
+export const fromAudioSettingsData = (d: AudioSettingsData): AudioSettings => ({
+  ...d,
+  crossfeedMode: d.crossfeedMode as CrossfeedMode,
+  channelMode: d.channelMode as ChannelMode,
+});
+
+/** Overwrite every setting atom at once (used when restoring the synced
+ *  fm.atradio.audioSettings record from the PDS). */
+export const applyRemoteAudioSettingsAtom = atom(
+  null,
+  (_get, set, s: AudioSettings) => {
+    set(eqEnabledAtom, s.eqEnabled);
+    set(eqGainsAtom, [...s.eqGains]);
+    set(bassAtom, s.bass);
+    set(trebleAtom, s.treble);
+    set(crossfeedModeAtom, s.crossfeedMode);
+    set(crossfeedDirectAtom, s.crossfeedDirect);
+    set(pbeAtom, s.pbe);
+    set(pbePrecutAtom, s.pbePrecut);
+    set(surroundDelayAtom, s.surroundDelay);
+    set(surroundBalanceAtom, s.surroundBalance);
+    set(compThresholdAtom, s.compThreshold);
+    set(compRatioAtom, s.compRatio);
+    set(channelModeAtom, s.channelMode);
+    set(stereoWidthAtom, s.stereoWidth);
+  },
+);

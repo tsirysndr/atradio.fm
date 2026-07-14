@@ -1,6 +1,7 @@
 export const NSID = {
   station: "fm.atradio.station",
   favorite: "fm.atradio.favorite",
+  audioSettings: "fm.atradio.audioSettings",
   getFavorites: "fm.atradio.getFavorites",
   getStations: "fm.atradio.getStations",
 } as const;
@@ -94,3 +95,76 @@ export interface StationDraft {
   homepage?: string;
   logoUrl?: string;
 }
+
+// ---- fm.atradio.audioSettings ----
+
+export type CrossfeedModeValue = "off" | "meier" | "custom";
+export type ChannelModeValue =
+  | "stereo"
+  | "mono"
+  | "custom"
+  | "mono-left"
+  | "mono-right"
+  | "karaoke"
+  | "swap";
+
+/** Singleton record rkey (one settings record per repo). */
+export const AUDIO_SETTINGS_RKEY = "self";
+
+/** `fm.atradio.audioSettings` record. `crossfeedDirect` is in tenths of dB. */
+export interface AudioSettingsRecord {
+  $type?: typeof NSID.audioSettings;
+  eqEnabled?: boolean;
+  eqGains?: number[];
+  bass?: number;
+  treble?: number;
+  crossfeedMode?: CrossfeedModeValue;
+  crossfeedDirect?: number;
+  pbe?: number;
+  pbePrecut?: number;
+  surroundDelay?: number;
+  surroundBalance?: number;
+  compThreshold?: number;
+  compRatio?: number;
+  channelMode?: ChannelModeValue;
+  stereoWidth?: number;
+  updatedAt: string;
+}
+
+/**
+ * The app-level audio settings shape (mirrors apps/web `AudioSettings`).
+ * Unlike the record, `crossfeedDirect` is in plain dB here.
+ */
+export interface AudioSettingsData {
+  eqEnabled: boolean;
+  eqGains: number[];
+  bass: number;
+  treble: number;
+  crossfeedMode: CrossfeedModeValue;
+  crossfeedDirect: number;
+  pbe: number;
+  pbePrecut: number;
+  surroundDelay: number;
+  surroundBalance: number;
+  compThreshold: number;
+  compRatio: number;
+  channelMode: ChannelModeValue;
+  stereoWidth: number;
+}
+
+export const DEFAULT_AUDIO_SETTINGS: AudioSettingsData = {
+  eqEnabled: false,
+  eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  bass: 0,
+  treble: 0,
+  crossfeedMode: "off",
+  crossfeedDirect: -1.5,
+  pbe: 0,
+  pbePrecut: 0,
+  surroundDelay: 0,
+  surroundBalance: 35,
+  compThreshold: 0,
+  compRatio: 2,
+  channelMode: "stereo",
+  stereoWidth: 100,
+};
