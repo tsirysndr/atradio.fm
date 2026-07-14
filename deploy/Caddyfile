@@ -1,0 +1,7 @@
+# Reverse proxy for the atradio.fm API. Caddy provisions TLS automatically.
+# Point DNS A/AAAA for api.atradio.fm at this host, then:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile   (or `import` it)
+#   sudo systemctl reload caddy
+api.atradio.fm {
+	reverse_proxy 127.0.0.1:8080
+}
