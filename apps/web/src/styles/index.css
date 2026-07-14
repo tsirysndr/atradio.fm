@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/* Local fonts (bundled, no network) */
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "@fontsource/jetbrains-mono/700.css";
+@import "@fontsource/outfit/400.css";
+@import "@fontsource/outfit/500.css";
+@import "@fontsource/outfit/600.css";
+@import "@fontsource/outfit/700.css";
+@import "@fontsource/lexend/500.css";
+@import "@fontsource/lexend/600.css";
+@import "@fontsource/lexend/700.css";
+
+/*
+ * Custom design tokens. In Tailwind v4 anything under `@theme` becomes a
+ * utility: `--color-synth-pink` -> `bg-synth-pink`/`text-synth-pink`, etc.
+ */
+@theme {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Outfit", system-ui, sans-serif;
+  --font-display: "Lexend", "Outfit", system-ui, sans-serif;
+
+  /* pocketenv CLI palette (see pocketenv/apps/cli/src/theme.ts).
+     Token names kept from the old theme so all usages update in place. */
+  --color-synth-bg: #0a0e12;
+  --color-synth-surface: #111821;
+  --color-synth-panel: #18222d;
+  --color-synth-pink: #00e8c6; /* primary   (teal)   */
+  --color-synth-magenta: #64e882; /* highlight (green)  */
+  --color-synth-cyan: #00c6e8; /* secondary (cyan)   */
+  --color-synth-purple: #8264ff; /* accent    (indigo) */
+  --color-synth-yellow: #ffa064; /* link      (orange) */
+  --color-synth-blue: #00d2ff; /* sky                */
+
+  --shadow-neon: 0 0 12px rgba(0, 232, 198, 0.4),
+    0 0 32px rgba(0, 198, 232, 0.22);
+  --shadow-neon-cyan: 0 0 12px rgba(0, 198, 232, 0.5);
+
+  --animate-pulse-bars: pulse-bars 0.9s ease-in-out infinite;
+}
+
+@keyframes pulse-bars {
+  0%,
+  100% {
+    transform: scaleY(0.4);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+/*
+ * pocketenv palette: override HeroUI's semantic theme variables for the dark
+ * theme so its components (accent buttons, overlays, focus rings, statuses …)
+ * match. `@theme inline` in @heroui/styles maps these to the `bg-*`/`text-*`
+ * utilities automatically.
+ */
+@layer base {
+  .dark,
+  [data-theme="dark"] {
+    --background: #0a0e12;
+    --foreground: #e8eef4;
+
+    --surface: #111821;
+    --surface-foreground: #e8eef4;
+    --surface-secondary: #18222d;
+    --surface-tertiary: #1f2b37;
+
+    --overlay: #111821;
+    --overlay-foreground: #e8eef4;
+
+    --muted: #8b98a6;
+
+    --accent: #00e8c6;
+    --accent-foreground: #04211c;
+
+    --focus: #00c6e8;
+
+    --field-background: #18222d;
+    --field-foreground: #e8eef4;
+
+    --border: color-mix(in oklab, #e8eef4 12%, transparent);
+    --separator: color-mix(in oklab, #e8eef4 10%, transparent);
+
+    --backdrop: rgba(3, 7, 10, 0.72);
+
+    --success: #64e882;
+    --success-foreground: #04211c;
+    --warning: #ffa064;
+    --warning-foreground: #241203;
+    --danger: #ff6464;
+    --danger-foreground: #2a0606;
+  }
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-mono);
+  background-color: var(--color-synth-bg);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .neon-text {
+    color: #00e8c6;
+    text-shadow: 0 0 4px rgba(0, 232, 198, 0.8),
+      0 0 12px rgba(0, 232, 198, 0.55), 0 0 24px rgba(0, 198, 232, 0.35);
+  }
+
+  .neon-text-cyan {
+    color: #00c6e8;
+    text-shadow: 0 0 4px rgba(0, 198, 232, 0.8), 0 0 14px rgba(0, 198, 232, 0.5);
+  }
+
+  .synth-gradient-text {
+    background-image: linear-gradient(
+      92deg,
+      #00e8c6 0%,
+      #64e882 28%,
+      #00c6e8 58%,
+      #8264ff 100%
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+}
