@@ -10,6 +10,8 @@ const DEFAULT_JETSTREAMS = [
 
 export const env = {
   DATABASE_URL: process.env.DATABASE_URL ?? "",
+  /** Optional Redis cache; caching is disabled when unset. */
+  REDIS_URL: process.env.REDIS_URL ?? "",
   PORT: Number(process.env.PORT ?? 8080),
   /** All Jetstream hosts we connect to simultaneously for redundancy. */
   JETSTREAM_HOSTS: (process.env.JETSTREAM_HOSTS

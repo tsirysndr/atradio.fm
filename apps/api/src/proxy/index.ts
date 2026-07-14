@@ -1,22 +1,39 @@
 import { Router, type Request, type Response } from "express";
 import { consola } from "consola";
+import { cacheGet, cacheSet } from "../cache";
 
 export const proxyRouter = Router();
+
+// Cache TTLs (seconds): TuneIn search results are stable; ICY "now playing"
+// changes per song, so keep it short but enough to absorb concurrent listeners.
+const TUNEIN_TTL = 300;
+const ICY_TTL = 20;
 
 /* ----------------------------- TuneIn proxy ----------------------------- */
 
 /** Reverse-proxy /api/tunein/* to opml.radiotime.com/* (TuneIn sends no CORS). */
 proxyRouter.get(/^\/tunein\/.*/, async (req: Request, res: Response) => {
   const path = req.originalUrl.replace(/^\/api\/tunein/, "");
+  const key = `tunein:${path}`;
+
+  const cached = await cacheGet(key);
+  if (cached) {
+    const { ct, body } = JSON.parse(cached) as { ct?: string; body: string };
+    res.setHeader("X-Cache", "HIT");
+    if (ct) res.setHeader("Content-Type", ct);
+    return res.send(body);
+  }
+
   const target = `https://opml.radiotime.com${path}`;
   try {
     const upstream = await fetch(target, {
       headers: { Accept: req.headers.accept ?? "application/json" },
     });
-    res.status(upstream.status);
-    const type = upstream.headers.get("content-type");
-    if (type) res.setHeader("Content-Type", type);
+    const type = upstream.headers.get("content-type") ?? undefined;
     const body = await upstream.text();
+    if (upstream.ok) await cacheSet(key, JSON.stringify({ ct: type, body }), TUNEIN_TTL);
+    res.status(upstream.status).setHeader("X-Cache", "MISS");
+    if (type) res.setHeader("Content-Type", type);
     res.send(body);
   } catch (err) {
     consola.error("[proxy] tunein error", err);
@@ -129,8 +146,16 @@ proxyRouter.get("/icy", async (req: Request, res: Response) => {
   if (!/^https?:\/\//i.test(target)) {
     return res.json({ title: null });
   }
+  const key = `icy:${target}`;
+  const cached = await cacheGet(key);
+  if (cached) {
+    res.setHeader("X-Cache", "HIT");
+    return res.json(JSON.parse(cached));
+  }
   try {
     const title = await readIcyTitle(target);
+    await cacheSet(key, JSON.stringify({ title }), ICY_TTL);
+    res.setHeader("X-Cache", "MISS");
     return res.json({ title });
   } catch (err) {
     consola.error("[proxy] icy error", err);

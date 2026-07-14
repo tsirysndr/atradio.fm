@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { StationInfo, StationView } from "@atradio/lexicons";
 import { db, schema } from "../db";
 import { resolveDid } from "../lib/profile";
+import { cacheJson } from "../cache";
 
 export const xrpcRouter = Router();
 
@@ -54,7 +55,7 @@ function stationRowToInfo(row: StationRow): StationInfo {
 }
 
 /** GET /xrpc/fm.atradio.getFavorites?actor=&limit=&cursor=&q=&source=&sort= */
-xrpcRouter.get("/fm.atradio.getFavorites", async (req: Request, res: Response) => {
+xrpcRouter.get("/fm.atradio.getFavorites", cacheJson(20), async (req: Request, res: Response) => {
   const params = parseParams(req, res);
   if (!params) return;
   const did = await resolveDid(params.actor);
@@ -112,7 +113,7 @@ xrpcRouter.get("/fm.atradio.getFavorites", async (req: Request, res: Response) =
 });
 
 /** GET /xrpc/fm.atradio.getStations?actor=&limit=&cursor=&q=&source=&sort= */
-xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) => {
+xrpcRouter.get("/fm.atradio.getStations", cacheJson(20), async (req: Request, res: Response) => {
   const params = parseParams(req, res);
   if (!params) return;
   const did = await resolveDid(params.actor);
@@ -169,6 +170,7 @@ xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) =>
 /** GET /xrpc/fm.atradio.getRecentStations?limit= — global discovery. */
 xrpcRouter.get(
   "/fm.atradio.getRecentStations",
+  cacheJson(60),
   async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(1, Number(req.query.limit) || 30), 100);
     const rows = await db
@@ -188,6 +190,7 @@ xrpcRouter.get(
 /** GET /xrpc/fm.atradio.getPopularStations?limit= — most-favorited. */
 xrpcRouter.get(
   "/fm.atradio.getPopularStations",
+  cacheJson(60),
   async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(1, Number(req.query.limit) || 30), 100);
     const rows = await db
