@@ -10,6 +10,7 @@ export const SHORTCUTS: ShortcutHelp[] = [
   { keys: ["M"], description: "Mute / unmute" },
   { keys: ["F"], description: "Favorite current station" },
   { keys: ["A"], description: "Add your own station" },
+  { keys: ["E"], description: "Equalizer & audio settings" },
   { keys: ["↑", "↓"], description: "Volume up / down" },
   { keys: ["?"], description: "Show this help" },
   { keys: ["Esc"], description: "Close dialogs / blur search" },

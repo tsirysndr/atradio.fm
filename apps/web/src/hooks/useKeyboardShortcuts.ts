@@ -10,6 +10,7 @@ import { toggleFavoriteAtom } from "@/atoms/favorites";
 import { isLoggedInAtom } from "@/atoms/auth";
 import {
   addStationOpenAtom,
+  audioSettingsOpenAtom,
   shortcutsOpenAtom,
   openSearchPaletteAtom,
   loginModalOpenAtom,
@@ -36,6 +37,7 @@ export function useKeyboardShortcuts() {
   const [muted, setMuted] = useAtom(mutedAtom);
   const setVolume = useSetAtom(volumeAtom);
   const setAddOpen = useSetAtom(addStationOpenAtom);
+  const setAudioSettingsOpen = useSetAtom(audioSettingsOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
   const openLogin = useSetAtom(loginModalOpenAtom);
   const isLoggedIn = useAtomValue(isLoggedInAtom);
@@ -90,6 +92,10 @@ export function useKeyboardShortcuts() {
           if (isLoggedIn) setAddOpen(true);
           else openLogin(true);
           break;
+        case "e":
+        case "E":
+          setAudioSettingsOpen((v) => !v);
+          break;
         case "ArrowUp":
           e.preventDefault();
           setVolume((v) => clamp(v + 0.05));
@@ -117,6 +123,7 @@ export function useKeyboardShortcuts() {
     muted,
     setVolume,
     setAddOpen,
+    setAudioSettingsOpen,
     openSearch,
     openLogin,
     isLoggedIn,
