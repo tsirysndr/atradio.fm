@@ -4,7 +4,7 @@
   "client_uri": "https://atradio.fm",
   "logo_uri": "https://atradio.fm/pwa-192x192.png",
   "redirect_uris": ["https://atradio.fm/oauth/callback"],
-  "scope": "atproto repo:fm.atradio.favorite repo:fm.atradio.station",
+  "scope": "atproto repo:fm.atradio.favorite repo:fm.atradio.station repo:fm.atradio.audioSettings",
   "grant_types": ["authorization_code", "refresh_token"],
   "response_types": ["code"],
   "application_type": "web",
