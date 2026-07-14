@@ -13,6 +13,7 @@
   web:dev       {:doc "Run the web app (Vite)" :task (shell {:dir (str root "/apps/web")} "bun" "run" "dev")}
   web:build     {:doc "Build the web app" :task (shell {:dir (str root "/apps/web")} "bun" "run" "build")}
   web:preview   {:doc "Preview the web build" :task (shell {:dir (str root "/apps/web")} "bun" "run" "preview")}
+  web:deploy    {:doc "Deploy web to Cloudflare Workers" :task (shell {:dir (str root "/apps/web")} "bun" "run" "deploy")}
   icons         {:doc "Regenerate PWA icons" :task (shell {:dir (str root "/apps/web")} "bun" "run" "generate-icons")}
 
   api:dev       {:doc "Run API server + Jetstream" :task (shell {:dir (str root "/apps/api")} "bun" "run" "dev")}

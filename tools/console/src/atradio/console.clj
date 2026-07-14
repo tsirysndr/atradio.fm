@@ -37,6 +37,7 @@
 (defn web-dev "Run the web app (Vite)" [] (web! "bun" "run" "dev"))
 (defn web-build "Build the web app" [] (web! "bun" "run" "build"))
 (defn web-preview "Preview the web build (PWA active)" [] (web! "bun" "run" "preview"))
+(defn web-deploy "Build + deploy the web app to Cloudflare Workers" [] (web! "bun" "run" "deploy"))
 (defn gen-icons "Regenerate the PWA icon set" [] (web! "bun" "run" "generate-icons"))
 
 ;; ---- api ----
@@ -61,6 +62,7 @@
    ["(web-dev)"       "Run the web app (Vite)"]
    ["(web-build)"     "Build the web app"]
    ["(web-preview)"   "Preview the web build"]
+   ["(web-deploy)"    "Deploy web to Cloudflare"]
    ["(gen-icons)"     "Regenerate PWA icons"]
    ["(api-dev)"       "Run API server + Jetstream"]
    ["(api-server)"    "Run only the Express server"]
