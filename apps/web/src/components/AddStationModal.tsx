@@ -12,6 +12,7 @@ import {
   FieldError,
   useOverlayState,
 } from "@heroui/react";
+import { consola } from "consola";
 import { InlineLoader } from "./Skeletons";
 import { IconPlus, IconBroadcast, IconPhoto } from "@tabler/icons-react";
 import { addStationOpenAtom } from "@/atoms/ui";
@@ -43,6 +44,7 @@ export function AddStationModal() {
   const addStation = useSetAtom(addCustomStationAtom);
   const play = useSetAtom(playStationAtom);
   const [logoError, setLogoError] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const {
     register,
@@ -61,6 +63,7 @@ export function AddStationModal() {
     setOpen(false);
     reset(DEFAULTS);
     setLogoError(false);
+    setSaveError(null);
   };
 
   const state = useOverlayState({
@@ -68,17 +71,22 @@ export function AddStationModal() {
     onOpenChange: (open) => (open ? setOpen(true) : closeAndReset()),
   });
 
-  const persist = (values: StationFormValues, playNow: boolean) => {
-    const station = addStation({
-      name: values.name,
-      description: values.description,
-      genre: values.genre,
-      streamUrl: values.streamUrl,
-      homepage: values.homepage || undefined,
-      logoUrl: values.logoUrl || undefined,
-    });
-    if (playNow) play(station);
-    closeAndReset();
+  const persist = async (values: StationFormValues, playNow: boolean) => {
+    try {
+      const station = await addStation({
+        name: values.name,
+        description: values.description,
+        genre: values.genre,
+        streamUrl: values.streamUrl,
+        homepage: values.homepage || undefined,
+        logoUrl: values.logoUrl || undefined,
+      });
+      if (playNow) play(station);
+      closeAndReset();
+    } catch (err) {
+      consola.error("[stations] save failed", err);
+      setSaveError("Couldn't save the station to your account. Try again.");
+    }
   };
 
   const onSave = handleSubmit((values) => persist(values, false));
@@ -223,6 +231,7 @@ export function AddStationModal() {
                 Add it anyway (skip the stream check)
               </button>
             )}
+            {saveError && <p className="text-xs text-danger">{saveError}</p>}
           </Modal.Body>
 
           <Modal.Footer className="flex justify-end gap-2 border-t border-white/10 pt-3">

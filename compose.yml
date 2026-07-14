@@ -1,0 +1,27 @@
+# Local Postgres for the atradio.fm AppView (apps/api).
+#
+#   docker compose up -d
+#   # then in apps/api/.env:
+#   DATABASE_URL=postgresql://atradio:atradio@localhost:5432/atradio
+#   cd apps/api && bun run db:migrate
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: atradio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: atradio
+      POSTGRES_PASSWORD: atradio
+      POSTGRES_DB: atradio
+    ports:
+      - "5432:5432"
+    volumes:
+      - atradio-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U atradio -d atradio"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  atradio-pgdata:

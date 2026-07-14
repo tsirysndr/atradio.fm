@@ -1,0 +1,58 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.station",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A user-defined radio station.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "name",
+          "streamUrl",
+          "createdAt"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "streamUrl": {
+            "type": "string",
+            "description": "Direct, playable stream URL.",
+            "format": "uri"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "genre": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "homepage": {
+            "type": "string",
+            "format": "uri"
+          },
+          "logo": {
+            "type": "string",
+            "description": "Logo/artwork URL.",
+            "format": "uri"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

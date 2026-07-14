@@ -44,18 +44,25 @@ describe("modals open", () => {
     const user = userEvent.setup();
     renderApp();
 
-    // Wait for the app to mount, then confirm the modal isn't shown yet.
+    // Add-station is gated behind login, so a logged-out click opens the
+    // login modal. This still verifies a nested HeroUI modal renders correctly.
     const addButton = await screen.findByRole("button", {
       name: /add station/i,
     });
-    expect(screen.queryByText("Add your own station")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Log in with Atmosphere account/i),
+    ).not.toBeInTheDocument();
 
     await user.click(addButton);
 
     await waitFor(() =>
-      expect(screen.getByText("Add your own station")).toBeInTheDocument(),
+      expect(
+        screen.getByText(/Log in with Atmosphere account/i),
+      ).toBeInTheDocument(),
     );
     // A field from the modal body is present -> the dialog actually rendered.
-    expect(screen.getByText("Stream URL")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("atmosphere.handle"),
+    ).toBeInTheDocument();
   });
 });

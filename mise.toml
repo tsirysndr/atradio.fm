@@ -1,3 +1,7 @@
 [tools]
 node = "24.12.0"
 bun = "1.3.14"
+# Toolchain for the tools/console command hub (Babashka + Clojure + rebel REPL)
+java = "temurin-21"
+clojure = "latest"
+babashka = "latest"

@@ -1,132 +1,131 @@
 # atradio.fm
 
-A synthwave-themed internet radio player. Search stations from
-[radio-browser.info](https://www.radio-browser.info/) and TuneIn, stream them
-right in the browser, favorite the ones you love, and add your own. Installable
-as a PWA.
+A **social internet radio platform built on the AT Protocol**. Search stations
+from [radio-browser.info](https://www.radio-browser.info/) and TuneIn, stream
+them in the browser, and save favorites + your own stations to **your own PDS**
+(portable, user-owned data). Installable as a PWA.
 
-> **Frontend only.** There is no backend yet — favorites and your own stations
-> live in `localStorage`. Search hits the public provider APIs directly (TuneIn
-> via a dev proxy).
+![atradio.fm](./preview.png)
 
-## Stack
+## Architecture
 
-- **Monorepo:** Turborepo + Bun workspaces
-- **App:** Vite + React 19 + TypeScript
-- **Styling:** Tailwind CSS **v4** + [HeroUI **v3**](https://www.heroui.com/), dark synthwave-80s theme
-- **Fonts:** JetBrains Mono (body/mono) paired with Outfit + Lexend (UI/display)
-- **Icons:** [@tabler/icons-react](https://tabler.io/icons)
-- **Routing:** TanStack Router
-- **Data:** TanStack Query
-- **State:** Jotai (with `localStorage` persistence)
-- **Forms:** React Hook Form + Zod (incl. live stream-URL verification)
-- **PWA:** vite-plugin-pwa (Workbox service worker + web manifest)
-- **Tests:** Vitest + Testing Library
-- **Toolchain:** pinned via `mise` (Node 24, Bun 1.3)
-
-## Getting started
-
-```bash
-mise install      # optional: install the pinned Node + Bun
-bun install
-bun dev           # turbo -> vite dev server on http://localhost:3000
+```
+                 OAuth + reads/writes (in the browser, via atcute)
+   apps/web (React SPA) ───────────────────────────────► your PDS (source of truth)
+        │  reads other users' profiles                        │  fm.atradio.* records
+        ▼                                                     │  (firehose)
+   apps/api  ◄── XRPC (/xrpc/fm.atradio.*) ── discovery       ▼
+   Express + Drizzle + Postgres  ◄── Jetstream consumer ◄── Jetstream (×4 hosts)
+   (the AppView / index)
 ```
 
-Other tasks (run from the repo root, orchestrated by Turbo):
+- **Auth + your own data** are 100% client-side (`@atcute/oauth-browser-client`).
+  Favorites/stations are written straight to your PDS as `fm.atradio.*` records —
+  no auth server.
+- **apps/api** is a read-only **AppView**: a Jetstream consumer indexes those
+  records into Postgres, and XRPC endpoints serve them (for public profiles and
+  discovery). It also hosts the production TuneIn + ICY media proxies.
 
-```bash
-bun run build         # type-check + production build (also builds the PWA)
-bun run preview       # preview the production build (PWA/service worker active)
-bun run test          # run unit tests   ⚠️ use `bun run test`, NOT `bun test`
-bun run typecheck     # type-check only
-```
-
-> ⚠️ `bun test` runs Bun's **built-in** test runner and bypasses Vitest. Always
-> use `bun run test` (which goes through Turbo → Vitest).
-
-App-scoped scripts (in `apps/web`):
-
-```bash
-bun run generate-icons   # regenerate the PWA icon set from the synthwave mark
-```
-
-## Project layout
+## Monorepo layout
 
 ```
 atradio.fm/
 ├─ apps/
-│  └─ web/                 # the Vite React app
-│     ├─ src/
-│     │  ├─ atoms/         # Jotai state (player, favorites, custom stations, ui)
-│     │  ├─ components/    # Navbar, Player, StationCard, CategoryGrid, modals, …
-│     │  ├─ hooks/         # search, debounce, keyboard shortcuts
-│     │  ├─ lib/
-│     │  │  ├─ api/        # radio-browser + TuneIn clients + unified search
-│     │  │  ├─ audio/      # stream resolution, stream probe, ICY metadata
-│     │  │  └─ validation/ # Zod schema for the add-station form
-│     │  ├─ routes/        # SearchPage, ProfilePage
-│     │  └─ test/          # Vitest setup + smoke/modal tests
-│     ├─ scripts/          # generate-icons.mjs (sharp)
-│     └─ vite.config.ts    # TuneIn dev proxy + PWA config
-├─ turbo.json
-├─ mise.toml
-└─ package.json            # bun workspaces
+│  ├─ web/            # Vite + React SPA (player, search, OAuth, gating, profiles)
+│  └─ api/            # Express + Drizzle + Postgres: Jetstream consumer, XRPC, proxies
+├─ packages/
+│  └─ lexicons/       # fm.atradio.* lexicons (authored in Pkl → JSON) + TS/zod/mappers
+├─ tools/
+│  └─ console/        # Babashka + Clojure + rebel REPL command hub
+├─ systemd/           # deployment units (api + jetstream)
+├─ console            # ./console → launches the command REPL
+└─ turbo.json / mise.toml / package.json (bun workspaces)
 ```
 
-## Providers & the TuneIn proxy
+## Stack
 
-- **radio-browser** sends permissive CORS headers, so it's queried directly. A
-  random mirror is chosen per session.
-- **TuneIn** (`opml.radiotime.com`) sends **no** CORS headers, so browser
-  requests are blocked. All TuneIn traffic is routed through a proxy:
-  - **dev:** Vite proxies `/api/tunein/*` → `https://opml.radiotime.com/*`.
-  - **prod:** set `VITE_TUNEIN_PROXY` to an equivalent server-side proxy.
+- **Monorepo:** Turborepo + Bun workspaces; toolchain pinned via `mise`
+- **Web:** React 19, Vite, Tailwind v4, HeroUI v3, TanStack Router/Query, Jotai, Vitest
+- **AT Proto:** `@atcute/*` (browser OAuth, client, identity-resolver, tid)
+- **API:** Express, Drizzle ORM, Postgres, `ws` (Jetstream), Zod, consola
+- **Lexicons:** Apple **Pkl** → lexicon JSON (`pkl eval`)
+- **Console:** Babashka + Clojure + rebel-readline
 
-  If the proxy is unreachable, search degrades gracefully — radio-browser
-  results still show, with an inline notice.
+## Getting started
 
-## Adding your own station
+```bash
+mise install        # node, bun, java, clojure, babashka
+bun install
+bun dev             # turbo: web (:3000) + api (:8080)
+```
 
-The "Add station" form is validated with **React Hook Form + Zod**. Beyond
-format checks, it **verifies the stream is actually playable**: the URL is
-loaded into a throwaway `<audio>` element (media loads aren't blocked by CORS
-the way `fetch` is). If the probe fails — e.g. an HLS stream that only plays via
-hls.js — an **"add it anyway"** option appears. An optional logo/picture URL is
-supported, with a live preview.
+Set up the database (Postgres; TLS required):
 
-## "Now playing" (ICY metadata)
+```bash
+cd apps/api
+cp .env.example .env      # set DATABASE_URL, PORT
+bun run db:generate       # generate migration from the Drizzle schema
+bun run db:migrate        # apply it
+```
 
-The player reads **ICY** (`StreamTitle`) metadata directly from the byte stream
-(`Icy-MetaData: 1` + `icy-metaint` parsing) and shows the current track when
-available. This is best-effort: many stream hosts don't expose CORS/`icy-metaint`,
-in which case no title is shown. HLS streams carry no ICY metadata.
+## Command console
 
-## PWA
+```bash
+./console           # Clojure + rebel REPL: (dev) (build) (migrate) (gen-lexicons) …
+# or from tools/console:
+bb tasks            # the same commands as Babashka tasks
+```
 
-Built with `vite-plugin-pwa` (Workbox `generateSW`):
+## AT Protocol
 
-- Installable with a web manifest + maskable icons.
-- Offline app shell (precached build + fonts), `NetworkFirst` caching for
-  radio-browser responses and `CacheFirst` for station artwork.
-- Auto-updates when a new build is deployed.
+- **Login** is browser OAuth (atcute public client). Dev uses the `127.0.0.1`
+  loopback client — **open the app at `http://127.0.0.1:3000`** (not `localhost`).
+  Prod uses the static `apps/web/public/client-metadata.json`.
+- **Gating:** favoriting, adding, and removing stations require login (they open
+  the login modal). Browsing, search, and playback stay public.
+- **Lexicons** (`packages/lexicons`, NSID `fm.atradio.*`): `station`, `favorite`,
+  and the `getFavorites` / `getStations` queries. Authored in **Pkl**:
+  ```bash
+  cd packages/lexicons && bun run pkl:gen   # pkl/defs/**.pkl → lexicons/**.json
+  ```
+- **Data:** your favorites/stations are records in your PDS (read on login,
+  written with optimistic UI). Any user's profile is viewable at
+  `/profile/:did` or `/profile/:handle`.
 
-The service worker is disabled in dev; test it via `bun run build && bun run preview`.
+## Backend (apps/api)
+
+- **Jetstream consumer** connects to **all four** official instances
+  simultaneously (`jetstream{1,2}.us-{east,west}.bsky.network`) for redundancy,
+  filtering `fm.atradio.favorite` / `fm.atradio.station`, and upserts into
+  Postgres (`users`, `favorites`, `stations`) with a resumable cursor. Duplicate
+  events across hosts are harmless (idempotent upserts keyed by record `uri`).
+- **XRPC** (open CORS, read-only): `fm.atradio.getFavorites`,
+  `fm.atradio.getStations` (`?actor=<did|handle>&limit&cursor`), plus
+  `getRecentStations` / `getPopularStations` for discovery.
+- **Media proxies:** `GET /api/tunein/*` (TuneIn CORS) and `GET /api/icy?url=…`
+  (ICY "now playing"). The web app points `VITE_TUNEIN_PROXY` / `VITE_ICY_PROXY`
+  at the deployed API in prod; in dev it uses Vite's built-in proxy.
+
+## Deployment
+
+- Static-host `apps/web/dist/` (includes the PWA service worker + client-metadata).
+- Run the API via the `systemd/` units (`atradio-api` + `atradio-jetstream`) — see
+  `systemd/README.md`.
 
 ## Keyboard shortcuts
 
-| Key            | Action                     |
-| -------------- | -------------------------- |
-| `/`            | Focus search               |
-| `Space` / `K`  | Play / pause               |
-| `M`            | Mute / unmute              |
-| `F`            | Favorite current station   |
-| `A`            | Add your own station       |
-| `↑` / `↓`      | Volume up / down           |
-| `?`            | Show the shortcuts overlay |
-| `Esc`          | Close dialogs / blur input |
+| Key           | Action                     |
+| ------------- | -------------------------- |
+| `/`           | Open search palette        |
+| `Space` / `K` | Play / pause               |
+| `M`           | Mute / unmute              |
+| `F`           | Favorite (requires login)  |
+| `A`           | Add station (requires login) |
+| `↑` / `↓`     | Volume up / down           |
+| `?`           | Shortcuts overlay          |
+| `Esc`         | Close dialogs              |
 
-## Roadmap
+## Notes
 
-- Real backend API (accounts, synced favorites, server-side TuneIn proxy)
-- Recently played history & sleep timer
-- Route-level code splitting to shrink the initial bundle
+- Use **`bun run test`**, not `bun test` (the latter runs Bun's built-in runner).
+- ICY "now playing" is best-effort — many stations expose no metadata.

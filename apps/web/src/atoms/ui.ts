@@ -9,6 +9,9 @@ export const shortcutsOpenAtom = atom(false);
 /** Controls the Raycast-style quick-search palette. */
 export const searchPaletteOpenAtom = atom(false);
 
+/** Controls the AT Proto login modal. */
+export const loginModalOpenAtom = atom(false);
+
 /** Seed query for the palette (e.g. when opened from a category tile). */
 export const searchPaletteQueryAtom = atom("");
 

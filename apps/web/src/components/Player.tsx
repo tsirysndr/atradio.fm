@@ -22,6 +22,7 @@ import {
   volumeAtom,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { resolveStream } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
@@ -44,6 +45,7 @@ export function Player() {
   const [nowPlaying, setNowPlaying] = useAtom(nowPlayingAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
+  const ensureAuth = useRequireAuth();
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -181,6 +183,9 @@ export function Player() {
                   {station?.name ?? "Nothing playing"}
                 </p>
                 <div className="flex items-center gap-2">
+                  {status === "playing" && (
+                    <AudioBars className="mx-1 shrink-0" />
+                  )}
                   {status === "error" ? (
                     <span className="flex items-center gap-1 text-xs text-danger">
                       <IconAlertTriangle size={13} />
@@ -192,12 +197,9 @@ export function Player() {
                       <span className="truncate">{nowPlaying}</span>
                     </span>
                   ) : (
-                    <>
-                      {status === "playing" && <AudioBars />}
-                      <span className="truncate text-xs text-synth-cyan/80">
-                        {STATUS_TEXT[status] || station?.genre || ""}
-                      </span>
-                    </>
+                    <span className="truncate text-xs text-synth-cyan/80">
+                      {STATUS_TEXT[status] || station?.genre || ""}
+                    </span>
                   )}
                 </div>
               </div>
@@ -242,7 +244,7 @@ export function Player() {
                   variant="tertiary"
                   className="rounded-full"
                   aria-label="Toggle favorite"
-                  onPress={() => toggleFavorite(station)}
+                  onPress={() => ensureAuth(() => toggleFavorite(station))}
                 >
                   {isFavorite ? (
                     <IconHeartFilled size={16} className="text-synth-pink" />

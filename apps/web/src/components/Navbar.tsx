@@ -1,18 +1,24 @@
 import { Link } from "@tanstack/react-router";
 import { useSetAtom } from "jotai";
 import { Button } from "@heroui/react";
-import { IconSearch, IconUser, IconPlus } from "@tabler/icons-react";
+import {
+  IconSearch,
+  IconPlus,
+  IconLogin2,
+  IconUserCircle,
+} from "@tabler/icons-react";
 import { addStationOpenAtom, openSearchPaletteAtom } from "@/atoms/ui";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useAuth } from "@/hooks/useAuth";
 
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
-const navLinkActive = "bg-white/10 !text-synth-cyan";
 
 export function Navbar() {
   const openAddStation = useSetAtom(addStationOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
-
-  const triggerSearch = () => openSearch();
+  const ensureAuth = useRequireAuth();
+  const { isLoggedIn, profile, openLogin } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-synth-bg/80 backdrop-blur-xl">
@@ -24,7 +30,11 @@ export function Navbar() {
         </Link>
 
         <nav className="flex items-center gap-1">
-          <button type="button" onClick={triggerSearch} className={navLinkBase}>
+          <button
+            type="button"
+            onClick={() => openSearch()}
+            className={navLinkBase}
+          >
             <IconSearch size={16} />
             <span className="hidden items-center gap-1.5 sm:inline-flex">
               Search
@@ -33,25 +43,45 @@ export function Navbar() {
               </kbd>
             </span>
           </button>
-          <Link
-            to="/profile"
-            className={navLinkBase}
-            activeProps={{ className: navLinkActive }}
-          >
-            <IconUser size={16} />
-            <span className="hidden sm:inline">Profile</span>
-          </Link>
 
           <Button
             size="sm"
             variant="primary"
-            className="ml-1 gap-1.5 rounded-full"
-            onPress={() => openAddStation(true)}
+            className="gap-1.5 rounded-full"
+            onPress={() => ensureAuth(() => openAddStation(true))}
           >
             <IconPlus size={16} />
             <span className="hidden sm:inline">Add station</span>
             <span className="sm:hidden">Add</span>
           </Button>
+
+          {isLoggedIn ? (
+            <Link
+              to="/profile"
+              className="ml-1 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-synth-panel"
+              title="Your profile"
+            >
+              {profile?.avatar ? (
+                <img
+                  src={profile.avatar}
+                  alt={profile.handle}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <IconUserCircle size={20} className="text-foreground/70" />
+              )}
+            </Link>
+          ) : (
+            <Button
+              size="sm"
+              variant="tertiary"
+              className="ml-1 gap-1.5 rounded-full !bg-white/5"
+              onPress={() => openLogin(true)}
+            >
+              <IconLogin2 size={16} />
+              <span className="hidden sm:inline">Sign in</span>
+            </Button>
+          )}
         </nav>
       </div>
     </header>

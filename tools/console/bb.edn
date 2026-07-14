@@ -1,0 +1,30 @@
+;; Babashka task hub for the atradio.fm monorepo.
+;; Run from this directory: `bb tasks` to list, `bb dev`, `bb migrate`, …
+{:paths ["src"]
+ :tasks
+ {:init (def root "../..")
+
+  install       {:doc "Install all workspace deps" :task (shell {:dir root} "bun" "install")}
+  dev           {:doc "Run every app in dev (turbo)" :task (shell {:dir root} "bun" "run" "dev")}
+  build         {:doc "Build everything" :task (shell {:dir root} "bun" "run" "build")}
+  test          {:doc "Run all tests" :task (shell {:dir root} "bun" "run" "test")}
+  typecheck     {:doc "Typecheck all workspaces" :task (shell {:dir root} "bun" "run" "typecheck")}
+
+  web:dev       {:doc "Run the web app (Vite)" :task (shell {:dir (str root "/apps/web")} "bun" "run" "dev")}
+  web:build     {:doc "Build the web app" :task (shell {:dir (str root "/apps/web")} "bun" "run" "build")}
+  web:preview   {:doc "Preview the web build" :task (shell {:dir (str root "/apps/web")} "bun" "run" "preview")}
+  icons         {:doc "Regenerate PWA icons" :task (shell {:dir (str root "/apps/web")} "bun" "run" "generate-icons")}
+
+  api:dev       {:doc "Run API server + Jetstream" :task (shell {:dir (str root "/apps/api")} "bun" "run" "dev")}
+  api:server    {:doc "Run only the Express server" :task (shell {:dir (str root "/apps/api")} "bun" "run" "start:server")}
+  api:consumer  {:doc "Run only the Jetstream consumer" :task (shell {:dir (str root "/apps/api")} "bun" "run" "start:consumer")}
+  db:generate   {:doc "Generate a Drizzle migration" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:generate")}
+  db:migrate    {:doc "Apply Drizzle migrations" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:migrate")}
+  db:push       {:doc "Push the Drizzle schema" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:push")}
+  db:up         {:doc "Start local Postgres (docker compose up -d)" :task (shell {:dir root} "docker" "compose" "up" "-d")}
+  db:down       {:doc "Stop local Postgres (docker compose down)" :task (shell {:dir root} "docker" "compose" "down")}
+
+  lexicons:gen  {:doc "Generate lexicon JSON from Pkl" :task (shell {:dir (str root "/packages/lexicons")} "bun" "run" "pkl:gen")}
+
+  repl          {:doc "Launch the interactive Clojure + rebel console"
+                 :task (clojure "-M:console")}}}

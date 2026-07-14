@@ -1,0 +1,69 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.getStations",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List a user's own radio stations.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string",
+            "description": "DID or handle of the user.",
+            "format": "at-identifier"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "cursor": {
+            "type": "string"
+          },
+          "q": {
+            "type": "string",
+            "description": "Filter by text (name or genre)."
+          },
+          "source": {
+            "type": "string",
+            "description": "Filter by provider: radio-browser | tunein | custom."
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort order: recent | name | -name."
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "total",
+            "items"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "total": {
+              "type": "integer",
+              "description": "Total number of records for the actor."
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "fm.atradio.defs#stationView"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

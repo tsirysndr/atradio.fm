@@ -16,6 +16,7 @@ import {
   togglePlayAtom,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
 
@@ -42,6 +43,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
   const togglePlay = useSetAtom(togglePlayAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
+  const ensureAuth = useRequireAuth();
 
   const isCurrent = current?.id === station.id;
   const isActive = isCurrent && isPlaying;
@@ -127,7 +129,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
               : "!bg-white/5 hover:!bg-white/10"
           }`}
           aria-label={isFavorite ? "Remove favorite" : "Add to favorites"}
-          onPress={() => toggleFavorite(station)}
+          onPress={() => ensureAuth(() => toggleFavorite(station))}
         >
           {isFavorite ? (
             <IconHeartFilled size={16} className="text-synth-pink" />

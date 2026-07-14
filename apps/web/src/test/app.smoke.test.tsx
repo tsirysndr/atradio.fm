@@ -58,9 +58,11 @@ describe("app smoke", () => {
 
   it("renders the profile page with empty states", async () => {
     renderApp("/profile");
+    // Logged out, the profile page shows a sign-in call to action.
     await waitFor(() =>
-      expect(screen.getByText("Your dial")).toBeInTheDocument(),
+      expect(
+        screen.getByText(/sign in to see your dial/i),
+      ).toBeInTheDocument(),
     );
-    expect(screen.getByText(/no favorites yet/i)).toBeInTheDocument();
   });
 });

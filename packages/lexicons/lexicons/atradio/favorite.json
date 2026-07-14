@@ -1,0 +1,32 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.favorite",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A favorited radio station.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "station",
+          "createdAt"
+        ],
+        "properties": {
+          "station": {
+            "type": "ref",
+            "ref": "fm.atradio.defs#stationInfo"
+          },
+          "subject": {
+            "type": "ref",
+            "ref": "com.atproto.repo.strongRef"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}
