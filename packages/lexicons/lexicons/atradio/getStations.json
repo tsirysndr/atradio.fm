@@ -31,11 +31,16 @@
         "schema": {
           "type": "object",
           "required": [
+            "total",
             "items"
           ],
           "properties": {
             "cursor": {
               "type": "string"
+            },
+            "total": {
+              "type": "integer",
+              "description": "Total number of records for the actor."
             },
             "items": {
               "type": "array",

@@ -60,6 +60,8 @@ export interface StationView {
 /** Output of `fm.atradio.getFavorites` / `getStations`. */
 export interface StationListOutput {
   cursor?: string;
+  /** Total number of records for the actor (not just this page). */
+  total: number;
   items: StationView[];
 }
 

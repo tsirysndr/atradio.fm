@@ -183,6 +183,9 @@ export function Player() {
                   {station?.name ?? "Nothing playing"}
                 </p>
                 <div className="flex items-center gap-2">
+                  {status === "playing" && (
+                    <AudioBars className="mx-1 shrink-0" />
+                  )}
                   {status === "error" ? (
                     <span className="flex items-center gap-1 text-xs text-danger">
                       <IconAlertTriangle size={13} />
@@ -194,12 +197,9 @@ export function Player() {
                       <span className="truncate">{nowPlaying}</span>
                     </span>
                   ) : (
-                    <>
-                      {status === "playing" && <AudioBars />}
-                      <span className="truncate text-xs text-synth-cyan/80">
-                        {STATUS_TEXT[status] || station?.genre || ""}
-                      </span>
-                    </>
+                    <span className="truncate text-xs text-synth-cyan/80">
+                      {STATUS_TEXT[status] || station?.genre || ""}
+                    </span>
                   )}
                 </div>
               </div>

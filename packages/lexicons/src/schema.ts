@@ -54,5 +54,6 @@ export const stationViewSchema = z.object({
 
 export const stationListOutputSchema = z.object({
   cursor: z.string().optional(),
+  total: z.number(),
   items: z.array(stationViewSchema),
 });

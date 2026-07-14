@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { Modal, Button, useOverlayState } from "@heroui/react";
 import { IconAt, IconBrandBluesky } from "@tabler/icons-react";
 import { consola } from "consola";
 import { loginModalOpenAtom } from "@/atoms/ui";
-import { startLogin } from "@/lib/atproto/session";
+import { startLogin, startSignup } from "@/lib/atproto/session";
 
 export function LoginModal() {
   const [isOpen, setOpen] = useAtom(loginModalOpenAtom);
@@ -12,6 +12,19 @@ export function LoginModal() {
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Anti-autofill: keep the field `readonly` (Safari/iCloud skip readonly fields
+  // during their autofill scan), and only make it editable on focus. Managed via
+  // the DOM so React's controlled `value` doesn't fight the attribute.
+  useEffect(() => {
+    inputRef.current?.setAttribute("readonly", "");
+  }, []);
+
+  // Focus the field when the modal opens (still readonly -> no autofill prompt).
+  useEffect(() => {
+    if (isOpen) requestAnimationFrame(() => inputRef.current?.focus());
+  }, [isOpen]);
 
   const submit = async () => {
     const h = handle.trim().replace(/^@/, "");
@@ -24,6 +37,18 @@ export function LoginModal() {
       consola.error("[auth] login failed", err);
       setBusy(false);
       setError("Couldn't start login. Check your handle and try again.");
+    }
+  };
+
+  const signup = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await startSignup(); // redirect to bsky.social create-account flow
+    } catch (err) {
+      consola.error("[auth] signup failed", err);
+      setBusy(false);
+      setError("Couldn't start signup. Please try again.");
     }
   };
 
@@ -42,16 +67,29 @@ export function LoginModal() {
                 <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-synth-panel px-3 focus-within:border-synth-cyan">
                   <IconAt size={16} className="text-foreground/40" />
                   <input
-                    autoFocus
+                    ref={inputRef}
                     value={handle}
                     onChange={(e) => setHandle(e.target.value)}
+                    onFocus={(e) => {
+                      // Editable once focused; the autofill scan already skipped it.
+                      const el = e.currentTarget;
+                      requestAnimationFrame(() => el.removeAttribute("readonly"));
+                    }}
+                    onBlur={(e) => e.currentTarget.setAttribute("readonly", "")}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void submit();
                     }}
                     placeholder="atmosphere.handle"
                     className="h-10 w-full bg-transparent text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
-                    autoComplete="username"
+                    type="text"
+                    name="atproto-handle"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
                     spellCheck={false}
+                    data-1p-ignore
+                    data-lpignore="true"
+                    data-form-type="other"
                   />
                 </div>
                 {error && <p className="text-xs text-danger">{error}</p>}
@@ -71,15 +109,15 @@ export function LoginModal() {
                   atradio is part of the Atmosphere. Create an Atmosphere account
                   on Bluesky to get started!
                 </p>
-                <a
-                  href="https://bsky.app"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center justify-center gap-1.5 rounded-full bg-synth-blue/15 px-3 py-2 text-sm font-medium text-synth-blue transition-colors hover:bg-synth-blue/25"
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signup()}
+                  className="flex items-center justify-center gap-1.5 rounded-full bg-synth-blue/15 px-3 py-2 text-sm font-medium text-synth-blue transition-colors hover:bg-synth-blue/25 disabled:opacity-50"
                 >
                   <IconBrandBluesky size={16} />
                   Signup via Bluesky
-                </a>
+                </button>
               </div>
             </Modal.Body>
           </Modal.Dialog>

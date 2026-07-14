@@ -164,7 +164,12 @@ function subscribeUrl(host: string): string {
 /** Connect to a single Jetstream host with auto-reconnect. */
 function connect(host: string, signal: AbortSignal): void {
   if (signal.aborted) return;
-  const ws = new WebSocket(subscribeUrl(host));
+  // Force IPv4: some networks advertise AAAA records but can't route IPv6, and
+  // Node's dual-stack fallback can stall (ETIMEDOUT) instead of trying IPv4.
+  const ws = new WebSocket(subscribeUrl(host), {
+    family: 4,
+    handshakeTimeout: 15000,
+  });
 
   ws.on("open", () => consola.success(`[jetstream] connected ${host}`));
   ws.on("message", (data) => {

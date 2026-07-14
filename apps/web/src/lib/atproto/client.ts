@@ -1,12 +1,14 @@
 import { configureOAuth } from "@atcute/oauth-browser-client";
+import { NSID } from "@atradio/lexicons";
 import { actorResolver } from "./resolver";
 
 /**
- * `transition:generic` grants broad repo read/write today and is the most
- * widely-supported scope; combined with `atproto` it lets us read/write our
- * `fm.atradio.*` records in the user's PDS.
+ * Request the minimum needed: `atproto` (base) plus granular `repo:` write
+ * permissions for exactly our two `fm.atradio.*` collections. Record reads are
+ * public in AT Proto, so `repo:<nsid>` effectively grants read+write for our own
+ * data without asking for broad access to the whole repo.
  */
-export const OAUTH_SCOPE = "atproto transition:generic";
+export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station}`;
 
 /** Production origin (client-metadata + redirect must live here). */
 const PROD_ORIGIN = "https://atradio.fm";

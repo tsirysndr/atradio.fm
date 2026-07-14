@@ -28,10 +28,14 @@ defs = new Mapping<String, Query> {
       encoding = "application/json"
       schema = new ObjectType {
         type = "object"
-        required = List("items")
+        required = List("total", "items")
         properties {
           ["cursor"] = new StringType {
             type = "string"
+          }
+          ["total"] = new IntegerType {
+            type = "integer"
+            description = "Total number of records for the actor."
           }
           ["items"] = new Array {
             type = "array"

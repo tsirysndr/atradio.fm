@@ -214,6 +214,10 @@ export default defineConfig({
     },
   },
   server: {
+    // Bind the IPv4 loopback: AT Proto OAuth requires 127.0.0.1 (not the
+    // `localhost` hostname, which can resolve to IPv6 ::1). The app also
+    // auto-redirects localhost -> 127.0.0.1 in dev (see main.tsx).
+    host: "127.0.0.1",
     port: 3000,
     proxy: {
       // TuneIn's OPML endpoint sends no CORS headers, so the browser blocks

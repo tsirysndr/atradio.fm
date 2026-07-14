@@ -67,7 +67,12 @@ xrpcRouter.get("/fm.atradio.getFavorites", async (req: Request, res: Response) =
     ? page[page.length - 1]?.indexedAt.toISOString()
     : undefined;
 
-  return res.json({ cursor: nextCursor, items });
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(schema.favorites)
+    .where(eq(schema.favorites.did, did));
+
+  return res.json({ cursor: nextCursor, total, items });
 });
 
 /** GET /xrpc/fm.atradio.getStations?actor=&limit=&cursor= */
@@ -105,7 +110,12 @@ xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) =>
     ? page[page.length - 1]?.indexedAt.toISOString()
     : undefined;
 
-  return res.json({ cursor: nextCursor, items });
+  const [{ total }] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(schema.stations)
+    .where(eq(schema.stations.did, did));
+
+  return res.json({ cursor: nextCursor, total, items });
 });
 
 /** GET /xrpc/fm.atradio.getRecentStations?limit= — global discovery. */
