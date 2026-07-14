@@ -5,6 +5,8 @@ from [radio-browser.info](https://www.radio-browser.info/) and TuneIn, stream
 them in the browser, and save favorites + your own stations to **your own PDS**
 (portable, user-owned data). Installable as a PWA.
 
+![atradio.fm](./preview.png)
+
 ## Architecture
 
 ```
