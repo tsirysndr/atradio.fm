@@ -20,7 +20,8 @@ import {
 import { addStationOpenAtom } from "@/atoms/ui";
 import { useAuth } from "@/hooks/useAuth";
 import { getProfile, type ActorProfile } from "@/lib/atproto/profile";
-import { readPublicUser } from "@/lib/atproto/publicReader";
+import * as appview from "@/lib/appview";
+import { infoToStation } from "@atradio/lexicons";
 import { StationGrid } from "@/components/StationGrid";
 import { EmptyState } from "@/components/EmptyState";
 import type { Station } from "@/lib/types";
@@ -87,12 +88,17 @@ function PublicProfile({ actor }: { actor: string }) {
     queryKey: ["profile", actor],
     queryFn: () => getProfile(actor),
   });
-  const dataQuery = useQuery({
-    queryKey: ["public-user", actor],
-    queryFn: () => readPublicUser(actor),
+  // Read the indexed data from the AppView XRPC (apps/api).
+  const favQuery = useQuery({
+    queryKey: ["appview-favorites", actor],
+    queryFn: () => appview.getFavorites(actor, { limit: 100 }),
+  });
+  const staQuery = useQuery({
+    queryKey: ["appview-stations", actor],
+    queryFn: () => appview.getStations(actor, { limit: 100 }),
   });
 
-  if (profileQuery.isLoading || dataQuery.isLoading) {
+  if (profileQuery.isLoading) {
     return <CenteredSpinner />;
   }
   if (profileQuery.isError || !profileQuery.data) {
@@ -108,8 +114,8 @@ function PublicProfile({ actor }: { actor: string }) {
   return (
     <ProfileView
       profile={profileQuery.data}
-      favorites={(dataQuery.data?.favorites ?? []).map((f) => f.station)}
-      stations={(dataQuery.data?.stations ?? []).map((s) => s.station)}
+      favorites={(favQuery.data?.items ?? []).map((v) => infoToStation(v.station))}
+      stations={(staQuery.data?.items ?? []).map((v) => infoToStation(v.station))}
     />
   );
 }
