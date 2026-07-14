@@ -6,6 +6,7 @@ import {
 import { Layout } from "@/components/Layout";
 import { SearchPage } from "@/routes/SearchPage";
 import { ProfilePage } from "@/routes/ProfilePage";
+import { OAuthCallback } from "@/routes/OAuthCallback";
 
 const rootRoute = createRootRoute({
   component: Layout,
@@ -17,13 +18,32 @@ const indexRoute = createRoute({
   component: SearchPage,
 });
 
+/** The logged-in user's own profile. */
 const profileRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/profile",
   component: ProfilePage,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute, profileRoute]);
+/** A public profile by DID or handle. */
+const actorProfileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/profile/$actor",
+  component: ProfilePage,
+});
+
+const oauthCallbackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/oauth/callback",
+  component: OAuthCallback,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  profileRoute,
+  actorProfileRoute,
+  oauthCallbackRoute,
+]);
 
 export const router = createRouter({
   routeTree,

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Provider as JotaiProvider } from "jotai";
+import { AuthInitializer } from "@/components/AuthInitializer";
 
 // HeroUI v3 requires no Provider wrapper — theming is CSS-driven via the
 // `.dark` / `data-theme="dark"` attributes on <html>.
@@ -20,6 +21,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
   return (
     <JotaiProvider>
       <QueryClientProvider client={queryClient}>
+        <AuthInitializer />
         <div className="min-h-screen overflow-x-hidden">{children}</div>
       </QueryClientProvider>
     </JotaiProvider>

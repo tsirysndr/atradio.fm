@@ -1,0 +1,88 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.defs"
+description = "Shared objects for atradio.fm lexicons."
+defs = new Mapping<String, ObjectType> {
+  ["stationInfo"] {
+    type = "object"
+    description = "A self-contained snapshot of a radio station."
+    required = List("stationId", "name", "streamUrl", "source")
+    properties {
+      ["stationId"] = new StringType {
+        type = "string"
+        description = "Source-prefixed stable id, e.g. rb:uuid, tunein:s123, custom:xyz."
+        maxLength = 512
+      }
+      ["name"] = new StringType {
+        type = "string"
+        minLength = 1
+        maxLength = 512
+      }
+      ["streamUrl"] = new StringType {
+        type = "string"
+        description = "Direct, playable stream URL."
+        format = "uri"
+      }
+      ["source"] = new StringType {
+        type = "string"
+        description = "Provider: radio-browser | tunein | custom."
+      }
+      ["description"] = new StringType {
+        type = "string"
+        maxLength = 2000
+      }
+      ["genre"] = new StringType {
+        type = "string"
+        maxLength = 256
+      }
+      ["homepage"] = new StringType {
+        type = "string"
+        format = "uri"
+      }
+      ["logo"] = new StringType {
+        type = "string"
+        description = "Logo/artwork URL."
+        format = "uri"
+      }
+      ["country"] = new StringType {
+        type = "string"
+      }
+      ["language"] = new StringType {
+        type = "string"
+      }
+      ["bitrate"] = new IntegerType {
+        type = "integer"
+        minimum = 0
+      }
+      ["codec"] = new StringType {
+        type = "string"
+      }
+      ["tags"] = new Array {
+        type = "array"
+        items = new StringType {
+          type = "string"
+        }
+      }
+    }
+  }
+  ["stationView"] {
+    type = "object"
+    description = "A station snapshot paired with its record uri (query output item)."
+    required = List("uri", "station", "createdAt")
+    properties {
+      ["uri"] = new StringType {
+        type = "string"
+        format = "at-uri"
+      }
+      ["station"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.defs#stationInfo"
+      }
+      ["createdAt"] = new StringType {
+        type = "string"
+        format = "datetime"
+      }
+    }
+  }
+}

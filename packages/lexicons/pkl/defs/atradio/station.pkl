@@ -1,0 +1,54 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.station"
+defs = new Mapping<String, Record> {
+  ["main"] {
+    type = "record"
+    key = "tid"
+    description = "A user-defined radio station."
+    `record` {
+      type = "object"
+      required = List("name", "streamUrl", "createdAt")
+      properties {
+        ["name"] = new StringType {
+          type = "string"
+          minLength = 1
+          maxLength = 512
+        }
+        ["streamUrl"] = new StringType {
+          type = "string"
+          description = "Direct, playable stream URL."
+          format = "uri"
+        }
+        ["description"] = new StringType {
+          type = "string"
+          maxLength = 2000
+        }
+        ["genre"] = new StringType {
+          type = "string"
+          maxLength = 256
+        }
+        ["homepage"] = new StringType {
+          type = "string"
+          format = "uri"
+        }
+        ["logo"] = new StringType {
+          type = "string"
+          description = "Logo/artwork URL."
+          format = "uri"
+        }
+        ["tags"] = new Array {
+          type = "array"
+          items = new StringType {
+            type = "string"
+          }
+        }
+        ["createdAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+}

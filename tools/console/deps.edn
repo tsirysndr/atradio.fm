@@ -1,0 +1,6 @@
+{:paths ["src"]
+ :aliases
+ {;; Interactive rebel-readline REPL with every command preloaded (via user.clj).
+  :console
+  {:extra-deps {com.bhauman/rebel-readline {:mvn/version "0.1.5"}}
+   :main-opts ["-m" "rebel-readline.main"]}}}

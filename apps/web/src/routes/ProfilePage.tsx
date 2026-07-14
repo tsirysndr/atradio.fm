@@ -1,11 +1,15 @@
 import { useMemo, useState } from "react";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { Button } from "@heroui/react";
+import { useAtomValue, useSetAtom } from "jotai";
+import { useParams } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Button, Spinner } from "@heroui/react";
 import {
   IconHeart,
   IconBroadcast,
   IconPlus,
   IconUserCircle,
+  IconLogin2,
+  IconLogout,
 } from "@tabler/icons-react";
 import { favoritesAtom } from "@/atoms/favorites";
 import {
@@ -13,69 +17,200 @@ import {
   removeCustomStationAtom,
 } from "@/atoms/customStations";
 import { addStationOpenAtom } from "@/atoms/ui";
+import { useAuth } from "@/hooks/useAuth";
+import { getProfile, type ActorProfile } from "@/lib/atproto/profile";
+import { readPublicUser } from "@/lib/atproto/publicReader";
 import { StationGrid } from "@/components/StationGrid";
 import { EmptyState } from "@/components/EmptyState";
 import type { Station } from "@/lib/types";
 
-type TabKey = "favorites" | "custom";
-
 export function ProfilePage() {
+  const params = useParams({ strict: false }) as { actor?: string };
+  return params.actor ? (
+    <PublicProfile actor={params.actor} />
+  ) : (
+    <SelfProfile />
+  );
+}
+
+/* ---------------- self ---------------- */
+
+function SelfProfile() {
+  const { isLoggedIn, profile, loading, logout, openLogin } = useAuth();
   const favorites = useAtomValue(favoritesAtom);
-  const [customStations] = useAtom(customStationsAtom);
+  const stations = useAtomValue(customStationsAtom);
   const removeCustom = useSetAtom(removeCustomStationAtom);
   const openAddStation = useSetAtom(addStationOpenAtom);
-  const [tab, setTab] = useState<TabKey>("favorites");
 
-  const handleRemoveCustom = (station: Station) => removeCustom(station.id);
+  if (loading) {
+    return <CenteredSpinner />;
+  }
 
-  const stats = useMemo(
-    () => [
-      { label: "Favorites", value: favorites.length },
-      { label: "Your stations", value: customStations.length },
-    ],
-    [favorites.length, customStations.length],
+  if (!isLoggedIn) {
+    return (
+      <EmptyState
+        icon={<IconUserCircle size={44} stroke={1.5} />}
+        title="Sign in to see your dial"
+        description="Log in with your Atmosphere account to save favorites and add your own stations."
+        action={
+          <Button
+            variant="primary"
+            className="gap-1.5 rounded-full"
+            onPress={() => openLogin(true)}
+          >
+            <IconLogin2 size={16} />
+            Sign in
+          </Button>
+        }
+      />
+    );
+  }
+
+  return (
+    <ProfileView
+      profile={profile}
+      favorites={favorites}
+      stations={stations}
+      editable
+      onRemove={(s) => removeCustom(s.id)}
+      onAddStation={() => openAddStation(true)}
+      onLogout={logout}
+    />
+  );
+}
+
+/* ---------------- public (any actor) ---------------- */
+
+function PublicProfile({ actor }: { actor: string }) {
+  const profileQuery = useQuery({
+    queryKey: ["profile", actor],
+    queryFn: () => getProfile(actor),
+  });
+  const dataQuery = useQuery({
+    queryKey: ["public-user", actor],
+    queryFn: () => readPublicUser(actor),
+  });
+
+  if (profileQuery.isLoading || dataQuery.isLoading) {
+    return <CenteredSpinner />;
+  }
+  if (profileQuery.isError || !profileQuery.data) {
+    return (
+      <EmptyState
+        icon={<IconUserCircle size={44} stroke={1.5} />}
+        title="Profile not found"
+        description={`Couldn't find “${actor}”.`}
+      />
+    );
+  }
+
+  return (
+    <ProfileView
+      profile={profileQuery.data}
+      favorites={(dataQuery.data?.favorites ?? []).map((f) => f.station)}
+      stations={(dataQuery.data?.stations ?? []).map((s) => s.station)}
+    />
+  );
+}
+
+/* ---------------- shared view ---------------- */
+
+interface ProfileViewProps {
+  profile: ActorProfile | null;
+  favorites: Station[];
+  stations: Station[];
+  editable?: boolean;
+  onRemove?: (station: Station) => void;
+  onAddStation?: () => void;
+  onLogout?: () => void;
+}
+
+function ProfileView({
+  profile,
+  favorites,
+  stations,
+  editable = false,
+  onRemove,
+  onAddStation,
+  onLogout,
+}: ProfileViewProps) {
+  const [tab, setTab] = useState<"favorites" | "custom">("favorites");
+
+  const tabs = useMemo(
+    () =>
+      [
+        {
+          key: "favorites" as const,
+          label: "Favorites",
+          count: favorites.length,
+          icon: IconHeart,
+        },
+        {
+          key: "custom" as const,
+          label: "Stations",
+          count: stations.length,
+          icon: IconBroadcast,
+        },
+      ],
+    [favorites.length, stations.length],
   );
 
-  const tabs: { key: TabKey; label: string; count: number; icon: typeof IconHeart }[] =
-    [
-      {
-        key: "favorites",
-        label: "Favorites",
-        count: favorites.length,
-        icon: IconHeart,
-      },
-      {
-        key: "custom",
-        label: "Your stations",
-        count: customStations.length,
-        icon: IconBroadcast,
-      },
-    ];
+  const displayName = profile?.displayName || profile?.handle || "Listener";
 
   return (
     <div className="flex flex-col gap-8">
-      {/* Profile header */}
+      {/* Header */}
       <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-synth-purple to-synth-cyan shadow-neon">
-            <IconUserCircle size={40} className="text-white" stroke={1.5} />
+          <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-synth-panel">
+            {profile?.avatar ? (
+              <img
+                src={profile.avatar}
+                alt={displayName}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <IconUserCircle size={40} className="text-synth-cyan" stroke={1.5} />
+            )}
           </span>
-          <div>
-            <h1 className="font-display text-2xl font-bold">
-              <span className="synth-gradient-text">Your dial</span>
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-2xl font-bold">
+              {displayName}
             </h1>
-            <div className="mt-1 flex gap-4 text-sm text-foreground/60">
-              {stats.map((s) => (
-                <span key={s.label}>
-                  <span className="font-semibold text-synth-cyan">
-                    {s.value}
-                  </span>{" "}
-                  {s.label}
-                </span>
-              ))}
+            {profile?.handle && (
+              <p className="truncate text-sm text-synth-cyan/90">
+                @{profile.handle}
+              </p>
+            )}
+            <div className="mt-1 flex gap-4 text-xs text-foreground/50">
+              <span>
+                <span className="font-semibold text-synth-cyan">
+                  {favorites.length}
+                </span>{" "}
+                favorites
+              </span>
+              <span>
+                <span className="font-semibold text-synth-cyan">
+                  {stations.length}
+                </span>{" "}
+                stations
+              </span>
             </div>
           </div>
         </div>
+
+        {editable && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="tertiary"
+              className="gap-1.5 rounded-full !bg-white/5"
+              onPress={onLogout}
+            >
+              <IconLogout size={16} />
+              Log out
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Tabs */}
@@ -113,37 +248,55 @@ export function ProfilePage() {
               <EmptyState
                 icon={<IconHeart size={40} stroke={1.5} />}
                 title="No favorites yet"
-                description="Tap the heart on any station to save it here for quick access."
+                description={
+                  editable
+                    ? "Tap the heart on any station to save it here."
+                    : "This user hasn't favorited any stations."
+                }
               />
             ) : (
               <StationGrid stations={favorites} />
             ))}
 
           {tab === "custom" &&
-            (customStations.length === 0 ? (
+            (stations.length === 0 ? (
               <EmptyState
                 icon={<IconBroadcast size={40} stroke={1.5} />}
-                title="You haven't added any stations"
-                description="Know a stream that isn't listed? Add it with its name and stream URL."
+                title="No stations yet"
+                description={
+                  editable
+                    ? "Add a stream that isn't listed with its name and URL."
+                    : "This user hasn't added any stations."
+                }
                 action={
-                  <Button
-                    variant="primary"
-                    className="gap-1.5 rounded-full"
-                    onPress={() => openAddStation(true)}
-                  >
-                    <IconPlus size={16} />
-                    Add your first station
-                  </Button>
+                  editable ? (
+                    <Button
+                      variant="primary"
+                      className="gap-1.5 rounded-full"
+                      onPress={onAddStation}
+                    >
+                      <IconPlus size={16} />
+                      Add your first station
+                    </Button>
+                  ) : undefined
                 }
               />
             ) : (
               <StationGrid
-                stations={customStations}
-                onRemove={handleRemoveCustom}
+                stations={stations}
+                onRemove={editable ? onRemove : undefined}
               />
             ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CenteredSpinner() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <Spinner color="accent" size="lg" />
     </div>
   );
 }

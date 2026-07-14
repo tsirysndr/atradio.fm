@@ -1,0 +1,26 @@
+{
+  "name": "@atradio/lexicons",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./lexicons/*.json": "./lexicons/*.json"
+  },
+  "scripts": {
+    "pkl:eval": "pkl eval -f json",
+    "pkl:gen": "tsx ./scripts/pkl.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@pkl-community/pkl": "^0.28.2",
+    "chalk": "^5.4.1",
+    "consola": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "zx": "^8.3.0"
+  }
+}

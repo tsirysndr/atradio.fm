@@ -1,0 +1,22 @@
+[Unit]
+Description=atradio.fm API (Express XRPC + media proxies)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/github/atradio.fm/apps/api
+ExecStart=/bin/bash -ic 'exec bun run start:server'
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=atradio-api
+
+# Environment (reads apps/api/.env via dotenv)
+Environment=HOME=/root
+Environment=USER=root
+
+[Install]
+WantedBy=multi-user.target

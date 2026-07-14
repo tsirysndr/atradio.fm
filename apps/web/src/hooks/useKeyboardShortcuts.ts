@@ -7,10 +7,12 @@ import {
   volumeAtom,
 } from "@/atoms/player";
 import { toggleFavoriteAtom } from "@/atoms/favorites";
+import { isLoggedInAtom } from "@/atoms/auth";
 import {
   addStationOpenAtom,
   shortcutsOpenAtom,
   openSearchPaletteAtom,
+  loginModalOpenAtom,
 } from "@/atoms/ui";
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -35,6 +37,8 @@ export function useKeyboardShortcuts() {
   const setVolume = useSetAtom(volumeAtom);
   const setAddOpen = useSetAtom(addStationOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
+  const openLogin = useSetAtom(loginModalOpenAtom);
+  const isLoggedIn = useAtomValue(isLoggedInAtom);
   const [shortcutsOpen, setShortcutsOpen] = useAtom(shortcutsOpenAtom);
 
   useEffect(() => {
@@ -75,12 +79,16 @@ export function useKeyboardShortcuts() {
           break;
         case "f":
         case "F":
-          if (currentStation) toggleFavorite(currentStation);
+          if (currentStation) {
+            if (isLoggedIn) toggleFavorite(currentStation);
+            else openLogin(true);
+          }
           break;
         case "a":
         case "A":
           e.preventDefault();
-          setAddOpen(true);
+          if (isLoggedIn) setAddOpen(true);
+          else openLogin(true);
           break;
         case "ArrowUp":
           e.preventDefault();
@@ -110,6 +118,8 @@ export function useKeyboardShortcuts() {
     setVolume,
     setAddOpen,
     openSearch,
+    openLogin,
+    isLoggedIn,
     shortcutsOpen,
     setShortcutsOpen,
   ]);

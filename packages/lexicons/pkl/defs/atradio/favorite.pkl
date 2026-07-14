@@ -1,0 +1,29 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.favorite"
+defs = new Mapping<String, Record> {
+  ["main"] {
+    type = "record"
+    key = "tid"
+    description = "A favorited radio station."
+    `record` {
+      type = "object"
+      required = List("station", "createdAt")
+      properties {
+        ["station"] = new Ref {
+          type = "ref"
+          ref = "fm.atradio.defs#stationInfo"
+        }
+        ["subject"] = new Ref {
+          type = "ref"
+          ref = "com.atproto.repo.strongRef"
+        }
+        ["createdAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+}
