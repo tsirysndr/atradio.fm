@@ -7,6 +7,12 @@ import { sessionAtom, authProfileAtom, authLoadingAtom } from "@/atoms/auth";
 import { finishLogin } from "@/lib/atproto/session";
 import { getProfile } from "@/lib/atproto/profile";
 
+// The OAuth `state`/`code` is single-use: `finalizeAuthorization` consumes it.
+// A module-level guard makes sure we finalize exactly once even under React
+// StrictMode's double-invoked effects (which would otherwise throw "unknown
+// state" on the second run).
+let handled = false;
+
 export function OAuthCallback() {
   const setSession = useSetAtom(sessionAtom);
   const setProfile = useSetAtom(authProfileAtom);
@@ -15,28 +21,24 @@ export function OAuthCallback() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    if (handled) return;
+    handled = true;
     (async () => {
       try {
         const session = await finishLogin();
-        if (cancelled) return;
         setSession(session);
         setLoading(false);
         try {
-          const profile = await getProfile(session.info.sub);
-          if (!cancelled) setProfile(profile);
+          setProfile(await getProfile(session.info.sub));
         } catch {
           /* best-effort */
         }
         navigate({ to: "/" });
       } catch (err) {
         consola.error("[auth] callback failed", err);
-        if (!cancelled) setError("Login failed. Please try again.");
+        setError("Login failed. Please try again.");
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [setSession, setProfile, setLoading, navigate]);
 
   return (

@@ -106,8 +106,8 @@ export function LoginModal() {
               {/* Signup */}
               <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-synth-panel/50 p-3">
                 <p className="text-xs text-foreground/60">
-                  atradio is part of the Atmosphere. Create an Atmosphere account
-                  on Bluesky to get started!
+                  atradio.fm is part of the Atmosphere. Create an Atmosphere
+                  account on Bluesky to get started!
                 </p>
                 <button
                   type="button"
