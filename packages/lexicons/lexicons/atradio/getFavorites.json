@@ -23,6 +23,18 @@
           },
           "cursor": {
             "type": "string"
+          },
+          "q": {
+            "type": "string",
+            "description": "Filter by text (name or genre)."
+          },
+          "source": {
+            "type": "string",
+            "description": "Filter by provider: radio-browser | tunein | custom."
+          },
+          "sort": {
+            "type": "string",
+            "description": "Sort order: recent | name | -name."
           }
         }
       },

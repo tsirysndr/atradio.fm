@@ -1,19 +1,40 @@
 import { Router, type Request, type Response } from "express";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, lt, or, sql, type SQL } from "drizzle-orm";
+import { z } from "zod";
 import type { StationInfo, StationView } from "@atradio/lexicons";
 import { db, schema } from "../db";
 import { resolveDid } from "../lib/profile";
 
 export const xrpcRouter = Router();
 
-function parseLimit(v: unknown, def = 50, max = 100): number {
-  const n = Number(v);
-  if (!Number.isFinite(n)) return def;
-  return Math.min(Math.max(1, Math.floor(n)), max);
-}
+/** Shared query params for the list endpoints, incl. required `actor`. */
+const listParams = z.object({
+  actor: z.string().trim().min(1, "actor is required"),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  cursor: z.string().optional(),
+  q: z.string().trim().min(1).optional(),
+  source: z.enum(["radio-browser", "tunein", "custom"]).optional(),
+  sort: z.enum(["recent", "name", "-name"]).optional().default("recent"),
+});
+type ListParams = z.infer<typeof listParams>;
 
 function xrpcError(res: Response, status: number, error: string, message: string) {
   return res.status(status).json({ error, message });
+}
+
+/** Validate the query params; sends an XRPC InvalidRequest and returns null on failure. */
+function parseParams(req: Request, res: Response): ListParams | null {
+  const parsed = listParams.safeParse(req.query);
+  if (!parsed.success) {
+    xrpcError(
+      res,
+      400,
+      "InvalidRequest",
+      parsed.error.issues[0]?.message ?? "invalid parameters",
+    );
+    return null;
+  }
+  return parsed.data;
 }
 
 type StationRow = typeof schema.stations.$inferSelect;
@@ -32,28 +53,42 @@ function stationRowToInfo(row: StationRow): StationInfo {
   };
 }
 
-/** GET /xrpc/fm.atradio.getFavorites?actor=&limit=&cursor= */
+/** GET /xrpc/fm.atradio.getFavorites?actor=&limit=&cursor=&q=&source=&sort= */
 xrpcRouter.get("/fm.atradio.getFavorites", async (req: Request, res: Response) => {
-  const actor = String(req.query.actor ?? "");
-  if (!actor) return xrpcError(res, 400, "InvalidRequest", "actor is required");
-  const did = await resolveDid(actor);
+  const params = parseParams(req, res);
+  if (!params) return;
+  const did = await resolveDid(params.actor);
   if (!did) return xrpcError(res, 404, "NotFound", "actor not found");
 
-  const limit = parseLimit(req.query.limit);
-  const cursor = req.query.cursor ? new Date(String(req.query.cursor)) : null;
+  const { limit, q, source, sort } = params;
+  const like = q ? `%${q}%` : null;
+  const nameExpr = sql`(${schema.favorites.station} ->> 'name')`;
+
+  // Filters shared by the page + count queries.
+  const filter: SQL | undefined = and(
+    eq(schema.favorites.did, did),
+    source
+      ? sql`(${schema.favorites.station} ->> 'source') = ${source}`
+      : undefined,
+    like
+      ? sql`(${nameExpr} ILIKE ${like} OR (${schema.favorites.station} ->> 'genre') ILIKE ${like})`
+      : undefined,
+  );
+
+  const cursor =
+    sort === "recent" && params.cursor ? new Date(params.cursor) : null;
+  const orderBy =
+    sort === "name"
+      ? asc(nameExpr)
+      : sort === "-name"
+        ? desc(nameExpr)
+        : desc(schema.favorites.indexedAt);
 
   const rows = await db
     .select()
     .from(schema.favorites)
-    .where(
-      cursor
-        ? and(
-            eq(schema.favorites.did, did),
-            lt(schema.favorites.indexedAt, cursor),
-          )
-        : eq(schema.favorites.did, did),
-    )
-    .orderBy(desc(schema.favorites.indexedAt))
+    .where(cursor ? and(filter, lt(schema.favorites.indexedAt, cursor)) : filter)
+    .orderBy(orderBy)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
@@ -63,40 +98,52 @@ xrpcRouter.get("/fm.atradio.getFavorites", async (req: Request, res: Response) =
     station: row.station,
     createdAt: (row.createdAt ?? row.indexedAt).toISOString(),
   }));
-  const nextCursor = hasMore
-    ? page[page.length - 1]?.indexedAt.toISOString()
-    : undefined;
+  const nextCursor =
+    hasMore && sort === "recent"
+      ? page[page.length - 1]?.indexedAt.toISOString()
+      : undefined;
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(schema.favorites)
-    .where(eq(schema.favorites.did, did));
+    .where(filter);
 
   return res.json({ cursor: nextCursor, total, items });
 });
 
-/** GET /xrpc/fm.atradio.getStations?actor=&limit=&cursor= */
+/** GET /xrpc/fm.atradio.getStations?actor=&limit=&cursor=&q=&source=&sort= */
 xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) => {
-  const actor = String(req.query.actor ?? "");
-  if (!actor) return xrpcError(res, 400, "InvalidRequest", "actor is required");
-  const did = await resolveDid(actor);
+  const params = parseParams(req, res);
+  if (!params) return;
+  const did = await resolveDid(params.actor);
   if (!did) return xrpcError(res, 404, "NotFound", "actor not found");
 
-  const limit = parseLimit(req.query.limit);
-  const cursor = req.query.cursor ? new Date(String(req.query.cursor)) : null;
+  const { limit, q, source, sort } = params;
+  // Every station is `source: custom`; any other source filter yields nothing.
+  if (source && source !== "custom") return res.json({ total: 0, items: [] });
+
+  const like = q ? `%${q}%` : null;
+  const filter: SQL | undefined = and(
+    eq(schema.stations.did, did),
+    like
+      ? or(ilike(schema.stations.name, like), ilike(schema.stations.genre, like))
+      : undefined,
+  );
+
+  const cursor =
+    sort === "recent" && params.cursor ? new Date(params.cursor) : null;
+  const orderBy =
+    sort === "name"
+      ? asc(schema.stations.name)
+      : sort === "-name"
+        ? desc(schema.stations.name)
+        : desc(schema.stations.indexedAt);
 
   const rows = await db
     .select()
     .from(schema.stations)
-    .where(
-      cursor
-        ? and(
-            eq(schema.stations.did, did),
-            lt(schema.stations.indexedAt, cursor),
-          )
-        : eq(schema.stations.did, did),
-    )
-    .orderBy(desc(schema.stations.indexedAt))
+    .where(cursor ? and(filter, lt(schema.stations.indexedAt, cursor)) : filter)
+    .orderBy(orderBy)
     .limit(limit + 1);
 
   const hasMore = rows.length > limit;
@@ -106,14 +153,15 @@ xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) =>
     station: stationRowToInfo(row),
     createdAt: (row.createdAt ?? row.indexedAt).toISOString(),
   }));
-  const nextCursor = hasMore
-    ? page[page.length - 1]?.indexedAt.toISOString()
-    : undefined;
+  const nextCursor =
+    hasMore && sort === "recent"
+      ? page[page.length - 1]?.indexedAt.toISOString()
+      : undefined;
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(schema.stations)
-    .where(eq(schema.stations.did, did));
+    .where(filter);
 
   return res.json({ cursor: nextCursor, total, items });
 });
@@ -122,7 +170,7 @@ xrpcRouter.get("/fm.atradio.getStations", async (req: Request, res: Response) =>
 xrpcRouter.get(
   "/fm.atradio.getRecentStations",
   async (req: Request, res: Response) => {
-    const limit = parseLimit(req.query.limit, 30, 100);
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 30), 100);
     const rows = await db
       .select()
       .from(schema.stations)
@@ -141,7 +189,7 @@ xrpcRouter.get(
 xrpcRouter.get(
   "/fm.atradio.getPopularStations",
   async (req: Request, res: Response) => {
-    const limit = parseLimit(req.query.limit, 30, 100);
+    const limit = Math.min(Math.max(1, Number(req.query.limit) || 30), 100);
     const rows = await db
       .select({
         stationId: schema.favorites.stationId,

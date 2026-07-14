@@ -10,6 +10,7 @@ import {
   IconUserCircle,
   IconLogin2,
   IconLogout,
+  IconSearch,
 } from "@tabler/icons-react";
 import { favoritesAtom } from "@/atoms/favorites";
 import {
@@ -125,6 +126,9 @@ interface ProfileViewProps {
   onLogout?: () => void;
 }
 
+const selectClass =
+  "h-8 rounded-lg border border-white/15 bg-synth-panel px-2 text-xs text-foreground focus:border-synth-cyan focus:outline-none";
+
 function ProfileView({
   profile,
   favorites,
@@ -135,6 +139,9 @@ function ProfileView({
   onLogout,
 }: ProfileViewProps) {
   const [tab, setTab] = useState<"favorites" | "custom">("favorites");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<"recent" | "name" | "name-desc">("recent");
+  const [source, setSource] = useState<"all" | Station["source"]>("all");
 
   const tabs = useMemo(
     () =>
@@ -154,6 +161,27 @@ function ProfileView({
       ],
     [favorites.length, stations.length],
   );
+
+  const activeList = tab === "favorites" ? favorites : stations;
+
+  const visible = useMemo(() => {
+    let list = activeList;
+    if (source !== "all") list = list.filter((s) => s.source === source);
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((s) =>
+        [s.name, s.genre, s.country, s.description].some((v) =>
+          v?.toLowerCase().includes(q),
+        ),
+      );
+    }
+    if (sort === "name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "name-desc") {
+      list = [...list].sort((a, b) => b.name.localeCompare(a.name));
+    }
+    return list;
+  }, [activeList, source, query, sort]);
 
   const displayName = profile?.displayName || profile?.handle || "Listener";
 
@@ -177,11 +205,30 @@ function ProfileView({
             <h1 className="truncate font-display text-2xl font-bold">
               {displayName}
             </h1>
-            {profile?.handle && (
-              <p className="truncate text-sm text-synth-cyan/90">
-                @{profile.handle}
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              {profile?.handle && (
+                <a
+                  href={`https://bsky.app/profile/${profile.handle}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open on Bluesky"
+                  className="truncate text-sm text-synth-cyan/90 hover:text-synth-cyan hover:underline"
+                >
+                  @{profile.handle}
+                </a>
+              )}
+              {profile?.did && (
+                <a
+                  href={`https://pdsls.dev/at://${profile.did}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="View repo on PDSls"
+                  className="text-xs text-foreground/40 hover:text-synth-cyan hover:underline"
+                >
+                  pdsls ↗
+                </a>
+              )}
+            </div>
             <div className="mt-1 flex gap-4 text-xs text-foreground/50">
               <span>
                 <span className="font-semibold text-synth-cyan">
@@ -213,38 +260,79 @@ function ProfileView({
         )}
       </section>
 
-      {/* Tabs */}
+      {/* Tabs + controls */}
       <div>
-        <div
-          role="tablist"
-          aria-label="Profile sections"
-          className="flex gap-6 border-b border-white/10"
-        >
-          {tabs.map(({ key, label, count, icon: Icon }) => {
-            const active = tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setTab(key)}
-                className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors ${
-                  active
-                    ? "border-synth-pink text-foreground"
-                    : "border-transparent text-foreground/50 hover:text-foreground/80"
-                }`}
-              >
-                <Icon size={16} className={active ? "text-synth-pink" : ""} />
-                {label} ({count})
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10">
+          <div
+            role="tablist"
+            aria-label="Profile sections"
+            className="flex gap-6"
+          >
+            {tabs.map(({ key, label, count, icon: Icon }) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(key)}
+                  className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors ${
+                    active
+                      ? "border-synth-pink text-foreground"
+                      : "border-transparent text-foreground/50 hover:text-foreground/80"
+                  }`}
+                >
+                  <Icon size={16} className={active ? "text-synth-pink" : ""} />
+                  {label} ({count})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* search / filter / sort */}
+          <div className="flex items-center gap-2 pb-2">
+            <div className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-synth-panel px-2 focus-within:border-synth-cyan">
+              <IconSearch size={14} className="text-foreground/40" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter…"
+                aria-label="Filter stations"
+                className="h-8 w-24 bg-transparent text-xs text-foreground placeholder:text-foreground/30 focus:outline-none sm:w-32"
+              />
+            </div>
+            <select
+              value={source}
+              onChange={(e) =>
+                setSource(e.target.value as "all" | Station["source"])
+              }
+              aria-label="Filter by source"
+              className={selectClass}
+            >
+              <option value="all">All sources</option>
+              <option value="radio-browser">radio-browser</option>
+              <option value="tunein">TuneIn</option>
+              <option value="custom">Yours</option>
+            </select>
+            <select
+              value={sort}
+              onChange={(e) =>
+                setSort(e.target.value as "recent" | "name" | "name-desc")
+              }
+              aria-label="Sort"
+              className={selectClass}
+            >
+              <option value="recent">Recent</option>
+              <option value="name">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+            </select>
+          </div>
         </div>
 
         <div className="pt-6">
-          {tab === "favorites" &&
-            (favorites.length === 0 ? (
+          {activeList.length === 0 ? (
+            tab === "favorites" ? (
               <EmptyState
                 icon={<IconHeart size={40} stroke={1.5} />}
                 title="No favorites yet"
@@ -255,11 +343,6 @@ function ProfileView({
                 }
               />
             ) : (
-              <StationGrid stations={favorites} />
-            ))}
-
-          {tab === "custom" &&
-            (stations.length === 0 ? (
               <EmptyState
                 icon={<IconBroadcast size={40} stroke={1.5} />}
                 title="No stations yet"
@@ -281,12 +364,19 @@ function ProfileView({
                   ) : undefined
                 }
               />
-            ) : (
-              <StationGrid
-                stations={stations}
-                onRemove={editable ? onRemove : undefined}
-              />
-            ))}
+            )
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={<IconSearch size={40} stroke={1.5} />}
+              title="No matches"
+              description="Nothing matches your search or filters."
+            />
+          ) : (
+            <StationGrid
+              stations={visible}
+              onRemove={editable && tab === "custom" ? onRemove : undefined}
+            />
+          )}
         </div>
       </div>
     </div>
