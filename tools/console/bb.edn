@@ -21,6 +21,8 @@
   db:generate   {:doc "Generate a Drizzle migration" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:generate")}
   db:migrate    {:doc "Apply Drizzle migrations" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:migrate")}
   db:push       {:doc "Push the Drizzle schema" :task (shell {:dir (str root "/apps/api")} "bun" "run" "db:push")}
+  db:up         {:doc "Start local Postgres (docker compose up -d)" :task (shell {:dir root} "docker" "compose" "up" "-d")}
+  db:down       {:doc "Stop local Postgres (docker compose down)" :task (shell {:dir root} "docker" "compose" "down")}
 
   lexicons:gen  {:doc "Generate lexicon JSON from Pkl" :task (shell {:dir (str root "/packages/lexicons")} "bun" "run" "pkl:gen")}
 

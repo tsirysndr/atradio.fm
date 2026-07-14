@@ -46,6 +46,8 @@
 (defn gen-migration "Generate a Drizzle migration from the schema" [] (api! "bun" "run" "db:generate"))
 (defn migrate "Apply Drizzle migrations" [] (api! "bun" "run" "db:migrate"))
 (defn db-push "Push the Drizzle schema (dev)" [] (api! "bun" "run" "db:push"))
+(defn db-up "Start local Postgres (docker compose up -d)" [] (root! "docker" "compose" "up" "-d"))
+(defn db-down "Stop local Postgres (docker compose down)" [] (root! "docker" "compose" "down"))
 
 ;; ---- lexicons ----
 (defn gen-lexicons "Generate lexicon JSON from Pkl" [] (lex! "bun" "run" "pkl:gen"))
@@ -66,6 +68,8 @@
    ["(gen-migration)" "Generate a Drizzle migration"]
    ["(migrate)"       "Apply Drizzle migrations"]
    ["(db-push)"       "Push the Drizzle schema"]
+   ["(db-up)"         "Start local Postgres (docker)"]
+   ["(db-down)"       "Stop local Postgres (docker)"]
    ["(gen-lexicons)"  "Generate lexicon JSON from Pkl"]
    ["(help)"          "Show this list"]])
 
