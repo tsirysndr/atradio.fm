@@ -21,7 +21,9 @@ import {
   mutedAtom,
   nowPlayingAtom,
   playbackStatusAtom,
+  streamInfoAtom,
   volumeAtom,
+  type StreamInfo,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
 import { audioSettingsOpenAtom } from "@/atoms/ui";
@@ -44,6 +46,21 @@ const STATUS_TEXT: Record<string, string> = {
   error: "Stream unavailable",
 };
 
+/** "MP3 · 44.1 kHz · 128 kbps" — from whatever fields are known. */
+function formatStreamInfo(info: StreamInfo | null): string {
+  if (!info) return "";
+  const kHz = info.sampleRate
+    ? `${(info.sampleRate / 1000).toFixed(1).replace(/\.0$/, "")} kHz`
+    : null;
+  return [
+    info.codec?.toUpperCase(),
+    kHz,
+    info.bitrate ? `${info.bitrate} kbps` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /** Which backend currently owns playback. Direct streams go through the
  *  Rockbox wasm engine (decoders + DSP); HLS stays on <audio> (+ hls.js),
  *  which is also the fallback when the engine can't fetch a stream (CORS). */
@@ -56,6 +73,7 @@ export function Player() {
   const [volume, setVolume] = useAtom(volumeAtom);
   const [muted, setMuted] = useAtom(mutedAtom);
   const [nowPlaying, setNowPlaying] = useAtom(nowPlayingAtom);
+  const [streamInfo, setStreamInfo] = useAtom(streamInfoAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
   const openAudioSettings = useSetAtom(audioSettingsOpenAtom);
@@ -95,12 +113,24 @@ export function Player() {
       if (engineRef.current !== "rockbox") return;
       if (state === "playing") setStatus("playing");
     };
+    let lastInfoJson = "";
     const onMeta = (md: TrackMetadata | null) => {
       if (engineRef.current !== "rockbox" || !md) return;
       const text = [md.artist, md.title].filter(Boolean).join(" – ");
       if (text) {
         engineMetaRef.current = true;
         setNowPlaying(text);
+      }
+      const info: StreamInfo = {
+        codec: md.codec,
+        bitrate: md.bitrate || undefined,
+        sampleRate: md.sample_rate || undefined,
+      };
+      // Progress events fire every second — only publish real changes.
+      const json = JSON.stringify(info);
+      if (json !== lastInfoJson && (info.codec || info.sampleRate)) {
+        lastInfoJson = json;
+        setStreamInfo(info);
       }
     };
     const onTrack = ({ metadata }: { metadata: TrackMetadata | null }) =>
@@ -142,6 +172,7 @@ export function Player() {
     let cancelled = false;
     setStatus("loading");
     setNowPlaying(null);
+    setStreamInfo(null);
     engineMetaRef.current = false;
 
     // Tear down whatever the previous station was using.
@@ -266,6 +297,15 @@ export function Player() {
 
   const isFavorite = station ? favoriteIds.has(station.id) : false;
 
+  // Engine-reported stream info, falling back to the station directory's
+  // codec/bitrate (radio-browser) while buffering or on the native path.
+  const infoText = formatStreamInfo(
+    streamInfo ??
+      (station && (station.codec || station.bitrate)
+        ? { codec: station.codec, bitrate: station.bitrate }
+        : null),
+  );
+
   const handleStop = () => {
     const p = getRockboxPlayer();
     if (p.ready) p.stop();
@@ -278,6 +318,7 @@ export function Player() {
     setIsPlaying(false);
     setStatus("idle");
     setNowPlaying(null);
+    setStreamInfo(null);
   };
 
   return (
@@ -333,6 +374,11 @@ export function Player() {
                   ) : (
                     <span className="truncate text-xs text-synth-cyan/80">
                       {STATUS_TEXT[status] || station?.genre || ""}
+                    </span>
+                  )}
+                  {infoText && status !== "error" && (
+                    <span className="hidden shrink-0 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[0.6rem] uppercase tracking-wide text-foreground/50 sm:inline">
+                      {infoText}
                     </span>
                   )}
                 </div>

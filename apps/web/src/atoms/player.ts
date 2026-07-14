@@ -15,6 +15,17 @@ export const playbackStatusAtom = atom<PlaybackStatus>("idle");
 /** Current ICY "now playing" track title, when the stream exposes it. */
 export const nowPlayingAtom = atom<string | null>(null);
 
+/** Technical stream info reported by the decoder (Rockbox engine). */
+export interface StreamInfo {
+  codec?: string;
+  /** kbps */
+  bitrate?: number;
+  /** Hz */
+  sampleRate?: number;
+}
+
+export const streamInfoAtom = atom<StreamInfo | null>(null);
+
 export const volumeAtom = atomWithStorage<number>("atradio:volume", 0.8);
 export const mutedAtom = atomWithStorage<boolean>("atradio:muted", false);
 
