@@ -1,0 +1,97 @@
+import { useAtomValue } from "jotai";
+import { atomWithStorage } from "jotai/utils";
+import { RockboxPlayer, ChannelMode, CrossfeedMode } from "rockbox-wasm";
+
+/** The 10 Rockbox EQ band centre frequencies (60 Hz … 20 kHz). */
+export const EQ_CUTOFFS = RockboxPlayer.EQ_BAND_CUTOFFS;
+
+// Every DSP setting persists to localStorage (atomWithStorage) so the audio
+// chain survives reloads — applyAudioSettings() pushes the whole snapshot to
+// the engine once it boots.
+
+export const eqEnabledAtom = atomWithStorage("atradio:eq.enabled", false);
+export const eqGainsAtom = atomWithStorage<number[]>(
+  "atradio:eq.gains",
+  EQ_CUTOFFS.map(() => 0),
+);
+
+export const bassAtom = atomWithStorage("atradio:tone.bass", 0); // dB
+export const trebleAtom = atomWithStorage("atradio:tone.treble", 0); // dB
+
+export const crossfeedModeAtom = atomWithStorage<CrossfeedMode>(
+  "atradio:crossfeed.mode",
+  CrossfeedMode.Off,
+);
+export const crossfeedDirectAtom = atomWithStorage(
+  "atradio:crossfeed.direct",
+  -1.5,
+); // dB (≤ 0)
+
+export const pbeAtom = atomWithStorage("atradio:pbe.strength", 0); // 0–100 %
+export const pbePrecutAtom = atomWithStorage("atradio:pbe.precut", 0); // dB cut
+
+export const surroundDelayAtom = atomWithStorage("atradio:surround.delay", 0); // ms, 0 = off
+export const surroundBalanceAtom = atomWithStorage(
+  "atradio:surround.balance",
+  35,
+); // %
+
+export const compThresholdAtom = atomWithStorage("atradio:comp.threshold", 0); // dB, 0 = off
+export const compRatioAtom = atomWithStorage("atradio:comp.ratio", 2);
+
+export const channelModeAtom = atomWithStorage<ChannelMode>(
+  "atradio:channel.mode",
+  ChannelMode.Stereo,
+);
+export const stereoWidthAtom = atomWithStorage("atradio:channel.width", 100); // %
+
+export interface AudioSettings {
+  eqEnabled: boolean;
+  eqGains: number[];
+  bass: number;
+  treble: number;
+  crossfeedMode: CrossfeedMode;
+  crossfeedDirect: number;
+  pbe: number;
+  pbePrecut: number;
+  surroundDelay: number;
+  surroundBalance: number;
+  compThreshold: number;
+  compRatio: number;
+  channelMode: ChannelMode;
+  stereoWidth: number;
+}
+
+/** Read the current value of every audio-setting atom as a plain snapshot. */
+export function useAudioSettingsSnapshot(): AudioSettings {
+  return {
+    eqEnabled: useAtomValue(eqEnabledAtom),
+    eqGains: useAtomValue(eqGainsAtom),
+    bass: useAtomValue(bassAtom),
+    treble: useAtomValue(trebleAtom),
+    crossfeedMode: useAtomValue(crossfeedModeAtom),
+    crossfeedDirect: useAtomValue(crossfeedDirectAtom),
+    pbe: useAtomValue(pbeAtom),
+    pbePrecut: useAtomValue(pbePrecutAtom),
+    surroundDelay: useAtomValue(surroundDelayAtom),
+    surroundBalance: useAtomValue(surroundBalanceAtom),
+    compThreshold: useAtomValue(compThresholdAtom),
+    compRatio: useAtomValue(compRatioAtom),
+    channelMode: useAtomValue(channelModeAtom),
+    stereoWidth: useAtomValue(stereoWidthAtom),
+  };
+}
+
+/** Push every persisted setting to the engine (call once it's ready). */
+export function applyAudioSettings(p: RockboxPlayer, s: AudioSettings) {
+  p.setEqEnabled(s.eqEnabled);
+  s.eqGains.forEach((gain, i) => p.setEqBand(i, EQ_CUTOFFS[i], 1.0, gain));
+  p.setTone(s.bass, s.treble);
+  // Crossfeed gains and the PBE precut are in tenths of dB (≤ 0).
+  p.setCrossfeed(s.crossfeedMode, Math.round(s.crossfeedDirect * 10));
+  p.setPbe(s.pbe, -Math.round(s.pbePrecut * 10));
+  p.setSurround(s.surroundDelay, s.surroundBalance, 0, 0);
+  p.setCompressor(s.compThreshold, 0, s.compRatio, 0, 0, 0);
+  p.setChannelMode(s.channelMode);
+  p.setStereoWidth(s.stereoWidth);
+}

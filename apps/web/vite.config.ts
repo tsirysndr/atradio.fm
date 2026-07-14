@@ -3,6 +3,18 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath, URL } from "node:url";
+import { cpSync } from "node:fs";
+import { dirname } from "node:path";
+
+// rockbox-wasm's runtime (core + decoder worker + audio worklet) is fetched by
+// URL at runtime, so it can't go through the module graph. Mirror the package
+// dist into public/rockbox (gitignored) — served at /rockbox/*, which is the
+// RockboxPlayer baseUrl (see src/lib/audio/rockbox.ts).
+cpSync(
+  dirname(fileURLToPath(import.meta.resolve("rockbox-wasm"))),
+  fileURLToPath(new URL("./public/rockbox", import.meta.url)),
+  { recursive: true },
+);
 
 /**
  * Read the current ICY `StreamTitle` from a stream, server-side (no CORS).
@@ -173,6 +185,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
+        // The engine loads /rockbox/* (baseUrl) — the assets/rockbox-* copies
+        // Vite emits from the module's internal URL fallbacks are never used.
+        globIgnores: ["**/assets/rockbox-*"],
         // Take control immediately and purge stale precaches so a new deploy
         // never leaves users on an old build.
         clientsClaim: true,
@@ -212,6 +227,13 @@ export default defineConfig({
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
+  },
+  optimizeDeps: {
+    // Don't prebundle rockbox-wasm: its dynamic `new URL(\`./${name}\`,
+    // import.meta.url)` gets rewritten by Vite into a glob over the module's
+    // siblings — inside .vite/deps that means importing every optimized dep's
+    // .js.map as a module, which fails MIME checks and blanks the app.
+    exclude: ["rockbox-wasm"],
   },
   server: {
     // Bind the IPv4 loopback: AT Proto OAuth requires 127.0.0.1 (not the

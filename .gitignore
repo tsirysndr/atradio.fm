@@ -9,3 +9,6 @@ coverage
 .vite
 .cpcache
 .rebel_readline_history
+
+# rockbox-wasm runtime, mirrored from node_modules by apps/web/vite.config.ts
+apps/web/public/rockbox

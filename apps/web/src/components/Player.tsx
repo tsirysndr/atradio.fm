@@ -11,8 +11,10 @@ import {
   IconHeartFilled,
   IconAlertTriangle,
   IconMusic,
+  IconAdjustmentsHorizontal,
 } from "@tabler/icons-react";
 import type Hls from "hls.js";
+import type { TrackMetadata } from "rockbox-wasm";
 import {
   currentStationAtom,
   isPlayingAtom,
@@ -22,7 +24,13 @@ import {
   volumeAtom,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
+import { audioSettingsOpenAtom } from "@/atoms/ui";
+import {
+  applyAudioSettings,
+  useAudioSettingsSnapshot,
+} from "@/atoms/audioSettings";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { ensureRockboxReady, getRockboxPlayer } from "@/lib/audio/rockbox";
 import { resolveStream } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
@@ -36,6 +44,11 @@ const STATUS_TEXT: Record<string, string> = {
   error: "Stream unavailable",
 };
 
+/** Which backend currently owns playback. Direct streams go through the
+ *  Rockbox wasm engine (decoders + DSP); HLS stays on <audio> (+ hls.js),
+ *  which is also the fallback when the engine can't fetch a stream (CORS). */
+type Engine = "rockbox" | "native";
+
 export function Player() {
   const station = useAtomValue(currentStationAtom);
   const [isPlaying, setIsPlaying] = useAtom(isPlayingAtom);
@@ -45,66 +58,173 @@ export function Player() {
   const [nowPlaying, setNowPlaying] = useAtom(nowPlayingAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
+  const openAudioSettings = useSetAtom(audioSettingsOpenAtom);
   const ensureAuth = useRequireAuth();
+  const audioSettings = useAudioSettingsSnapshot();
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const engineRef = useRef<Engine | null>(null);
+  const currentUrlRef = useRef<string | null>(null);
+  /** URL we already fell back to native for (avoid fallback loops). */
+  const fallbackUrlRef = useRef<string | null>(null);
+  /** True once the engine delivered ICY metadata for this station — the
+   *  proxy-based watcher then stops overwriting it. */
+  const engineMetaRef = useRef(false);
+
+  // Latest values for use inside async flows / engine event handlers.
+  const stateRef = useRef({ volume, muted, audioSettings });
+  stateRef.current = { volume, muted, audioSettings };
+
+  /** Point the <audio> element at `url` when the wasm engine can't play it. */
+  const fallbackToNative = (url: string) => {
+    engineRef.current = "native";
+    const audio = audioRef.current;
+    if (!audio) return;
+    setStatus("loading");
+    audio.src = url;
+    audio.load();
+    void audio.play().catch(() => {});
+  };
+
+  // Mirror engine events into the player atoms (registered once).
+  useEffect(() => {
+    const p = getRockboxPlayer();
+
+    const onStatus = ({ state }: { state: string }) => {
+      if (engineRef.current !== "rockbox") return;
+      if (state === "playing") setStatus("playing");
+    };
+    const onMeta = (md: TrackMetadata | null) => {
+      if (engineRef.current !== "rockbox" || !md) return;
+      const text = [md.artist, md.title].filter(Boolean).join(" – ");
+      if (text) {
+        engineMetaRef.current = true;
+        setNowPlaying(text);
+      }
+    };
+    const onTrack = ({ metadata }: { metadata: TrackMetadata | null }) =>
+      onMeta(metadata);
+    const onProgress = ({ metadata }: { metadata: TrackMetadata | null }) =>
+      onMeta(metadata);
+    const onError = () => {
+      if (engineRef.current !== "rockbox") return;
+      const url = currentUrlRef.current;
+      // Typical cause: the stream host doesn't send CORS headers, so the
+      // decoder worker's fetch is blocked — the <audio> element still works.
+      if (url && fallbackUrlRef.current !== url) {
+        fallbackUrlRef.current = url;
+        fallbackToNative(url);
+      } else {
+        setStatus("error");
+        setIsPlaying(false);
+      }
+    };
+
+    p.on("status", onStatus);
+    p.on("track", onTrack);
+    p.on("progress", onProgress);
+    p.on("error", onError);
+    return () => {
+      p.off("status", onStatus);
+      p.off("track", onTrack);
+      p.off("progress", onProgress);
+      p.off("error", onError);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load & (re)resolve the stream whenever the selected station changes.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !station) return;
+    if (!station) return;
 
     const controller = new AbortController();
     let cancelled = false;
     setStatus("loading");
     setNowPlaying(null);
+    engineMetaRef.current = false;
 
-    const teardownHls = () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-    teardownHls();
+    // Tear down whatever the previous station was using.
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    {
+      const p = getRockboxPlayer();
+      if (p.ready) p.stop();
+    }
+
+    // Boot the engine in parallel with stream resolution, while the click's
+    // user activation is still fresh (the AudioContext needs a gesture).
+    const engineBoot = ensureRockboxReady().catch(() => null);
 
     (async () => {
       try {
         const { url, isHls } = await resolveStream(station, controller.signal);
         if (cancelled) return;
-
-        const nativeHls = audio.canPlayType("application/vnd.apple.mpegurl");
-        if (isHls && !nativeHls) {
-          const { default: HlsCtor } = await import("hls.js");
-          if (cancelled) return;
-          if (HlsCtor.isSupported()) {
-            const hls = new HlsCtor();
-            hlsRef.current = hls;
-            hls.loadSource(url);
-            hls.attachMedia(audio);
-            hls.on(HlsCtor.Events.ERROR, (_e, data) => {
-              if (data.fatal) setStatus("error");
-            });
-          } else {
-            audio.src = url;
-          }
-        } else {
-          audio.src = url;
-          audio.load();
-        }
+        currentUrlRef.current = url;
 
         if (station.source === "radio-browser") {
           registerRadioBrowserClick(station.id);
         }
 
-        // Best-effort ICY "now playing" — only for direct (non-HLS) streams.
-        if (!isHls) {
-          void watchIcyMetadata(url, setNowPlaying, controller.signal);
+        if (isHls) {
+          // HLS is segment-based — not the engine's territory.
+          engineRef.current = "native";
+          if (!audio) return;
+          if (!audio.canPlayType("application/vnd.apple.mpegurl")) {
+            const { default: HlsCtor } = await import("hls.js");
+            if (cancelled) return;
+            if (HlsCtor.isSupported()) {
+              const hls = new HlsCtor();
+              hlsRef.current = hls;
+              hls.loadSource(url);
+              hls.attachMedia(audio);
+              hls.on(HlsCtor.Events.ERROR, (_e, data) => {
+                if (data.fatal) setStatus("error");
+              });
+            } else {
+              audio.src = url;
+            }
+          } else {
+            audio.src = url;
+            audio.load();
+          }
+          await audio.play().catch(() => {
+            /* element error listener handles surfacing */
+          });
+          return;
         }
 
-        await audio.play().catch(() => {
-          /* element error listener handles surfacing */
-        });
+        // Direct (Icecast/SHOUTcast/file) stream → Rockbox engine.
+        // Best-effort ICY "now playing" via the proxy, for streams whose
+        // metadata the engine can't read over CORS.
+        void watchIcyMetadata(
+          url,
+          (title) => {
+            if (!engineMetaRef.current) setNowPlaying(title);
+          },
+          controller.signal,
+        );
+
+        const p = await engineBoot;
+        if (cancelled) return;
+        if (p) {
+          engineRef.current = "rockbox";
+          const { volume, muted, audioSettings } = stateRef.current;
+          applyAudioSettings(p, audioSettings);
+          p.setVolume(muted ? 0 : volume);
+          p.setQueue([url], true);
+        } else {
+          fallbackUrlRef.current = url;
+          fallbackToNative(url);
+        }
       } catch {
         if (!cancelled) setStatus("error");
       }
@@ -117,25 +237,38 @@ export function Player() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [station?.id]);
 
-  // Reflect user play/pause intent onto the media element.
+  // Reflect user play/pause intent onto the active backend.
   useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !station) return;
-    if (isPlaying) audio.play().catch(() => {});
-    else audio.pause();
+    if (!station) return;
+    if (engineRef.current === "rockbox") {
+      const p = getRockboxPlayer();
+      if (!p.ready) return;
+      if (isPlaying) p.play();
+      else p.pause();
+    } else {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (isPlaying) audio.play().catch(() => {});
+      else audio.pause();
+    }
   }, [isPlaying, station]);
 
-  // Volume / mute.
+  // Volume / mute (both backends — only the active one is audible).
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    audio.volume = volume;
-    audio.muted = muted;
+    if (audio) {
+      audio.volume = volume;
+      audio.muted = muted;
+    }
+    const p = getRockboxPlayer();
+    if (p.ready) p.setVolume(muted ? 0 : volume);
   }, [volume, muted, station?.id]);
 
   const isFavorite = station ? favoriteIds.has(station.id) : false;
 
   const handleStop = () => {
+    const p = getRockboxPlayer();
+    if (p.ready) p.stop();
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -154,6 +287,7 @@ export function Player() {
         onPlaying={() => setStatus("playing")}
         onWaiting={() => setStatus("loading")}
         onError={() => {
+          if (engineRef.current !== "native") return;
           setStatus("error");
           setIsPlaying(false);
         }}
@@ -235,7 +369,7 @@ export function Player() {
               </Button>
             </div>
 
-            {/* Favorite + volume */}
+            {/* Favorite + equalizer + volume */}
             <div className="flex items-center gap-2">
               {station && (
                 <Button
@@ -253,6 +387,24 @@ export function Player() {
                   )}
                 </Button>
               )}
+
+              <Button
+                isIconOnly
+                size="sm"
+                variant="tertiary"
+                className="rounded-full"
+                aria-label="Equalizer & audio settings"
+                onPress={() => openAudioSettings(true)}
+              >
+                <IconAdjustmentsHorizontal
+                  size={16}
+                  className={
+                    audioSettings.eqEnabled
+                      ? "text-synth-cyan"
+                      : "text-foreground/70"
+                  }
+                />
+              </Button>
 
               <div className="hidden items-center gap-2 sm:flex">
                 <Button

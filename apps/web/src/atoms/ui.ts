@@ -12,6 +12,9 @@ export const searchPaletteOpenAtom = atom(false);
 /** Controls the AT Proto login modal. */
 export const loginModalOpenAtom = atom(false);
 
+/** Controls the advanced audio settings (EQ / DSP) modal. */
+export const audioSettingsOpenAtom = atom(false);
+
 /** Seed query for the palette (e.g. when opened from a category tile). */
 export const searchPaletteQueryAtom = atom("");
 
