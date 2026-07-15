@@ -39,6 +39,23 @@ export const CATEGORIES: Category[] = [
   { label: "Metal", term: "metal", icon: IconGuitarPick, color: "text-synth-purple" },
   { label: "News", term: "news", icon: IconNews, color: "text-synth-cyan" },
   { label: "World", term: "world", icon: IconWorld, color: "text-synth-blue" },
+  { label: "House", term: "house", icon: IconDeviceSpeaker, color: "text-synth-cyan" },
+  { label: "Trance", term: "trance", icon: IconWaveSine, color: "text-synth-purple" },
+  { label: "Drum & Bass", term: "drum and bass", icon: IconDeviceSpeaker, color: "text-synth-blue" },
+  { label: "Disco", term: "disco", icon: IconDisc, color: "text-synth-pink" },
+  { label: "Funk", term: "funk", icon: IconVinyl, color: "text-synth-magenta" },
+  { label: "Soul", term: "soul", icon: IconMusic, color: "text-synth-pink" },
+  { label: "R&B", term: "r&b", icon: IconMicrophone2, color: "text-synth-purple" },
+  { label: "Blues", term: "blues", icon: IconGuitarPick, color: "text-synth-blue" },
+  { label: "Country", term: "country", icon: IconGuitarPick, color: "text-synth-yellow" },
+  { label: "Folk", term: "folk", icon: IconMusic, color: "text-synth-cyan" },
+  { label: "Punk", term: "punk", icon: IconGuitarPick, color: "text-synth-pink" },
+  { label: "Indie", term: "indie", icon: IconGuitarPick, color: "text-synth-magenta" },
+  { label: "Latin", term: "latin", icon: IconMusic, color: "text-synth-magenta" },
+  { label: "K-Pop", term: "k-pop", icon: IconMicrophone2, color: "text-synth-pink" },
+  { label: "Gospel", term: "gospel", icon: IconMusic, color: "text-synth-yellow" },
+  { label: "Oldies", term: "oldies", icon: IconVinyl, color: "text-synth-cyan" },
+  { label: "Soundtrack", term: "soundtrack", icon: IconPiano, color: "text-synth-blue" },
 ];
 
 /** URL-safe slug for a tag, e.g. "hip hop" → "hip-hop". */

@@ -11,7 +11,7 @@ export function SearchPage() {
     <div className="flex flex-col gap-8">
       <section className="flex flex-col items-center gap-3 pt-2 text-center sm:gap-4 sm:pt-6">
         <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-5xl">
-          <span className="synth-gradient-text">Social radio, made yours.</span>
+          <span className="text-foreground">Social radio, made yours.</span>
         </h1>
         <p className="max-w-xl text-xs text-foreground/60 sm:text-sm">
           atradio.fm is a social internet radio platform built on{" "}
