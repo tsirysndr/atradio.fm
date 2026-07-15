@@ -281,10 +281,13 @@ xrpcRouter.get(
     const cursor =
       typeof req.query.cursor === "string" ? new Date(req.query.cursor) : null;
 
+    // One entry per actor (their most recent play) — a "story" row, so a busy
+    // listener doesn't fill the feed. Cursor paginates on that latest-play time.
+    const lastPlayed = sql<Date>`max(${schema.recentlyPlayed.playedAt})`;
     const rows = await db
       .select({
-        station: schema.recentlyPlayed.station,
-        playedAt: schema.recentlyPlayed.playedAt,
+        station: sql<StationInfo>`(array_agg(${schema.recentlyPlayed.station} ORDER BY ${schema.recentlyPlayed.playedAt} DESC))[1]`,
+        playedAt: lastPlayed,
         did: schema.recentlyPlayed.did,
         handle: schema.users.handle,
         displayName: schema.users.displayName,
@@ -295,15 +298,21 @@ xrpcRouter.get(
         schema.users,
         eq(schema.users.did, schema.recentlyPlayed.did),
       )
-      .where(cursor ? lt(schema.recentlyPlayed.playedAt, cursor) : undefined)
-      .orderBy(desc(schema.recentlyPlayed.playedAt))
+      .groupBy(
+        schema.recentlyPlayed.did,
+        schema.users.handle,
+        schema.users.displayName,
+        schema.users.avatarUrl,
+      )
+      .having(cursor ? lt(lastPlayed, cursor) : undefined)
+      .orderBy(desc(lastPlayed))
       .limit(limit + 1);
 
     const hasMore = rows.length > limit;
     const page = rows.slice(0, limit);
     const items: PlayView[] = page.map((r) => ({
       station: r.station,
-      playedAt: r.playedAt.toISOString(),
+      playedAt: new Date(r.playedAt).toISOString(),
       actor: {
         did: r.did,
         handle: r.handle ?? undefined,
@@ -312,7 +321,7 @@ xrpcRouter.get(
       },
     }));
     const nextCursor = hasMore
-      ? page[page.length - 1]!.playedAt.toISOString()
+      ? new Date(page[page.length - 1]!.playedAt).toISOString()
       : undefined;
     return res.json({ cursor: nextCursor, items });
   },

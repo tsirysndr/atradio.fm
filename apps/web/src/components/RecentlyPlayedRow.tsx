@@ -121,7 +121,7 @@ export function RecentlyPlayedRow() {
       </h2>
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
         {items.map((item, i) => (
-          <PlayCard key={`${item.actor?.did}-${item.playedAt}-${i}`} item={item} />
+          <PlayCard key={item.actor?.did ?? `${item.playedAt}-${i}`} item={item} />
         ))}
       </div>
     </section>
