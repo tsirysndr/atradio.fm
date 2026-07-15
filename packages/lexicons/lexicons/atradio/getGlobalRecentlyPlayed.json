@@ -1,0 +1,45 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.getGlobalRecentlyPlayed",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List recent play events across the whole platform, most recent first, each paired with the actor who played it.",
+      "parameters": {
+        "type": "params",
+        "required": [],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "fm.atradio.defs#playView"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

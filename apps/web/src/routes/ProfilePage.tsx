@@ -11,6 +11,7 @@ import {
   IconLogin2,
   IconLogout,
   IconSearch,
+  IconHistory,
 } from "@tabler/icons-react";
 import { favoritesAtom } from "@/atoms/favorites";
 import {
@@ -38,7 +39,7 @@ export function ProfilePage() {
 /* ---------------- self ---------------- */
 
 function SelfProfile() {
-  const { isLoggedIn, profile, loading, logout, openLogin } = useAuth();
+  const { isLoggedIn, did, profile, loading, logout, openLogin } = useAuth();
   const favorites = useAtomValue(favoritesAtom);
   const stations = useAtomValue(customStationsAtom);
   const removeCustom = useSetAtom(removeCustomStationAtom);
@@ -71,6 +72,7 @@ function SelfProfile() {
   return (
     <ProfileView
       profile={profile}
+      actor={did ?? profile?.handle}
       favorites={favorites}
       stations={stations}
       editable
@@ -114,6 +116,7 @@ function PublicProfile({ actor }: { actor: string }) {
   return (
     <ProfileView
       profile={profileQuery.data}
+      actor={actor}
       favorites={(favQuery.data?.items ?? []).map((v) => infoToStation(v.station))}
       stations={(staQuery.data?.items ?? []).map((v) => infoToStation(v.station))}
     />
@@ -124,6 +127,8 @@ function PublicProfile({ actor }: { actor: string }) {
 
 interface ProfileViewProps {
   profile: ActorProfile | null;
+  /** DID or handle used to read indexed data (recently played) from the AppView. */
+  actor?: string;
   favorites: Station[];
   stations: Station[];
   editable?: boolean;
@@ -137,6 +142,7 @@ const selectClass =
 
 function ProfileView({
   profile,
+  actor,
   favorites,
   stations,
   editable = false,
@@ -144,10 +150,22 @@ function ProfileView({
   onAddStation,
   onLogout,
 }: ProfileViewProps) {
-  const [tab, setTab] = useState<"favorites" | "custom">("favorites");
+  const [tab, setTab] = useState<"favorites" | "custom" | "recent">(
+    "favorites",
+  );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"recent" | "name" | "name-desc">("recent");
   const [source, setSource] = useState<"all" | Station["source"]>("all");
+
+  const recentQuery = useQuery({
+    queryKey: ["appview-recently-played", actor],
+    queryFn: () => appview.getRecentlyPlayed(actor!, { limit: 100 }),
+    enabled: !!actor,
+  });
+  const recentlyPlayed = useMemo(
+    () => (recentQuery.data?.items ?? []).map((v) => infoToStation(v.station)),
+    [recentQuery.data],
+  );
 
   const tabs = useMemo(
     () =>
@@ -164,11 +182,22 @@ function ProfileView({
           count: stations.length,
           icon: IconBroadcast,
         },
+        {
+          key: "recent" as const,
+          label: "Recently played",
+          count: recentlyPlayed.length,
+          icon: IconHistory,
+        },
       ],
-    [favorites.length, stations.length],
+    [favorites.length, stations.length, recentlyPlayed.length],
   );
 
-  const activeList = tab === "favorites" ? favorites : stations;
+  const activeList =
+    tab === "favorites"
+      ? favorites
+      : tab === "custom"
+        ? stations
+        : recentlyPlayed;
 
   const visible = useMemo(() => {
     let list = activeList;
@@ -346,6 +375,16 @@ function ProfileView({
                   editable
                     ? "Tap the heart on any station to save it here."
                     : "This user hasn't favorited any stations."
+                }
+              />
+            ) : tab === "recent" ? (
+              <EmptyState
+                icon={<IconHistory size={40} stroke={1.5} />}
+                title="Nothing played yet"
+                description={
+                  editable
+                    ? "Stations you play will show up here."
+                    : "This user hasn't played any stations yet."
                 }
               />
             ) : (

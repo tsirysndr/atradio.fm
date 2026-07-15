@@ -1,0 +1,28 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.actor.status",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "The actor's current listening status: the station they most recently played and when. A singleton record, overwritten on each play.",
+      "key": "literal:self",
+      "record": {
+        "type": "object",
+        "required": [
+          "station",
+          "playedAt"
+        ],
+        "properties": {
+          "station": {
+            "type": "ref",
+            "ref": "fm.atradio.defs#stationInfo"
+          },
+          "playedAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

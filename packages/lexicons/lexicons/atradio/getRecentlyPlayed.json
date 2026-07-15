@@ -1,0 +1,52 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.getRecentlyPlayed",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List the stations a user has recently played, most recent first (one entry per distinct station).",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "actor"
+        ],
+        "properties": {
+          "actor": {
+            "type": "string",
+            "description": "DID or handle of the user.",
+            "format": "at-identifier"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "fm.atradio.defs#playView"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

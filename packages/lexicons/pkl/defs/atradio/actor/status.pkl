@@ -1,0 +1,25 @@
+amends "../../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.actor.status"
+defs = new Mapping<String, Record> {
+  ["main"] {
+    type = "record"
+    key = "literal:self"
+    description = "The actor's current listening status: the station they most recently played and when. A singleton record, overwritten on each play."
+    `record` {
+      type = "object"
+      required = List("station", "playedAt")
+      properties {
+        ["station"] = new Ref {
+          type = "ref"
+          ref = "fm.atradio.defs#stationInfo"
+        }
+        ["playedAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+}

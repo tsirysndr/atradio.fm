@@ -58,6 +58,39 @@ export const stationListOutputSchema = z.object({
   items: z.array(stationViewSchema),
 });
 
+export const actorInfoSchema = z.object({
+  did: z.string(),
+  handle: z.string().optional(),
+  displayName: z.string().optional(),
+  avatar: z.string().optional(),
+});
+
+export const playViewSchema = z.object({
+  station: stationInfoSchema,
+  playedAt: z.string(),
+  actor: actorInfoSchema.optional(),
+});
+
+export const playListOutputSchema = z.object({
+  cursor: z.string().optional(),
+  items: z.array(playViewSchema),
+});
+
+export const actorStatusRecordSchema = z.object({
+  $type: z.literal("fm.atradio.actor.status").optional(),
+  station: stationInfoSchema,
+  playedAt: z.string(),
+});
+
+export const listenerCountSchema = z.object({
+  stationId: z.string(),
+  listeners: z.number(),
+});
+
+export const listenerCountsOutputSchema = z.object({
+  counts: z.array(listenerCountSchema),
+});
+
 export const crossfeedModeSchema = z.enum(["off", "meier", "custom"]);
 
 export const channelModeSchema = z.enum([

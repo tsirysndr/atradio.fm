@@ -4,11 +4,11 @@ import { actorResolver } from "./resolver";
 
 /**
  * Request the minimum needed: `atproto` (base) plus granular `repo:` write
- * permissions for exactly our two `fm.atradio.*` collections. Record reads are
+ * permissions for exactly our `fm.atradio.*` collections. Record reads are
  * public in AT Proto, so `repo:<nsid>` effectively grants read+write for our own
  * data without asking for broad access to the whole repo.
  */
-export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings}`;
+export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus}`;
 
 /** Production origin (client-metadata + redirect must live here). */
 const PROD_ORIGIN = "https://atradio.fm";

@@ -1,0 +1,42 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.getGlobalRecentlyPlayed"
+defs = new Mapping<String, Query> {
+  ["main"] {
+    type = "query"
+    description = "List recent play events across the whole platform, most recent first, each paired with the actor who played it."
+    parameters = new Params {
+      required = List()
+      properties {
+        ["limit"] = new IntegerType {
+          type = "integer"
+          minimum = 1
+          maximum = 100
+        }
+        ["cursor"] = new StringType {
+          type = "string"
+        }
+      }
+    }
+    output {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("items")
+        properties {
+          ["cursor"] = new StringType {
+            type = "string"
+          }
+          ["items"] = new Array {
+            type = "array"
+            items = new Ref {
+              type = "ref"
+              ref = "fm.atradio.defs#playView"
+            }
+          }
+        }
+      }
+    }
+  }
+}

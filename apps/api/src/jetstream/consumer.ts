@@ -3,6 +3,7 @@ import { consola } from "consola";
 import { eq } from "drizzle-orm";
 import {
   NSID,
+  actorStatusRecordSchema,
   favoriteRecordSchema,
   stationRecordSchema,
 } from "@atradio/lexicons";
@@ -10,7 +11,7 @@ import { env } from "../env";
 import { db, schema } from "../db";
 import { getProfile } from "../lib/profile";
 
-const WANTED: string[] = [NSID.favorite, NSID.station];
+const WANTED: string[] = [NSID.favorite, NSID.station, NSID.actorStatus];
 const CURSOR_ID = "global";
 
 interface JetstreamEvent {
@@ -62,6 +63,97 @@ async function ensureUser(did: string): Promise<void> {
     });
 }
 
+type Commit = NonNullable<JetstreamEvent["commit"]>;
+
+/** Upsert a fm.atradio.favorite record. */
+async function indexFavorite(did: string, c: Commit, uri: string): Promise<void> {
+  const parsed = favoriteRecordSchema.safeParse(c.record);
+  if (!parsed.success) return;
+  const r = parsed.data;
+  await ensureUser(did);
+  await db
+    .insert(schema.favorites)
+    .values({
+      uri,
+      did,
+      rkey: c.rkey,
+      stationId: r.station.stationId,
+      station: r.station,
+      subjectUri: r.subject?.uri ?? null,
+      createdAt: new Date(r.createdAt),
+      indexedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: schema.favorites.uri,
+      set: {
+        stationId: r.station.stationId,
+        station: r.station,
+        subjectUri: r.subject?.uri ?? null,
+        createdAt: new Date(r.createdAt),
+        indexedAt: new Date(),
+      },
+    });
+}
+
+/** Upsert a fm.atradio.station record. */
+async function indexStation(did: string, c: Commit, uri: string): Promise<void> {
+  const parsed = stationRecordSchema.safeParse(c.record);
+  if (!parsed.success) return;
+  const r = parsed.data;
+  await ensureUser(did);
+  const values = {
+    uri,
+    did,
+    rkey: c.rkey,
+    name: r.name,
+    streamUrl: r.streamUrl,
+    description: r.description ?? null,
+    genre: r.genre ?? null,
+    homepage: r.homepage ?? null,
+    logoUrl: r.logo ?? null,
+    tags: r.tags ?? null,
+    createdAt: new Date(r.createdAt),
+    indexedAt: new Date(),
+  };
+  await db
+    .insert(schema.stations)
+    .values(values)
+    .onConflictDoUpdate({
+      target: schema.stations.uri,
+      set: {
+        name: values.name,
+        streamUrl: values.streamUrl,
+        description: values.description,
+        genre: values.genre,
+        homepage: values.homepage,
+        logoUrl: values.logoUrl,
+        tags: values.tags,
+        createdAt: values.createdAt,
+        indexedAt: values.indexedAt,
+      },
+    });
+}
+
+/** Record a play from a fm.atradio.actor.status update. The record is a
+ *  singleton (rkey `self`) so each create/update is one play; we append a
+ *  history row keyed by (did, playedAt), ignoring idempotent replays. */
+async function indexPlay(did: string, c: Commit): Promise<void> {
+  const parsed = actorStatusRecordSchema.safeParse(c.record);
+  if (!parsed.success) return;
+  const r = parsed.data;
+  await ensureUser(did);
+  await db
+    .insert(schema.recentlyPlayed)
+    .values({
+      did,
+      stationId: r.station.stationId,
+      station: r.station,
+      playedAt: new Date(r.playedAt),
+      indexedAt: new Date(),
+    })
+    .onConflictDoNothing();
+}
+
 async function processCommit(evt: JetstreamEvent): Promise<void> {
   const c = evt.commit;
   if (!c || !WANTED.includes(c.collection)) return;
@@ -70,77 +162,17 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
   if (c.operation === "delete") {
     if (c.collection === NSID.favorite) {
       await db.delete(schema.favorites).where(eq(schema.favorites.uri, uri));
-    } else {
+    } else if (c.collection === NSID.station) {
       await db.delete(schema.stations).where(eq(schema.stations.uri, uri));
     }
+    // A deleted actor.status record leaves the play history intact.
     return;
   }
 
   // create / update
-  if (c.collection === NSID.favorite) {
-    const parsed = favoriteRecordSchema.safeParse(c.record);
-    if (!parsed.success) return;
-    const r = parsed.data;
-    await ensureUser(evt.did);
-    await db
-      .insert(schema.favorites)
-      .values({
-        uri,
-        did: evt.did,
-        rkey: c.rkey,
-        stationId: r.station.stationId,
-        station: r.station,
-        subjectUri: r.subject?.uri ?? null,
-        createdAt: new Date(r.createdAt),
-        indexedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: schema.favorites.uri,
-        set: {
-          stationId: r.station.stationId,
-          station: r.station,
-          subjectUri: r.subject?.uri ?? null,
-          createdAt: new Date(r.createdAt),
-          indexedAt: new Date(),
-        },
-      });
-  } else {
-    const parsed = stationRecordSchema.safeParse(c.record);
-    if (!parsed.success) return;
-    const r = parsed.data;
-    await ensureUser(evt.did);
-    const values = {
-      uri,
-      did: evt.did,
-      rkey: c.rkey,
-      name: r.name,
-      streamUrl: r.streamUrl,
-      description: r.description ?? null,
-      genre: r.genre ?? null,
-      homepage: r.homepage ?? null,
-      logoUrl: r.logo ?? null,
-      tags: r.tags ?? null,
-      createdAt: new Date(r.createdAt),
-      indexedAt: new Date(),
-    };
-    await db
-      .insert(schema.stations)
-      .values(values)
-      .onConflictDoUpdate({
-        target: schema.stations.uri,
-        set: {
-          name: values.name,
-          streamUrl: values.streamUrl,
-          description: values.description,
-          genre: values.genre,
-          homepage: values.homepage,
-          logoUrl: values.logoUrl,
-          tags: values.tags,
-          createdAt: values.createdAt,
-          indexedAt: values.indexedAt,
-        },
-      });
-  }
+  if (c.collection === NSID.favorite) await indexFavorite(evt.did, c, uri);
+  else if (c.collection === NSID.station) await indexStation(evt.did, c, uri);
+  else if (c.collection === NSID.actorStatus) await indexPlay(evt.did, c);
 }
 
 async function handleEvent(evt: JetstreamEvent): Promise<void> {

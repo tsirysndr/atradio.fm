@@ -1,0 +1,40 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.getListenerCounts",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "Unique-listener counts (distinct actors who have played a station) for one or more stations.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "stations"
+        ],
+        "properties": {
+          "stations": {
+            "type": "string",
+            "description": "Comma-separated station ids (source-prefixed, e.g. rb:uuid)."
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "counts"
+          ],
+          "properties": {
+            "counts": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "fm.atradio.defs#listenerCount"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

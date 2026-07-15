@@ -10,6 +10,7 @@ import { LoginModal } from "./LoginModal";
 import { AudioSettingsModal } from "./AudioSettingsModal";
 import { AudioSettingsSync } from "./AudioSettingsSync";
 import { UserDataSync } from "./UserDataSync";
+import { PlayStatusSync } from "./PlayStatusSync";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { shortcutsOpenAtom } from "@/atoms/ui";
 
@@ -42,6 +43,7 @@ export function Layout() {
       <AudioSettingsModal />
       <AudioSettingsSync />
       <UserDataSync />
+      <PlayStatusSync />
     </div>
   );
 }

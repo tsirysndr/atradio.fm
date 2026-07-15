@@ -2,8 +2,12 @@ export const NSID = {
   station: "fm.atradio.station",
   favorite: "fm.atradio.favorite",
   audioSettings: "fm.atradio.audio.settings",
+  actorStatus: "fm.atradio.actor.status",
   getFavorites: "fm.atradio.getFavorites",
   getStations: "fm.atradio.getStations",
+  getRecentlyPlayed: "fm.atradio.getRecentlyPlayed",
+  getGlobalRecentlyPlayed: "fm.atradio.getGlobalRecentlyPlayed",
+  getListenerCounts: "fm.atradio.getListenerCounts",
 } as const;
 
 export type StationSource = "radio-browser" | "tunein" | "custom";
@@ -64,6 +68,39 @@ export interface StationListOutput {
   /** Total number of records for the actor (not just this page). */
   total: number;
   items: StationView[];
+}
+
+/** `fm.atradio.defs#actorInfo` — a minimal public actor snapshot. */
+export interface ActorInfo {
+  did: string;
+  handle?: string;
+  displayName?: string;
+  avatar?: string;
+}
+
+/** `fm.atradio.defs#playView` — a single play event (query output item). */
+export interface PlayView {
+  station: StationInfo;
+  playedAt: string;
+  /** Present on the global feed; omitted on per-actor queries. */
+  actor?: ActorInfo;
+}
+
+/** Output of `fm.atradio.getRecentlyPlayed` / `getGlobalRecentlyPlayed`. */
+export interface PlayListOutput {
+  cursor?: string;
+  items: PlayView[];
+}
+
+/** `fm.atradio.defs#listenerCount` — unique listeners for one station. */
+export interface ListenerCount {
+  stationId: string;
+  listeners: number;
+}
+
+/** Output of `fm.atradio.getListenerCounts`. */
+export interface ListenerCountsOutput {
+  counts: ListenerCount[];
 }
 
 /**
@@ -168,3 +205,15 @@ export const DEFAULT_AUDIO_SETTINGS: AudioSettingsData = {
   channelMode: "stereo",
   stereoWidth: 100,
 };
+
+// ---- fm.atradio.actor.status ----
+
+/** Singleton record rkey (one status record per repo). */
+export const ACTOR_STATUS_RKEY = "self";
+
+/** `fm.atradio.actor.status` record — the actor's most recent play. */
+export interface ActorStatusRecord {
+  $type?: typeof NSID.actorStatus;
+  station: StationInfo;
+  playedAt: string;
+}

@@ -1,4 +1,5 @@
 import type {
+  ActorStatusRecord,
   AudioSettingsData,
   AudioSettingsRecord,
   FavoriteRecord,
@@ -172,4 +173,18 @@ export function audioSettingsRecordToData(
     channelMode: r.channelMode ?? d.channelMode,
     stereoWidth: r.stereoWidth ?? d.stereoWidth,
   };
+}
+
+// ---- fm.atradio.actor.status ----
+
+/** Build the singleton listening-status record for a played station. */
+export function buildActorStatusRecord(
+  s: Station,
+  playedAt?: string,
+): ActorStatusRecord {
+  return clean({
+    $type: NSID.actorStatus,
+    station: stationToInfo(s),
+    playedAt: playedAt ?? new Date().toISOString(),
+  }) as ActorStatusRecord;
 }

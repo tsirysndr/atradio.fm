@@ -5,7 +5,9 @@ import type { Did, Nsid } from "@atcute/lexicons";
 import {
   NSID,
   AUDIO_SETTINGS_RKEY,
+  ACTOR_STATUS_RKEY,
   audioSettingsRecordSchema,
+  buildActorStatusRecord,
   buildAudioSettingsRecord,
   buildFavoriteRecord,
   buildStationRecord,
@@ -143,6 +145,28 @@ export async function getAudioSettings(
   if (!res.ok) return null;
   const parsed = audioSettingsRecordSchema.safeParse(res.data.value);
   return parsed.success ? (parsed.data as AudioSettingsRecord) : null;
+}
+
+/** Write the actor's singleton listening-status record (rkey `self`),
+ *  overwriting it with the station they just played. */
+export async function putActorStatus(
+  client: Client,
+  did: Did,
+  station: Station,
+): Promise<void> {
+  await ok(
+    client.post("com.atproto.repo.putRecord", {
+      input: {
+        repo: did,
+        collection: NSID.actorStatus as Nsid,
+        rkey: ACTOR_STATUS_RKEY,
+        record: buildActorStatusRecord(station) as unknown as Record<
+          string,
+          unknown
+        >,
+      },
+    }),
+  );
 }
 
 /** Write the actor's singleton audio-settings record (rkey `self`). */

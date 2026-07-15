@@ -92,6 +92,71 @@
           "format": "datetime"
         }
       }
+    },
+    "actorInfo": {
+      "type": "object",
+      "description": "A minimal public snapshot of an actor.",
+      "required": [
+        "did"
+      ],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did"
+        },
+        "handle": {
+          "type": "string",
+          "format": "at-identifier"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Avatar URL.",
+          "format": "uri"
+        }
+      }
+    },
+    "playView": {
+      "type": "object",
+      "description": "A single play event: a station an actor listened to at a point in time.",
+      "required": [
+        "station",
+        "playedAt"
+      ],
+      "properties": {
+        "station": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#stationInfo"
+        },
+        "playedAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "actor": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#actorInfo"
+        }
+      }
+    },
+    "listenerCount": {
+      "type": "object",
+      "description": "Unique-listener count for a single station.",
+      "required": [
+        "stationId",
+        "listeners"
+      ],
+      "properties": {
+        "stationId": {
+          "type": "string"
+        },
+        "listeners": {
+          "type": "integer",
+          "description": "Number of distinct actors who have played this station.",
+          "minimum": 0
+        }
+      }
     }
   }
 }

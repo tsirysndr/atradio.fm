@@ -1,6 +1,7 @@
 import { useSetAtom } from "jotai";
 import { IconSearch } from "@tabler/icons-react";
 import { CategoryGrid } from "@/components/CategoryGrid";
+import { RecentlyPlayedRow } from "@/components/RecentlyPlayedRow";
 import { openSearchPaletteAtom } from "@/atoms/ui";
 
 export function SearchPage() {
@@ -50,6 +51,8 @@ export function SearchPage() {
           </kbd>
         </button>
       </section>
+
+      <RecentlyPlayedRow />
 
       <CategoryGrid onSelect={(term) => openSearch(term)} />
     </div>

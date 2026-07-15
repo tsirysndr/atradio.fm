@@ -12,6 +12,7 @@ import {
   IconAlertTriangle,
   IconMusic,
   IconAdjustmentsHorizontal,
+  IconHeadphones,
 } from "@tabler/icons-react";
 import type Hls from "hls.js";
 import type { TrackMetadata } from "rockbox-wasm";
@@ -32,6 +33,7 @@ import {
   useAudioSettingsSnapshot,
 } from "@/atoms/audioSettings";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
+import { useListenerCount } from "@/hooks/useListenerCount";
 import { ensureRockboxReady, getRockboxPlayer } from "@/lib/audio/rockbox";
 import { resolveStream } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
@@ -79,6 +81,7 @@ export function Player() {
   const openAudioSettings = useSetAtom(audioSettingsOpenAtom);
   const ensureAuth = useRequireAuth();
   const audioSettings = useAudioSettingsSnapshot();
+  const listeners = useListenerCount(station?.id);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -381,6 +384,15 @@ export function Player() {
                       {infoText}
                     </span>
                   )}
+                  {listeners ? (
+                    <span
+                      className="flex shrink-0 items-center gap-1 text-xs text-synth-magenta"
+                      title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
+                    >
+                      <IconHeadphones size={13} />
+                      {listeners}
+                    </span>
+                  ) : null}
                 </div>
               </div>
             </div>

@@ -1,4 +1,9 @@
-import type { StationListOutput, StationView } from "@atradio/lexicons";
+import type {
+  ListenerCount,
+  PlayView,
+  StationListOutput,
+  StationView,
+} from "@atradio/lexicons";
 
 /**
  * Client for the atradio.fm AppView XRPC API (apps/api). Reads the indexed,
@@ -60,3 +65,54 @@ export const getRecentStations = (limit?: number) =>
   feed("fm.atradio.getRecentStations", limit);
 export const getPopularStations = (limit?: number) =>
   feed("fm.atradio.getPopularStations", limit);
+
+interface PlayFeed {
+  cursor?: string;
+  items: PlayView[];
+}
+
+/** A user's recently played stations (distinct, newest first). */
+export async function getRecentlyPlayed(
+  actor: string,
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<PlayFeed> {
+  const params = new URLSearchParams({ actor });
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  const res = await fetch(
+    `${BASE}/xrpc/fm.atradio.getRecentlyPlayed?${params}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) throw new Error(`getRecentlyPlayed: ${res.status}`);
+  return (await res.json()) as PlayFeed;
+}
+
+/** Platform-wide recent play events (with the actor who played each). */
+export async function getGlobalRecentlyPlayed(
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<PlayFeed> {
+  const params = new URLSearchParams();
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  const res = await fetch(
+    `${BASE}/xrpc/fm.atradio.getGlobalRecentlyPlayed?${params}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) throw new Error(`getGlobalRecentlyPlayed: ${res.status}`);
+  return (await res.json()) as PlayFeed;
+}
+
+/** Unique-listener counts for the given station ids (missing ids → absent). */
+export async function getListenerCounts(
+  stationIds: string[],
+): Promise<ListenerCount[]> {
+  if (stationIds.length === 0) return [];
+  const params = new URLSearchParams({ stations: stationIds.join(",") });
+  const res = await fetch(
+    `${BASE}/xrpc/fm.atradio.getListenerCounts?${params}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) throw new Error(`getListenerCounts: ${res.status}`);
+  const data = (await res.json()) as { counts: ListenerCount[] };
+  return data.counts;
+}

@@ -1,0 +1,35 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.getListenerCounts"
+defs = new Mapping<String, Query> {
+  ["main"] {
+    type = "query"
+    description = "Unique-listener counts (distinct actors who have played a station) for one or more stations."
+    parameters = new Params {
+      required = List("stations")
+      properties {
+        ["stations"] = new StringType {
+          type = "string"
+          description = "Comma-separated station ids (source-prefixed, e.g. rb:uuid)."
+        }
+      }
+    }
+    output {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("counts")
+        properties {
+          ["counts"] = new Array {
+            type = "array"
+            items = new Ref {
+              type = "ref"
+              ref = "fm.atradio.defs#listenerCount"
+            }
+          }
+        }
+      }
+    }
+  }
+}

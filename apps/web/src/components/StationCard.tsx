@@ -7,8 +7,10 @@ import {
   IconHeartFilled,
   IconExternalLink,
   IconTrash,
+  IconHeadphones,
 } from "@tabler/icons-react";
 import type { Station } from "@/lib/types";
+import { useListenerCount } from "@/hooks/useListenerCount";
 import {
   currentStationAtom,
   isPlayingAtom,
@@ -48,6 +50,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
   const isCurrent = current?.id === station.id;
   const isActive = isCurrent && isPlaying;
   const isFavorite = favoriteIds.has(station.id);
+  const listeners = useListenerCount(station.id);
 
   const handlePlay = () => {
     if (isCurrent) togglePlay();
@@ -100,6 +103,17 @@ export function StationCard({ station, onRemove }: StationCardProps) {
         {station.bitrate ? (
           <Chip size="sm" variant="soft" color="default">
             {station.bitrate}kbps
+          </Chip>
+        ) : null}
+        {listeners ? (
+          <Chip
+            size="sm"
+            variant="soft"
+            className="gap-1 !bg-synth-magenta/10 !text-synth-magenta"
+            title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
+          >
+            <IconHeadphones size={12} />
+            {listeners}
           </Chip>
         ) : null}
       </div>

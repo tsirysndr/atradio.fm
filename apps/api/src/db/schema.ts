@@ -5,6 +5,7 @@ import {
   bigint,
   timestamp,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import type { StationInfo } from "@atradio/lexicons";
 
@@ -63,6 +64,30 @@ export const favorites = pgTable(
   (t) => [
     index("favorites_did_idx").on(t.did),
     index("favorites_station_id_idx").on(t.stationId),
+  ],
+);
+
+/**
+ * Play-history from fm.atradio.actor.status updates (from Jetstream). The status
+ * record is a singleton (rkey `self`) overwritten on each play, so each update
+ * yields one history row here, keyed by (did, playedAt).
+ */
+export const recentlyPlayed = pgTable(
+  "recently_played",
+  {
+    did: text("did").notNull(),
+    stationId: text("station_id").notNull(),
+    station: jsonb("station").$type<StationInfo>().notNull(),
+    playedAt: timestamp("played_at", { withTimezone: true }).notNull(),
+    indexedAt: timestamp("indexed_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.did, t.playedAt] }),
+    index("recently_played_did_idx").on(t.did),
+    index("recently_played_station_id_idx").on(t.stationId),
+    index("recently_played_played_at_idx").on(t.playedAt),
   ],
 );
 
