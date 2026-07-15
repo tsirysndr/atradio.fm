@@ -44,7 +44,7 @@ export function SearchPage() {
         >
           <IconSearch size={20} className="text-foreground/40" />
           <span className="flex-1 text-base text-foreground/30">
-            Search stations, genres, cities…
+            Search stations, genres…
           </span>
           <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-xs text-foreground/50">
             /
