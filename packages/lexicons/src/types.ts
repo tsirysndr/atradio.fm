@@ -1,7 +1,7 @@
 export const NSID = {
   station: "fm.atradio.station",
   favorite: "fm.atradio.favorite",
-  audioSettings: "fm.atradio.audioSettings",
+  audioSettings: "fm.atradio.audio.settings",
   getFavorites: "fm.atradio.getFavorites",
   getStations: "fm.atradio.getStations",
 } as const;
@@ -96,7 +96,7 @@ export interface StationDraft {
   logoUrl?: string;
 }
 
-// ---- fm.atradio.audioSettings ----
+// ---- fm.atradio.audio.settings ----
 
 export type CrossfeedModeValue = "off" | "meier" | "custom";
 export type ChannelModeValue =
@@ -111,7 +111,7 @@ export type ChannelModeValue =
 /** Singleton record rkey (one settings record per repo). */
 export const AUDIO_SETTINGS_RKEY = "self";
 
-/** `fm.atradio.audioSettings` record. `crossfeedDirect` is in tenths of dB. */
+/** `fm.atradio.audio.settings` record. `crossfeedDirect` is in tenths of dB. */
 export interface AudioSettingsRecord {
   $type?: typeof NSID.audioSettings;
   eqEnabled?: boolean;

@@ -1,7 +1,7 @@
-amends "../../schema/lexicon.pkl"
+amends "../../../schema/lexicon.pkl"
 
 lexicon = 1
-id = "fm.atradio.audioSettings"
+id = "fm.atradio.audio.settings"
 defs = new Mapping<String, Record> {
   ["main"] {
     type = "record"

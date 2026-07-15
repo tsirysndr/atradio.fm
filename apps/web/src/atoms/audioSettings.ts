@@ -12,7 +12,7 @@ export const EQ_CUTOFFS = RockboxPlayer.EQ_BAND_CUTOFFS;
 // Every DSP setting persists to localStorage (atomWithStorage) so the audio
 // chain survives reloads — applyAudioSettings() pushes the whole snapshot to
 // the engine once it boots. Defaults come from @atradio/lexicons so the local
-// state, the fm.atradio.audioSettings record, and other devices agree.
+// state, the fm.atradio.audio.settings record, and other devices agree.
 
 export const eqEnabledAtom = atomWithStorage(
   "atradio:eq.enabled",
@@ -137,7 +137,7 @@ export const fromAudioSettingsData = (d: AudioSettingsData): AudioSettings => ({
 });
 
 /** Overwrite every setting atom at once (used when restoring the synced
- *  fm.atradio.audioSettings record from the PDS). */
+ *  fm.atradio.audio.settings record from the PDS). */
 export const applyRemoteAudioSettingsAtom = atom(
   null,
   (_get, set, s: AudioSettings) => {

@@ -24,10 +24,10 @@ const CUSTOM: AudioSettingsData = {
   stereoWidth: 130,
 };
 
-describe("fm.atradio.audioSettings mappers", () => {
+describe("fm.atradio.audio.settings mappers", () => {
   it("round-trips settings through the record shape", () => {
     const record = buildAudioSettingsRecord(CUSTOM);
-    expect(record.$type).toBe("fm.atradio.audioSettings");
+    expect(record.$type).toBe("fm.atradio.audio.settings");
     // dB -> tenths of dB in the record (lexicons have no floats)…
     expect(record.crossfeedDirect).toBe(-15);
     expect(record.updatedAt).toBeTruthy();

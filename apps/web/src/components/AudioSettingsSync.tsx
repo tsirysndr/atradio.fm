@@ -23,7 +23,7 @@ const WRITE_DEBOUNCE_MS = 3000;
 
 /**
  * Syncs the audio settings (EQ + DSP chain) with the logged-in user's
- * fm.atradio.audioSettings record; renders nothing.
+ * fm.atradio.audio.settings record; renders nothing.
  *
  * On login the remote record wins: it's applied to the local atoms (and the
  * live engine). After that, local changes are debounced and written back, so

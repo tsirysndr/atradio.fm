@@ -121,7 +121,7 @@ export function stationRecordToStation(
   }) as Station;
 }
 
-// ---- fm.atradio.audioSettings ----
+// ---- fm.atradio.audio.settings ----
 
 /** Build the singleton settings record. `crossfeedDirect` goes from dB to
  *  tenths of dB; every gain is rounded to the integer the lexicon requires. */

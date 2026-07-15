@@ -1,6 +1,6 @@
 {
   "lexicon": 1,
-  "id": "fm.atradio.audioSettings",
+  "id": "fm.atradio.audio.settings",
   "defs": {
     "main": {
       "type": "record",

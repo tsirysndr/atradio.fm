@@ -71,7 +71,7 @@ export const channelModeSchema = z.enum([
 ]);
 
 export const audioSettingsRecordSchema = z.object({
-  $type: z.literal("fm.atradio.audioSettings").optional(),
+  $type: z.literal("fm.atradio.audio.settings").optional(),
   eqEnabled: z.boolean().optional(),
   eqGains: z.array(z.number().min(-24).max(24)).optional(),
   bass: z.number().min(-24).max(24).optional(),
