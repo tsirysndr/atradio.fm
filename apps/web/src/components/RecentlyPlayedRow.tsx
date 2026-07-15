@@ -117,7 +117,7 @@ export function RecentlyPlayedRow() {
     <section className="flex flex-col gap-3">
       <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
         <IconHistory size={18} className="text-synth-magenta" />
-        Recently played on atradio
+        Recently played on atradio.fm
       </h2>
       <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
         {items.map((item, i) => (
