@@ -15,6 +15,9 @@ const BASE = (import.meta.env.VITE_APPVIEW_URL ?? "https://api.atradio.fm").repl
   "",
 );
 
+/** Base origin of the AppView API (also hosts the media proxies under /api). */
+export const APPVIEW_URL = BASE;
+
 export interface ListQuery {
   limit?: number;
   cursor?: string;

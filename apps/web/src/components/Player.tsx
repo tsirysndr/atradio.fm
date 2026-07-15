@@ -35,7 +35,7 @@ import {
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useListenerCount } from "@/hooks/useListenerCount";
 import { ensureRockboxReady, getRockboxPlayer } from "@/lib/audio/rockbox";
-import { resolveStream } from "@/lib/audio/resolve";
+import { resolveStream, proxiedStreamUrl } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
 import { StationLogo } from "./StationLogo";
@@ -202,7 +202,11 @@ export function Player() {
       try {
         const { url, isHls } = await resolveStream(station, controller.signal);
         if (cancelled) return;
-        currentUrlRef.current = url;
+        // Playback URL: http streams are routed through our https proxy so the
+        // browser doesn't block them as mixed content. ICY polling below keeps
+        // using the original URL (that runs server-side, no mixed content).
+        const playUrl = isHls ? url : proxiedStreamUrl(url);
+        currentUrlRef.current = playUrl;
 
         if (station.source === "radio-browser") {
           registerRadioBrowserClick(station.id);
@@ -218,16 +222,16 @@ export function Player() {
             if (HlsCtor.isSupported()) {
               const hls = new HlsCtor();
               hlsRef.current = hls;
-              hls.loadSource(url);
+              hls.loadSource(playUrl);
               hls.attachMedia(audio);
               hls.on(HlsCtor.Events.ERROR, (_e, data) => {
                 if (data.fatal) setStatus("error");
               });
             } else {
-              audio.src = url;
+              audio.src = playUrl;
             }
           } else {
-            audio.src = url;
+            audio.src = playUrl;
             audio.load();
           }
           await audio.play().catch(() => {
@@ -254,10 +258,10 @@ export function Player() {
           const { volume, muted, audioSettings } = stateRef.current;
           applyAudioSettings(p, audioSettings);
           p.setVolume(muted ? 0 : volume);
-          p.setQueue([url], true);
+          p.setQueue([playUrl], true);
         } else {
-          fallbackUrlRef.current = url;
-          fallbackToNative(url);
+          fallbackUrlRef.current = playUrl;
+          fallbackToNative(playUrl);
         }
       } catch {
         if (!cancelled) setStatus("error");

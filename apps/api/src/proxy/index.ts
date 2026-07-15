@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { Readable } from "node:stream";
 import { consola } from "consola";
 import { cacheGet, cacheSet } from "../cache";
 
@@ -38,6 +39,81 @@ proxyRouter.get(/^\/tunein\/.*/, async (req: Request, res: Response) => {
   } catch (err) {
     consola.error("[proxy] tunein error", err);
     res.status(502).json({ error: "BadGateway" });
+  }
+});
+
+/* ------------------------------ Stream proxy ---------------------------- */
+
+/** Upstream response headers worth forwarding to the player, incl. the ICY
+ *  metadata headers the decoder reads for "now playing". */
+const STREAM_HEADERS = [
+  "content-type",
+  "icy-metaint",
+  "icy-name",
+  "icy-genre",
+  "icy-br",
+  "icy-description",
+  "icy-url",
+];
+
+/**
+ * GET /api/stream?url=<http(s) stream>
+ *
+ * Reverse-proxy an audio stream so the https app can play `http://` streams
+ * without the browser blocking them as mixed content. Bytes are piped straight
+ * through (never buffered), and the client's ICY intent is forwarded so
+ * metadata interleaving still works when the decoder asks for it.
+ */
+proxyRouter.get("/stream", async (req: Request, res: Response) => {
+  const target = String(req.query.url ?? "");
+  if (!/^https?:\/\//i.test(target)) {
+    res
+      .status(400)
+      .json({ error: "InvalidRequest", message: "url must be http(s)" });
+    return;
+  }
+
+  const controller = new AbortController();
+  // Drop the upstream connection as soon as the client goes away.
+  res.on("close", () => controller.abort());
+
+  try {
+    const upstream = await fetch(target, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "atradio.fm/1.0",
+        // Only interleave metadata if the decoder actually requested it.
+        ...(req.headers["icy-metadata"]
+          ? { "Icy-MetaData": String(req.headers["icy-metadata"]) }
+          : {}),
+        ...(req.headers.range ? { Range: String(req.headers.range) } : {}),
+      },
+    });
+
+    res.status(upstream.status);
+    for (const h of STREAM_HEADERS) {
+      const v = upstream.headers.get(h);
+      if (v) res.setHeader(h, v);
+    }
+    // Let cross-origin JS (the wasm decoder) read the ICY headers.
+    res.setHeader("Access-Control-Expose-Headers", STREAM_HEADERS.join(", "));
+    res.setHeader("Cache-Control", "no-store");
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+    const stream = Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]);
+    stream.on("error", () => {
+      if (!res.destroyed) res.destroy();
+    });
+    stream.pipe(res);
+  } catch (err) {
+    if (controller.signal.aborted) return; // client disconnected — expected
+    consola.error("[proxy] stream error", err);
+    if (!res.headersSent) res.status(502).json({ error: "BadGateway" });
+    else res.destroy();
   }
 });
 
