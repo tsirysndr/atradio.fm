@@ -109,7 +109,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
           <Chip
             size="sm"
             variant="soft"
-            className="gap-1 !bg-synth-magenta/10 !text-synth-magenta"
+            className="gap-1 !bg-synth-purple/10 !text-synth-purple"
             title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
           >
             <IconHeadphones size={12} />

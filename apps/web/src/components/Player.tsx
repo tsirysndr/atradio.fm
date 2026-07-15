@@ -390,7 +390,7 @@ export function Player() {
                   )}
                   {listeners ? (
                     <span
-                      className="flex shrink-0 items-center gap-1 text-xs text-synth-magenta"
+                      className="flex shrink-0 items-center gap-1 text-xs text-synth-purple"
                       title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
                     >
                       <IconHeadphones size={13} />
