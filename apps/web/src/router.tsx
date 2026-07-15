@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-router";
 import { Layout } from "@/components/Layout";
 import { SearchPage } from "@/routes/SearchPage";
+import { BrowsePage } from "@/routes/BrowsePage";
 import { ProfilePage } from "@/routes/ProfilePage";
 import { OAuthCallback } from "@/routes/OAuthCallback";
 
@@ -16,6 +17,13 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: SearchPage,
+});
+
+/** Infinite-scroll browse view for a genre/category. */
+const browseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/browse/$category",
+  component: BrowsePage,
 });
 
 /** The logged-in user's own profile. */
@@ -40,6 +48,7 @@ const oauthCallbackRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  browseRoute,
   profileRoute,
   actorProfileRoute,
   oauthCallbackRoute,

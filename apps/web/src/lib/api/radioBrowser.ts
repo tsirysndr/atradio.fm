@@ -75,6 +75,43 @@ export async function searchRadioBrowser(
     .map(toStation);
 }
 
+export interface StationPageParams {
+  /** Tag/genre to browse, e.g. "synthwave" or "hip hop". */
+  tag: string;
+  /** How many stations to skip (for pagination). */
+  offset: number;
+  /** Page size. */
+  limit: number;
+  signal?: AbortSignal;
+}
+
+/**
+ * Browse every station carrying a given tag, most-played first. Unlike the
+ * name search this is paginated via `offset`/`limit`, which is what lets the
+ * category browse page infinite-scroll through the entire genre.
+ */
+export async function browseRadioBrowserByTag({
+  tag,
+  offset,
+  limit,
+  signal,
+}: StationPageParams): Promise<Station[]> {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+    hidebroken: "true",
+    order: "clickcount",
+    reverse: "true",
+  });
+  const res = await fetch(
+    `${BASE}/json/stations/bytag/${encodeURIComponent(tag)}?${params}`,
+    { signal, headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) throw new Error(`radio-browser: ${res.status}`);
+  const data = (await res.json()) as RadioBrowserStation[];
+  return data.filter((s) => s.url_resolved || s.url).map(toStation);
+}
+
 /**
  * radio-browser asks clients to register a "click" when a station is actually
  * played so its popularity ranking stays useful. Fire-and-forget; failures are

@@ -54,7 +54,7 @@ export function SearchPage() {
 
       <RecentlyPlayedRow />
 
-      <CategoryGrid onSelect={(term) => openSearch(term)} />
+      <CategoryGrid />
     </div>
   );
 }
