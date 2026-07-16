@@ -1,0 +1,17 @@
+{
+  "search": "Rechercher",
+  "addStation": "Ajouter une station",
+  "add": "Ajouter",
+  "signIn": "Se connecter",
+  "signOut": "Se déconnecter",
+  "cancel": "Annuler",
+  "save": "Enregistrer",
+  "saving": "Enregistrement…",
+  "close": "Fermer",
+  "loading": "Chargement…",
+  "retry": "Réessayer",
+  "error": "Une erreur est survenue",
+  "language": "Langue",
+  "shortcutsButton": "Afficher les raccourcis clavier",
+  "shortcutsButtonTitle": "Raccourcis clavier (?)"
+}

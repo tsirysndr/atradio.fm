@@ -1,0 +1,23 @@
+{
+  "back": "Back",
+  "loadingStations": "Loading stations…",
+  "stationCount_one": "{{display}} station",
+  "stationCount_other": "{{display}} stations",
+  "errorTitle": "Couldn't load stations",
+  "errorDescription": "Something went wrong reaching the station directory. Try again in a moment.",
+  "emptyTitle": "No {{label}} stations found",
+  "emptyDescription": "Try another category or search for a station by name.",
+  "endReached": "You've reached the end of {{label}}.",
+  "browseByCategory": "Browse by category",
+  "recentlyPlayed": "Recently played on atradio.fm",
+  "someone": "someone",
+  "playStation": "Play {{name}}",
+  "playedBy": "Played by {{name}}",
+  "timeAgo": {
+    "justNow": "just now",
+    "minutes": "{{count}}m ago",
+    "hours": "{{count}}h ago",
+    "days": "{{count}}d ago",
+    "weeks": "{{count}}w ago"
+  }
+}

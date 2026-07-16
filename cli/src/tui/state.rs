@@ -33,6 +33,53 @@ pub enum Overlay {
     Compose,
     /// OAuth sign-in prompt (enter a handle / DID / PDS URL).
     SignIn,
+    /// Add-a-custom-station form.
+    AddStation,
+}
+
+/// The add-station form: an ordered set of text fields.
+#[derive(Clone, Default)]
+pub struct AddStationForm {
+    pub name: String,
+    pub stream_url: String,
+    pub genre: String,
+    pub homepage: String,
+    pub logo: String,
+    /// Index of the focused field (0..FIELD_COUNT).
+    pub focus: usize,
+}
+
+impl AddStationForm {
+    pub const FIELD_COUNT: usize = 5;
+
+    pub fn labels() -> [&'static str; Self::FIELD_COUNT] {
+        ["Name*", "Stream URL*", "Genre", "Homepage", "Logo URL"]
+    }
+
+    pub fn field(&self, i: usize) -> &str {
+        match i {
+            0 => &self.name,
+            1 => &self.stream_url,
+            2 => &self.genre,
+            3 => &self.homepage,
+            _ => &self.logo,
+        }
+    }
+
+    pub fn field_mut(&mut self, i: usize) -> &mut String {
+        match i {
+            0 => &mut self.name,
+            1 => &mut self.stream_url,
+            2 => &mut self.genre,
+            3 => &mut self.homepage,
+            _ => &mut self.logo,
+        }
+    }
+
+    /// True when the required fields (name + stream URL) are filled.
+    pub fn is_valid(&self) -> bool {
+        !self.name.trim().is_empty() && !self.stream_url.trim().is_empty()
+    }
 }
 
 /// Home has several horizontally-laid lists; this tracks focus.
@@ -40,33 +87,42 @@ pub enum Overlay {
 pub enum HomeTab {
     Trending,
     Popular,
+    /// Global "who's listening" — recently played across atradio.fm.
+    Recent,
     Favorites,
+    /// The connected user's own stations.
+    Yours,
 }
 
 impl HomeTab {
-    pub fn all() -> [HomeTab; 3] {
-        [HomeTab::Trending, HomeTab::Popular, HomeTab::Favorites]
+    pub const ORDER: [HomeTab; 5] = [
+        HomeTab::Trending,
+        HomeTab::Popular,
+        HomeTab::Recent,
+        HomeTab::Favorites,
+        HomeTab::Yours,
+    ];
+
+    pub fn all() -> [HomeTab; 5] {
+        Self::ORDER
     }
     pub fn label(self) -> &'static str {
         match self {
             HomeTab::Trending => "Trending",
             HomeTab::Popular => "Popular",
+            HomeTab::Recent => "Recent",
             HomeTab::Favorites => "Favorites",
+            HomeTab::Yours => "Yours",
         }
+    }
+    fn index(self) -> usize {
+        Self::ORDER.iter().position(|t| *t == self).unwrap_or(0)
     }
     pub fn next(self) -> HomeTab {
-        match self {
-            HomeTab::Trending => HomeTab::Popular,
-            HomeTab::Popular => HomeTab::Favorites,
-            HomeTab::Favorites => HomeTab::Trending,
-        }
+        Self::ORDER[(self.index() + 1) % Self::ORDER.len()]
     }
     pub fn prev(self) -> HomeTab {
-        match self {
-            HomeTab::Trending => HomeTab::Favorites,
-            HomeTab::Popular => HomeTab::Trending,
-            HomeTab::Favorites => HomeTab::Popular,
-        }
+        Self::ORDER[(self.index() + Self::ORDER.len() - 1) % Self::ORDER.len()]
     }
 }
 
@@ -103,6 +159,16 @@ pub struct App {
     pub trending: Vec<StationInfo>,
     pub popular: Vec<StationInfo>,
     pub favorites: Vec<StationInfo>,
+    /// The connected user's own stations.
+    pub stations: Vec<StationInfo>,
+    /// Global recently-played stations (aligned 1:1 with `recent_actors`).
+    pub recent: Vec<StationInfo>,
+    /// Who played each `recent` station (display label, same index).
+    pub recent_actors: Vec<String>,
+    /// The connected user's own recently-played (for the profile view).
+    pub profile_recent: Vec<StationInfo>,
+    /// Selection index within the profile's recently-played list.
+    pub profile_recent_selected: usize,
     pub selected: usize,
 
     // ---- search overlay ----
@@ -118,8 +184,12 @@ pub struct App {
     // ---- sign-in overlay ----
     /// Handle / DID / PDS URL typed into the OAuth sign-in prompt.
     pub signin_input: String,
-    /// True while an OAuth flow is in progress (browser opened).
-    pub oauth_busy: bool,
+    /// Set by the modal to request the run loop start OAuth (with this input);
+    /// the loop suspends the TUI, runs it inline, then restores.
+    pub pending_oauth: Option<String>,
+
+    // ---- add-station overlay ----
+    pub add_form: AddStationForm,
 
     // ---- comments / notifications ----
     pub comments: Vec<CommentView>,
@@ -162,6 +232,11 @@ impl App {
             trending: Vec::new(),
             popular: Vec::new(),
             favorites: Vec::new(),
+            stations: Vec::new(),
+            recent: Vec::new(),
+            recent_actors: Vec::new(),
+            profile_recent: Vec::new(),
+            profile_recent_selected: 0,
             selected: 0,
             search_query: String::new(),
             search_results: Vec::new(),
@@ -169,7 +244,8 @@ impl App {
             search_dirty: false,
             compose_text: String::new(),
             signin_input: String::new(),
-            oauth_busy: false,
+            pending_oauth: None,
+            add_form: AddStationForm::default(),
             comments: Vec::new(),
             comments_selected: 0,
             notifications: Vec::new(),
@@ -196,7 +272,9 @@ impl App {
         match self.home_tab {
             HomeTab::Trending => &self.trending,
             HomeTab::Popular => &self.popular,
+            HomeTab::Recent => &self.recent,
             HomeTab::Favorites => &self.favorites,
+            HomeTab::Yours => &self.stations,
         }
     }
 
@@ -238,15 +316,5 @@ impl App {
 
     pub fn volume_pct(&self) -> u16 {
         (self.volume * 100.0).round() as u16
-    }
-
-    /// The connected user's display label: "Display Name (@handle)" when a
-    /// display name is known, otherwise "@handle".
-    pub fn user_label(&self) -> Option<String> {
-        let handle = self.handle.as_ref()?;
-        Some(match self.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
-            Some(name) => format!("{name} (@{handle})"),
-            None => format!("@{handle}"),
-        })
     }
 }

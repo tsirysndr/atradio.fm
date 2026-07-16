@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "@tanstack/react-router";
 import {
   IconArrowLeft,
@@ -13,6 +14,7 @@ import { useCategoryStations } from "@/hooks/useCategoryStations";
 import { categoryBySlug, slugToTerm } from "@/lib/categories";
 
 export function BrowsePage() {
+  const { t } = useTranslation("browse");
   const { category } = useParams({ from: "/browse/$category" });
   const known = categoryBySlug(category);
   const tag = known?.term ?? slugToTerm(category);
@@ -58,7 +60,7 @@ export function BrowsePage() {
           className="inline-flex w-fit items-center gap-1.5 text-sm text-foreground/50 transition-colors hover:text-synth-cyan"
         >
           <IconArrowLeft size={16} />
-          Back
+          {t("back")}
         </Link>
 
         <div className="flex items-center gap-4">
@@ -73,10 +75,11 @@ export function BrowsePage() {
             </h1>
             <p className="text-sm text-foreground/50">
               {isLoading
-                ? "Loading stations…"
-                : `${stations.length}${hasNextPage ? "+" : ""} station${
-                    stations.length === 1 ? "" : "s"
-                  }`}
+                ? t("loadingStations")
+                : t("stationCount", {
+                    count: stations.length,
+                    display: `${stations.length}${hasNextPage ? "+" : ""}`,
+                  })}
             </p>
           </div>
         </div>
@@ -87,14 +90,14 @@ export function BrowsePage() {
       ) : isError ? (
         <EmptyState
           icon={<IconAlertTriangle size={40} stroke={1.5} />}
-          title="Couldn't load stations"
-          description="Something went wrong reaching the station directory. Try again in a moment."
+          title={t("errorTitle")}
+          description={t("errorDescription")}
         />
       ) : stations.length === 0 ? (
         <EmptyState
           icon={<IconMoodEmpty size={40} stroke={1.5} />}
-          title={`No ${label} stations found`}
-          description="Try another category or search for a station by name."
+          title={t("emptyTitle", { label })}
+          description={t("emptyDescription")}
         />
       ) : (
         <>
@@ -107,7 +110,7 @@ export function BrowsePage() {
 
           {!hasNextPage && (
             <p className="py-6 text-center text-sm text-foreground/40">
-              You've reached the end of {label}.
+              {t("endReached", { label })}
             </p>
           )}
         </>

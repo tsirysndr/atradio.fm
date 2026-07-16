@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useAtomValue } from "jotai";
 import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { NSID } from "@atradio/lexicons";
@@ -6,14 +7,14 @@ import { sessionAtom } from "@/atoms/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { missingScopes } from "@/lib/atproto/client";
 
-/** Friendly feature name for a `repo:<nsid>` scope the session is missing. */
+/** i18n key (under `features.*`) for a `repo:<nsid>` scope the session is missing. */
 const SCOPE_FEATURE: Record<string, string> = {
   [`repo:${NSID.comment}`]: "comments",
   [`repo:${NSID.reaction}`]: "reactions",
   [`repo:${NSID.favorite}`]: "favorites",
-  [`repo:${NSID.station}`]: "your stations",
-  [`repo:${NSID.actorStatus}`]: "listening status",
-  [`repo:${NSID.audioSettings}`]: "audio settings",
+  [`repo:${NSID.station}`]: "stations",
+  [`repo:${NSID.actorStatus}`]: "status",
+  [`repo:${NSID.audioSettings}`]: "audio",
 };
 
 /**
@@ -22,6 +23,7 @@ const SCOPE_FEATURE: Record<string, string> = {
  * top banner prompting them to log out and back in to grant the new scopes.
  */
 export function PermissionBanner() {
+  const { t } = useTranslation("permission");
   const session = useAtomValue(sessionAtom);
   const { logout, openLogin } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -37,13 +39,13 @@ export function PermissionBanner() {
 
   const features = Array.from(
     new Set(missing.map((s) => SCOPE_FEATURE[s]).filter(Boolean)),
-  );
+  ).map((key) => t(`features.${key}`));
   const featureText =
     features.length === 0
-      ? "new features"
+      ? t("featuresFallback")
       : features.length === 1
         ? features[0]
-        : `${features.slice(0, -1).join(", ")} and ${features[features.length - 1]}`;
+        : `${features.slice(0, -1).join(", ")} ${t("and")} ${features[features.length - 1]}`;
 
   const reauth = async () => {
     setBusy(true);
@@ -64,11 +66,16 @@ export function PermissionBanner() {
           aria-hidden
         />
         <p className="min-w-0 flex-1 text-sm text-foreground/90">
-          <span className="font-semibold text-synth-yellow">
-            New permissions required.
-          </span>{" "}
-          Your session doesn't grant access to {featureText}. Please log out and
-          sign in again to continue.
+          <Trans
+            t={t}
+            i18nKey="message"
+            values={{ features: featureText }}
+            components={{
+              strong: (
+                <span className="font-semibold text-synth-yellow" />
+              ),
+            }}
+          />
         </p>
 
         <button
@@ -78,7 +85,7 @@ export function PermissionBanner() {
           className="flex shrink-0 items-center gap-1.5 rounded-full bg-synth-yellow/20 px-3 py-1.5 text-xs font-semibold text-synth-yellow transition-colors hover:bg-synth-yellow/30 disabled:opacity-50"
         >
           <IconRefresh size={14} className={busy ? "animate-spin" : ""} />
-          {busy ? "Signing out…" : "Log out & sign in"}
+          {busy ? t("signingOut") : t("reauth")}
         </button>
       </div>
     </div>

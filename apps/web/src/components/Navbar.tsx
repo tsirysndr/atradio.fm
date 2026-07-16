@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useSetAtom } from "jotai";
+import { useTranslation } from "react-i18next";
 import { Button } from "@heroui/react";
 import {
   IconSearch,
@@ -14,6 +15,7 @@ import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "./NotificationBell";
 import { IconTangled } from "./IconTangled";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
@@ -23,6 +25,7 @@ const iconLinkBase =
   "hidden h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground sm:flex";
 
 export function Navbar() {
+  const { t } = useTranslation("navbar");
   const openAddStation = useSetAtom(addStationOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
   const ensureAuth = useRequireAuth();
@@ -45,7 +48,7 @@ export function Navbar() {
           >
             <IconSearch size={16} />
             <span className="hidden items-center gap-1.5 sm:inline-flex">
-              Search
+              {t("searchShortcut")}
               <kbd className="rounded border border-white/15 bg-white/5 px-1 text-[10px] leading-relaxed text-foreground/50">
                 /
               </kbd>
@@ -57,8 +60,8 @@ export function Navbar() {
             target="_blank"
             rel="noreferrer"
             className={iconLinkBase}
-            title="atradio.fm on Bluesky"
-            aria-label="atradio.fm on Bluesky"
+            title={t("onBluesky")}
+            aria-label={t("onBluesky")}
           >
             <IconBrandBluesky size={18} />
           </a>
@@ -68,8 +71,8 @@ export function Navbar() {
             target="_blank"
             rel="noreferrer"
             className={iconLinkBase}
-            title="atradio.fm on Discord"
-            aria-label="atradio.fm on Discord"
+            title={t("onDiscord")}
+            aria-label={t("onDiscord")}
           >
             <IconBrandDiscord size={18} />
           </a>
@@ -79,11 +82,13 @@ export function Navbar() {
             target="_blank"
             rel="noreferrer"
             className={iconLinkBase}
-            title="atradio.fm on Tangled"
-            aria-label="atradio.fm on Tangled"
+            title={t("onTangled")}
+            aria-label={t("onTangled")}
           >
             <IconTangled size={18} />
           </a>
+
+          <LanguageSwitcher />
 
           <Button
             size="sm"
@@ -92,8 +97,8 @@ export function Navbar() {
             onPress={() => ensureAuth(() => openAddStation(true))}
           >
             <IconPlus size={16} />
-            <span className="hidden sm:inline">Add station</span>
-            <span className="sm:hidden">Add</span>
+            <span className="hidden sm:inline">{t("addStation", { ns: "common" })}</span>
+            <span className="sm:hidden">{t("add", { ns: "common" })}</span>
           </Button>
 
           {isLoggedIn && <NotificationBell />}
@@ -102,7 +107,7 @@ export function Navbar() {
             <Link
               to="/profile"
               className="ml-1 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-synth-panel"
-              title="Your profile"
+              title={t("yourProfile")}
             >
               {profile?.avatar ? (
                 <img
@@ -122,7 +127,7 @@ export function Navbar() {
               onPress={() => openLogin(true)}
             >
               <IconLogin2 size={16} />
-              <span className="hidden sm:inline">Sign in</span>
+              <span className="hidden sm:inline">{t("signIn", { ns: "common" })}</span>
             </Button>
           )}
         </nav>

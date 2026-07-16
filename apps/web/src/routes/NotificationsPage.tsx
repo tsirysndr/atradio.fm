@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -10,6 +11,7 @@ import { getNotifications, updateSeen } from "@/lib/appview";
 import { NotificationRow } from "@/components/NotificationBell";
 
 export function NotificationsPage() {
+  const { t } = useTranslation("notifications");
   const did = useAtomValue(didAtom);
   const setCommentsStation = useSetAtom(commentsStationAtom);
   const navigate = useNavigate();
@@ -48,13 +50,13 @@ export function NotificationsPage() {
     <div className="flex min-h-[calc(100vh-14rem)] w-full min-w-0 flex-col">
       <h1 className="mb-2 flex items-center gap-2 font-display text-2xl font-bold tracking-tight">
         <IconBell size={24} className="text-synth-pink" />
-        Notifications
+        {t("title")}
       </h1>
 
       {items.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-6 py-10">
           <p className="max-w-xs text-center text-sm text-foreground/40">
-            Nothing yet. Mentions and comments on your stations show up here.
+            {t("empty")}
           </p>
         </div>
       ) : (

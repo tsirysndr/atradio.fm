@@ -1,0 +1,30 @@
+{
+  "status": {
+    "buffering": "Carregando…",
+    "onAir": "No ar",
+    "unavailable": "Transmissão indisponível"
+  },
+  "liveRadio": "Rádio ao vivo",
+  "nowPlaying": "Tocando agora",
+  "nothingPlaying": "Nada tocando",
+  "liveComments": "Comentários ao vivo",
+  "listeners_one": "{{count}} ouvinte",
+  "listeners_other": "{{count}} ouvintes",
+  "uniqueListeners_one": "{{count}} ouvinte único",
+  "uniqueListeners_other": "{{count}} ouvintes únicos",
+  "aria": {
+    "closeFullscreen": "Fechar player em tela cheia",
+    "minimize": "Minimizar player",
+    "openStationPage": "Abrir página da estação",
+    "openFullscreen": "Abrir player em tela cheia",
+    "toggleFavorite": "Adicionar aos favoritos",
+    "play": "Reproduzir",
+    "pause": "Pausar",
+    "stop": "Parar",
+    "mute": "Silenciar",
+    "unmute": "Ativar som",
+    "volume": "Volume",
+    "audioSettings": "Equalizador e configurações de áudio",
+    "comments": "Comentários"
+  }
+}

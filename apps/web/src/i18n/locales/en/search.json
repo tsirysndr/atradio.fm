@@ -1,0 +1,20 @@
+{
+  "placeholder": "Search stations, genres, cities…",
+  "closeAria": "Close search",
+  "emptyHint": "Type to search thousands of internet radio stations.",
+  "noResults": "No stations found for “{{query}}”.",
+  "source": {
+    "custom": "yours"
+  },
+  "hints": {
+    "navigate": "navigate",
+    "play": "play",
+    "close": "close"
+  },
+  "page": {
+    "title": "Social radio, made yours.",
+    "intro": "atradio.fm is a social internet radio platform built on <atproto>AT Protocol</atproto>. Save, organize, discover, and listen to stations with your own <account>portable account</account>.",
+    "searchAria": "Search stations",
+    "searchPlaceholder": "Search stations, genres…"
+  }
+}

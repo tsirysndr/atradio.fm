@@ -1,0 +1,30 @@
+{
+  "status": {
+    "buffering": "Buffering…",
+    "onAir": "On air",
+    "unavailable": "Stream unavailable"
+  },
+  "liveRadio": "Live radio",
+  "nowPlaying": "Now playing",
+  "nothingPlaying": "Nothing playing",
+  "liveComments": "Live comments",
+  "listeners_one": "{{count}} listener",
+  "listeners_other": "{{count}} listeners",
+  "uniqueListeners_one": "{{count}} unique listener",
+  "uniqueListeners_other": "{{count}} unique listeners",
+  "aria": {
+    "closeFullscreen": "Close fullscreen player",
+    "minimize": "Minimize player",
+    "openStationPage": "Open station page",
+    "openFullscreen": "Open fullscreen player",
+    "toggleFavorite": "Toggle favorite",
+    "play": "Play",
+    "pause": "Pause",
+    "stop": "Stop",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "volume": "Volume",
+    "audioSettings": "Equalizer & audio settings",
+    "comments": "Comments"
+  }
+}

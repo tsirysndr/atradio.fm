@@ -1,0 +1,17 @@
+{
+  "search": "Search",
+  "addStation": "Add station",
+  "add": "Add",
+  "signIn": "Sign in",
+  "signOut": "Sign out",
+  "cancel": "Cancel",
+  "save": "Save",
+  "saving": "Saving…",
+  "close": "Close",
+  "loading": "Loading…",
+  "retry": "Retry",
+  "error": "Something went wrong",
+  "language": "Language",
+  "shortcutsButton": "Show keyboard shortcuts",
+  "shortcutsButtonTitle": "Keyboard shortcuts (?)"
+}

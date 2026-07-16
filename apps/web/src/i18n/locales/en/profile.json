@@ -1,0 +1,60 @@
+{
+  "signInPrompt": {
+    "title": "Sign in to see your dial",
+    "description": "Log in with your Atmosphere account to save favorites and add your own stations."
+  },
+  "notFound": {
+    "title": "Profile not found",
+    "description": "Couldn't find “{{actor}}”."
+  },
+  "displayNameFallback": "Listener",
+  "links": {
+    "bluesky": "Open on Bluesky",
+    "pdsls": "View repo on PDSls"
+  },
+  "header": {
+    "favorites_one": "favorite",
+    "favorites_other": "favorites",
+    "stations_one": "station",
+    "stations_other": "stations"
+  },
+  "logout": "Log out",
+  "tabs": {
+    "sectionsLabel": "Profile sections",
+    "favorites_one": "Favorite ({{count}})",
+    "favorites_other": "Favorites ({{count}})",
+    "stations_one": "Station ({{count}})",
+    "stations_other": "Stations ({{count}})",
+    "recent_one": "Recently played ({{count}})",
+    "recent_other": "Recently played ({{count}})"
+  },
+  "filter": {
+    "placeholder": "Filter…",
+    "stationsLabel": "Filter stations",
+    "sourceLabel": "Filter by source",
+    "sortLabel": "Sort"
+  },
+  "sources": {
+    "all": "All sources",
+    "custom": "Yours"
+  },
+  "sort": {
+    "recent": "Recent",
+    "nameAsc": "Name A–Z",
+    "nameDesc": "Name Z–A"
+  },
+  "empty": {
+    "favoritesTitle": "No favorites yet",
+    "favoritesSelf": "Tap the heart on any station to save it here.",
+    "favoritesOther": "This user hasn't favorited any stations.",
+    "recentTitle": "Nothing played yet",
+    "recentSelf": "Stations you play will show up here.",
+    "recentOther": "This user hasn't played any stations yet.",
+    "stationsTitle": "No stations yet",
+    "stationsSelf": "Add a stream that isn't listed with its name and URL.",
+    "stationsOther": "This user hasn't added any stations.",
+    "addFirst": "Add your first station",
+    "noMatchesTitle": "No matches",
+    "noMatchesDescription": "Nothing matches your search or filters."
+  }
+}

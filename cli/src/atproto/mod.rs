@@ -23,7 +23,18 @@ use crate::appview::StationInfo;
 use crate::fm_atradio::actor::status::Status as ActorStatus;
 use crate::fm_atradio::comment::Comment;
 use crate::fm_atradio::favorite::Favorite;
+use crate::fm_atradio::station::Station as StationRecord;
 use crate::fm_atradio::StationInfo as GenStation;
+
+/// User input for creating a custom station.
+#[derive(Clone, Debug, Default)]
+pub struct StationDraft {
+    pub name: String,
+    pub stream_url: String,
+    pub genre: Option<String>,
+    pub homepage: Option<String>,
+    pub logo: Option<String>,
+}
 
 pub use profile::Profile;
 
@@ -98,8 +109,11 @@ impl Atproto {
         };
 
         let did = auth.did.to_string();
+        // createSession gives us a reliable handle; only the display name needs
+        // the public profile lookup.
+        let (_, display_name) = fetch_profile(&did).await.unwrap_or((None, None));
         let profile = Profile {
-            display_name: fetch_display_name(&did).await,
+            display_name,
             did,
             handle: auth.handle.to_string(),
             pds: auth.pds.as_ref().map(|u| u.to_string()),
@@ -115,7 +129,6 @@ impl Atproto {
         use jacquard::oauth::atproto::AtprotoClientMetadata;
         use jacquard::oauth::client::OAuthClient;
         use jacquard::oauth::loopback::LoopbackConfig;
-        use jacquard::oauth::scopes::Scopes;
         use jacquard::oauth::types::AuthorizeOptions;
 
         let client_data = jacquard::oauth::session::ClientData {
@@ -127,7 +140,8 @@ impl Atproto {
         let store = FileAuthStore::new(self.session_path.to_string_lossy().to_string());
         let oauth = OAuthClient::new(store, client_data, reqwest::Client::new());
         let hint = SessionHint::from_optional_input(input);
-        let scopes = Scopes::builder().atproto().build().map_err(to_anyhow)?;
+        // Request write access to every fm.atradio.* collection the CLI touches.
+        let scopes = atradio_scopes()?;
 
         let session = match oauth
             .resume_or_login_with_local_server(
@@ -155,15 +169,18 @@ impl Atproto {
         };
 
         let agent: Agent<_> = Agent::from(session);
-        let (did, handle) = agent
+        // NOTE: `info().1` is the OAuth *session id*, not the handle — resolve
+        // the real handle (and display name) from the DID via the public API.
+        let (did, _session_id) = agent
             .info()
             .await
             .ok_or_else(|| anyhow!("OAuth session missing identity"))?;
         let did = did.to_string();
+        let (handle, display_name) = fetch_profile(&did).await.unwrap_or((None, None));
         let profile = Profile {
-            display_name: fetch_display_name(&did).await,
+            display_name,
+            handle: handle.unwrap_or_else(|| did.clone()),
             did,
-            handle: handle.map(|h| h.to_string()).unwrap_or_default(),
             pds: None,
             method: "oauth".into(),
         };
@@ -171,17 +188,104 @@ impl Atproto {
         Ok(profile)
     }
 
-    // ---- writes (require a resumed app-password session) -----------------
+    // ---- writes ----------------------------------------------------------
+    //
+    // Writes must resume whichever session the user has: app-password
+    // (CredentialSession) OR OAuth (OAuthSession). Both implement AgentSession,
+    // so `create_record`/`put_record` work on either — we just branch on the
+    // persisted `method` and resume the right one.
 
-    /// Resume the stored app-password session into an authenticated agent.
-    async fn agent(&self) -> Result<Agent<CredentialSession<FileAuthStore, Resolver>>> {
+    fn is_oauth(&self) -> bool {
+        self.profile().map(|p| p.method == "oauth").unwrap_or(false)
+    }
+
+    /// Resume the app-password session into an agent.
+    async fn credential_agent(&self) -> Result<Agent<CredentialSession<FileAuthStore, Resolver>>> {
         let session = CredentialSession::new(self.store.clone(), self.resolver.clone());
         let actor = self.actor();
         let hint = SessionHint::from_optional_input(actor.as_deref());
         match session.resume(&hint).await.map_err(to_anyhow)? {
             CredentialResumeResult::Resumed(_) => Ok(Agent::from(session)),
             CredentialResumeResult::LoginRequired(_) => Err(anyhow!(
-                "not signed in — run `atradio login` with an app password to post"
+                "not signed in — press s (or run `atradio login`) to sign in"
+            )),
+        }
+    }
+
+    /// Create a record on the user's PDS, resuming whichever session exists.
+    async fn create<R>(&self, record: R, what: &'static str) -> Result<String>
+    where
+        R: jacquard_common::types::collection::Collection + serde::Serialize,
+    {
+        if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            let out = Agent::from(session)
+                .create_record(record, None)
+                .await
+                .map_err(to_anyhow)
+                .context(what)?;
+            Ok(out.uri.to_string())
+        } else {
+            let out = self
+                .credential_agent()
+                .await?
+                .create_record(record, None)
+                .await
+                .map_err(to_anyhow)
+                .context(what)?;
+            Ok(out.uri.to_string())
+        }
+    }
+
+    /// Put (upsert) a record at `rkey`, resuming whichever session exists.
+    async fn put<R>(&self, rkey: RecordKey<Rkey>, record: R, what: &'static str) -> Result<()>
+    where
+        R: jacquard_common::types::collection::Collection + serde::Serialize,
+    {
+        if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .put_record(rkey, record)
+                .await
+                .map_err(to_anyhow)
+                .context(what)?;
+        } else {
+            self.credential_agent()
+                .await?
+                .put_record(rkey, record)
+                .await
+                .map_err(to_anyhow)
+                .context(what)?;
+        }
+        Ok(())
+    }
+
+    /// Resume a stored OAuth session (no browser). Errors if it can't be
+    /// resumed (expired) so the caller can prompt a fresh sign-in.
+    async fn resume_oauth(
+        &self,
+    ) -> Result<jacquard::oauth::client::OAuthSession<Resolver, FileAuthStore>> {
+        use jacquard::oauth::atproto::AtprotoClientMetadata;
+        use jacquard::oauth::client::{OAuthClient, OAuthResumeOrLogin};
+        use jacquard::oauth::types::AuthorizeOptions;
+
+        let client_data = jacquard::oauth::session::ClientData {
+            keyset: None,
+            config: AtprotoClientMetadata::default_localhost(),
+        };
+        let store = FileAuthStore::new(self.session_path.to_string_lossy().to_string());
+        let oauth = OAuthClient::new(store, client_data, reqwest::Client::new());
+        let actor = self.actor();
+        let hint = SessionHint::from_optional_input(actor.as_deref());
+        let opts = AuthorizeOptions::default().with_scopes(atradio_scopes()?);
+        match oauth
+            .resume_or_start_auth(&hint, opts)
+            .await
+            .map_err(to_anyhow)?
+        {
+            OAuthResumeOrLogin::Resumed(session) => Ok(session),
+            _ => Err(anyhow!(
+                "your OAuth session expired — press s to sign in again"
             )),
         }
     }
@@ -192,14 +296,7 @@ impl Atproto {
             .station(gen_station(station))
             .created_at(Datetime::now())
             .build();
-        let out = self
-            .agent()
-            .await?
-            .create_record(record, None)
-            .await
-            .map_err(to_anyhow)
-            .context("create favorite")?;
-        Ok(out.uri.to_string())
+        self.create(record, "create favorite").await
     }
 
     /// Post a comment on a station. Returns the created record URI.
@@ -209,14 +306,23 @@ impl Atproto {
             .text(text.to_string())
             .created_at(Datetime::now())
             .build();
-        let out = self
-            .agent()
-            .await?
-            .create_record(record, None)
-            .await
-            .map_err(to_anyhow)
-            .context("create comment")?;
-        Ok(out.uri.to_string())
+        self.create(record, "create comment").await
+    }
+
+    /// Create a custom station record on the user's PDS. Returns its URI.
+    pub async fn create_station(&self, draft: &StationDraft) -> Result<String> {
+        let record = StationRecord::new()
+            .name(draft.name.clone())
+            .stream_url(
+                parse_uri(&draft.stream_url)
+                    .unwrap_or_else(|| UriValue::Any(draft.stream_url.clone().into())),
+            )
+            .maybe_genre(draft.genre.clone().map(Into::into))
+            .maybe_homepage(draft.homepage.as_deref().and_then(parse_uri))
+            .maybe_logo(draft.logo.as_deref().and_then(parse_uri))
+            .created_at(Datetime::now())
+            .build();
+        self.create(record, "create station").await
     }
 
     /// Update the actor's play-status singleton (so you appear in the
@@ -227,14 +333,31 @@ impl Atproto {
             .played_at(Datetime::now())
             .build();
         let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
-        self.agent()
-            .await?
-            .put_record(rkey, record)
-            .await
-            .map_err(to_anyhow)
-            .context("update play status")?;
-        Ok(())
+        self.put(rkey, record, "update play status").await
     }
+}
+
+/// The OAuth scope set the CLI requests: atproto + write to the fm.atradio.*
+/// collections it actually writes. Shared by login and write-resume.
+///
+/// NOTE: `fm.atradio.audio.settings` is deliberately absent — the TUI's native
+/// Rockbox EQ bands (32 Hz…16 kHz) differ from the web build's (60 Hz…20 kHz),
+/// so DSP is persisted locally (settings.toml) and never synced to the PDS.
+fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>> {
+    jacquard::oauth::scopes::Scopes::builder()
+        .atproto()
+        .repo_collection("fm.atradio.station")
+        .map_err(to_anyhow)?
+        .repo_collection("fm.atradio.favorite")
+        .map_err(to_anyhow)?
+        .repo_collection("fm.atradio.comment")
+        .map_err(to_anyhow)?
+        .repo_collection("fm.atradio.reaction")
+        .map_err(to_anyhow)?
+        .repo_collection("fm.atradio.actor.status")
+        .map_err(to_anyhow)?
+        .build()
+        .map_err(to_anyhow)
 }
 
 /// Convert our wire `StationInfo` into the generated (lexicon) `StationInfo`.
@@ -264,13 +387,15 @@ fn to_anyhow<E: std::fmt::Display>(e: E) -> anyhow::Error {
     anyhow!("{e}")
 }
 
-/// Best-effort lookup of an actor's display name from the public Bluesky
-/// AppView (the same source atradio's own AppView uses). Returns None on any
-/// failure so login never blocks on it.
-async fn fetch_display_name(actor: &str) -> Option<String> {
+/// Best-effort lookup of an actor's handle + display name from the public
+/// Bluesky AppView (the same source atradio's own AppView uses). Returns None on
+/// any failure so login never blocks on it. `actor` may be a DID or a handle.
+async fn fetch_profile(actor: &str) -> Option<(Option<String>, Option<String>)> {
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct ProfileOut {
+        #[serde(default)]
+        handle: Option<String>,
         #[serde(default)]
         display_name: Option<String>,
     }
@@ -278,5 +403,6 @@ async fn fetch_display_name(actor: &str) -> Option<String> {
         "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={actor}"
     );
     let out: ProfileOut = reqwest::get(&url).await.ok()?.json().await.ok()?;
-    out.display_name.filter(|d| !d.trim().is_empty())
+    let clean = |s: Option<String>| s.filter(|v| !v.trim().is_empty());
+    Some((clean(out.handle), clean(out.display_name)))
 }

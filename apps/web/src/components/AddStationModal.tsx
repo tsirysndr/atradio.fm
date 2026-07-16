@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtom, useSetAtom } from "jotai";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -41,6 +42,7 @@ const inputClass =
   "h-10 w-full rounded-lg border border-white/15 bg-synth-panel px-3 text-sm text-foreground placeholder:text-foreground/30 focus:border-synth-cyan focus:outline-none";
 
 export function AddStationModal() {
+  const { t } = useTranslation("station");
   const [isOpen, setOpen] = useAtom(addStationOpenAtom);
   const addStation = useSetAtom(addCustomStationAtom);
   const play = useSetAtom(playStationAtom);
@@ -86,7 +88,7 @@ export function AddStationModal() {
       closeAndReset();
     } catch (err) {
       consola.error("[stations] save failed", err);
-      setSaveError("Couldn't save the station to your account. Try again.");
+      setSaveError(t("saveError"));
     }
   };
 
@@ -116,16 +118,16 @@ export function AddStationModal() {
           <Modal.Header className="flex items-center gap-2 border-b border-white/10 pb-3">
             <IconBroadcast size={20} className="text-synth-cyan" />
             <Modal.Heading className="font-display text-lg">
-              Add your own station
+              {t("addYourOwn")}
             </Modal.Heading>
           </Modal.Header>
 
           <Modal.Body className="flex flex-col gap-3 py-4">
             <TextField isRequired isInvalid={!!errors.name} className={fieldClass}>
-              <Label className={labelClass}>Name</Label>
+              <Label className={labelClass}>{t("name")}</Label>
               <Input
                 className={inputClass}
-                placeholder="e.g. Midnight Synthwave FM"
+                placeholder={t("namePlaceholder")}
                 {...register("name")}
               />
               {errors.name && (
@@ -140,7 +142,7 @@ export function AddStationModal() {
               isInvalid={!!errors.streamUrl}
               className={fieldClass}
             >
-              <Label className={labelClass}>Stream URL</Label>
+              <Label className={labelClass}>{t("streamUrl")}</Label>
               <Input
                 className={inputClass}
                 placeholder="https://…/stream.mp3"
@@ -155,13 +157,13 @@ export function AddStationModal() {
 
             {/* Optional logo/picture with a live preview */}
             <TextField isInvalid={!!errors.logoUrl} className={fieldClass}>
-              <Label className={labelClass}>Logo / picture</Label>
+              <Label className={labelClass}>{t("logoPicture")}</Label>
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-synth-panel">
                   {logoUrl && isValidHttpUrl(logoUrl.trim()) && !logoError ? (
                     <img
                       src={logoUrl.trim()}
-                      alt="Logo preview"
+                      alt={t("logoPreviewAlt")}
                       className="h-full w-full object-cover"
                       onError={() => setLogoError(true)}
                     />
@@ -171,7 +173,7 @@ export function AddStationModal() {
                 </div>
                 <Input
                   className={inputClass}
-                  placeholder="Optional — https://…/logo.png"
+                  placeholder={t("optionalLogoUrl")}
                   {...register("logoUrl", {
                     onChange: () => setLogoError(false),
                   })}
@@ -186,18 +188,18 @@ export function AddStationModal() {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <TextField className={fieldClass}>
-                <Label className={labelClass}>Genre</Label>
+                <Label className={labelClass}>{t("genre")}</Label>
                 <Input
                   className={inputClass}
-                  placeholder="Optional"
+                  placeholder={t("optional")}
                   {...register("genre")}
                 />
               </TextField>
               <TextField isInvalid={!!errors.homepage} className={fieldClass}>
-                <Label className={labelClass}>Station page</Label>
+                <Label className={labelClass}>{t("stationPage")}</Label>
                 <Input
                   className={inputClass}
-                  placeholder="Optional — https://…"
+                  placeholder={t("optionalUrl")}
                   {...register("homepage")}
                 />
                 {errors.homepage && (
@@ -209,10 +211,10 @@ export function AddStationModal() {
             </div>
 
             <TextField className={fieldClass}>
-              <Label className={labelClass}>Description</Label>
+              <Label className={labelClass}>{t("description")}</Label>
               <TextArea
                 className={`${inputClass} h-auto py-2`}
-                placeholder="Optional"
+                placeholder={t("optional")}
                 rows={2}
                 {...register("description")}
               />
@@ -221,7 +223,7 @@ export function AddStationModal() {
             {busy && (
               <div className="flex items-center gap-2 text-xs text-synth-cyan">
                 <InlineLoader width={90} />
-                Verifying the stream is reachable…
+                {t("verifyingStream")}
               </div>
             )}
             {canAddAnyway && !busy && (
@@ -230,7 +232,7 @@ export function AddStationModal() {
                 onClick={addAnyway}
                 className="self-start text-xs text-foreground/50 underline decoration-dotted hover:text-synth-cyan"
               >
-                Add it anyway (skip the stream check)
+                {t("addAnyway")}
               </button>
             )}
             {saveError && <p className="text-xs text-danger">{saveError}</p>}
@@ -238,7 +240,7 @@ export function AddStationModal() {
 
           <Modal.Footer className="flex justify-end gap-2 border-t border-white/10 pt-3">
             <Button variant="ghost" isDisabled={busy} onPress={closeAndReset}>
-              Cancel
+              {t("cancel", { ns: "common" })}
             </Button>
             <Button
               variant="tertiary"
@@ -247,14 +249,14 @@ export function AddStationModal() {
               onPress={() => void onSave()}
             >
               <IconPlus size={16} />
-              Save
+              {t("save", { ns: "common" })}
             </Button>
             <Button
               variant="primary"
               isDisabled={busy}
               onPress={() => void onSaveAndPlay()}
             >
-              Save &amp; play
+              {t("saveAndPlay")}
             </Button>
           </Modal.Footer>
           </Modal.Dialog>

@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph};
 use ratatui::Frame;
 
 use super::dsp_rows;
-use super::state::{App, HomeTab, Overlay, View};
+use super::state::{AddStationForm, App, HomeTab, Overlay, View};
 use crate::appview::StationInfo;
 use crate::player::NowPlaying;
 use crate::theme;
@@ -43,14 +43,50 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         Overlay::Search => draw_search(f, f.area(), app),
         Overlay::Compose => draw_compose(f, f.area(), app),
         Overlay::SignIn => draw_signin(f, f.area(), app),
+        Overlay::AddStation => draw_add_station(f, f.area(), app),
         Overlay::None => {}
     }
 }
 
 fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
+    // Build the "who" spans first so we can size its column to fit — the handle
+    // must never be truncated; only the display name is shortened if needed.
+    let who_spans: Vec<Span> = match &app.handle {
+        Some(handle) => {
+            let mut spans = vec![bell(app.unread), Span::raw(" ")];
+            if let Some(name) = app.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
+                // Trim the name (not the handle) so long names can't push the
+                // handle off-screen on a narrow terminal.
+                let name_budget = (area.width.saturating_sub(handle.chars().count() as u16 + 8))
+                    .clamp(6, 24) as usize;
+                spans.push(Span::styled(
+                    truncate(name, name_budget),
+                    Style::default().fg(theme::GREEN).add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::raw(" "));
+            }
+            spans.push(Span::styled(
+                format!("@{handle} "),
+                Style::default().fg(theme::GREEN),
+            ));
+            spans
+        }
+        None => vec![
+            bell(app.unread),
+            Span::styled(" guest · s to sign in ", Style::default().fg(theme::MUTED)),
+        ],
+    };
+
+    let who_width: u16 = who_spans
+        .iter()
+        .map(|s| s.content.chars().count() as u16)
+        .sum();
+    // Keep at least ~12 cols for the brand; otherwise give "who" what it needs.
+    let who_col = who_width.min(area.width.saturating_sub(12)).max(1);
+
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(10), Constraint::Length(40)])
+        .constraints([Constraint::Min(10), Constraint::Length(who_col)])
         .split(area);
 
     let brand = Line::from(vec![
@@ -62,19 +98,8 @@ fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
         Paragraph::new(brand).style(Style::default().bg(theme::SURFACE)),
         cols[0],
     );
-
-    let who = match app.user_label() {
-        Some(label) => Line::from(vec![
-            bell(app.unread),
-            Span::styled(format!(" {} ", truncate(&label, 34)), Style::default().fg(theme::GREEN)),
-        ]),
-        None => Line::from(vec![
-            bell(app.unread),
-            Span::styled(" guest · s to sign in ", Style::default().fg(theme::MUTED)),
-        ]),
-    };
     f.render_widget(
-        Paragraph::new(who)
+        Paragraph::new(Line::from(who_spans))
             .alignment(Alignment::Right)
             .style(Style::default().bg(theme::SURFACE)),
         cols[1],
@@ -112,7 +137,7 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
         .constraints([Constraint::Length(1), Constraint::Min(3)])
         .split(area);
 
-    // Tabs (numbered 1–3 for quick jumps).
+    // Tabs (numbered 1–5 for quick jumps).
     let mut spans: Vec<Span> = Vec::new();
     for (i, t) in HomeTab::all().into_iter().enumerate() {
         let active = t == app.home_tab;
@@ -133,10 +158,11 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
 
     if list.is_empty() {
         let msg = match app.home_tab {
-            HomeTab::Favorites if !app.logged_in => {
-                "Sign in to see your favorites (run `atradio login`)."
-            }
+            HomeTab::Favorites if !app.logged_in => "Press s to sign in and see your favorites.",
             HomeTab::Favorites => "No favorites yet. Press f on a station to favorite it.",
+            HomeTab::Yours if !app.logged_in => "Press s to sign in and see your stations.",
+            HomeTab::Yours => "No stations yet. Press A to add one.",
+            HomeTab::Recent => "Loading who's listening…",
             _ => "Loading…",
         };
         f.render_widget(
@@ -145,7 +171,9 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
         );
         return;
     }
-    render_station_list(f, inner, list, app.selected, app.current.as_ref());
+    // The Recent tab shows who played each station.
+    let actors = (app.home_tab == HomeTab::Recent).then_some(app.recent_actors.as_slice());
+    render_station_list(f, inner, list, app.selected, app.current.as_ref(), actors);
 }
 
 fn render_station_list(
@@ -154,6 +182,7 @@ fn render_station_list(
     list: &[StationInfo],
     selected: usize,
     current: Option<&StationInfo>,
+    actors: Option<&[String]>,
 ) {
     let height = area.height as usize;
     let start = selected.saturating_sub(height.saturating_sub(1));
@@ -169,13 +198,22 @@ fn render_station_list(
         } else {
             Style::default().fg(theme::FG)
         };
-        let sub = s.subtitle();
         let mut spans = vec![
             Span::styled(marker, Style::default().fg(theme::CYAN)),
             Span::styled(truncate(&s.name, 40), name_style),
         ];
-        if !sub.is_empty() {
-            spans.push(Span::styled(format!("  {sub}"), Style::default().fg(theme::MUTED)));
+        // Recent tab: "· by <actor>"; other tabs: the station subtitle.
+        match actors.and_then(|a| a.get(i)).filter(|a| !a.is_empty()) {
+            Some(actor) => spans.push(Span::styled(
+                format!("  · {actor}"),
+                Style::default().fg(theme::CYAN),
+            )),
+            None => {
+                let sub = s.subtitle();
+                if !sub.is_empty() {
+                    spans.push(Span::styled(format!("  {sub}"), Style::default().fg(theme::MUTED)));
+                }
+            }
         }
         lines.push(Line::from(spans));
     }
@@ -376,6 +414,44 @@ fn draw_profile(f: &mut Frame, area: Rect, app: &App) {
         field("Listening", &cur.name);
     }
 
+    // Recently played by this user.
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Recently played",
+        Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD),
+    )));
+    if app.profile_recent.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "    Nothing yet — play a station to start your history.",
+            Style::default().fg(theme::MUTED),
+        )));
+    } else {
+        for (i, s) in app.profile_recent.iter().enumerate().take(12) {
+            let is_cur = app
+                .current
+                .as_ref()
+                .map(|c| c.station_id == s.station_id)
+                .unwrap_or(false);
+            let is_sel = i == app.profile_recent_selected;
+            let name_style = if is_sel {
+                Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
+            } else if is_cur {
+                Style::default().fg(theme::GREEN)
+            } else {
+                Style::default().fg(theme::FG)
+            };
+            let marker = if is_cur { "♪ " } else if is_sel { "› " } else { "  " };
+            lines.push(Line::from(vec![
+                Span::styled(format!("    {marker}"), Style::default().fg(theme::CYAN)),
+                Span::styled(truncate(&s.name, 44), name_style),
+            ]));
+        }
+        lines.push(Line::from(Span::styled(
+            "    ↑↓ move · Enter play",
+            Style::default().fg(theme::MUTED),
+        )));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Press s to sign out.",
@@ -393,13 +469,14 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let keys = [
         ("↑/↓ j/k", "move selection"),
         ("←/→ Tab", "switch home tab"),
-        ("1 / 2 / 3", "jump to Trending / Popular / Favorites"),
+        ("1 … 5", "tabs: Trending / Popular / Recent / Favorites / Yours"),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
         ("m", "mute"),
         ("/", "fuzzy station search"),
         ("f", "favorite the selected/current station"),
+        ("A", "add a custom station (when signed in)"),
         ("c", "comments for the current station"),
         ("a", "add a comment"),
         ("n", "notifications"),
@@ -493,7 +570,7 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         );
         return;
     }
-    let hint = "  1/2/3=tabs  /=search  e=eq  c=comments  n=notifs  p=profile  f=fav  s=sign in/out  Space=play/pause  ?=help  q=quit";
+    let hint = "  1-5=tabs  /=search  A=add  e=eq  c=comments  n=notifs  p=profile  f=fav  s=sign in/out  Space=play/pause  ?=help  q=quit";
     f.render_widget(
         Paragraph::new(Span::styled(hint, Style::default().fg(theme::MUTED)))
             .style(Style::default().bg(theme::BG)),
@@ -620,28 +697,70 @@ fn draw_signin(f: &mut Frame, area: Rect, app: &App) {
         Paragraph::new(Line::from(vec![
             Span::styled("@ ", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
             Span::styled(&app.signin_input, Style::default().fg(theme::FG)),
-            Span::styled(
-                if app.oauth_busy { "" } else { "█" },
-                Style::default().fg(theme::TEAL),
-            ),
+            Span::styled("█", Style::default().fg(theme::TEAL)),
         ])),
         rows[1],
     );
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "Enter opens your browser to finish signing in · Esc to cancel",
+            Style::default().fg(theme::MUTED),
+        )))
+        .wrap(ratatui::widgets::Wrap { trim: true }),
+        rows[3],
+    );
+}
 
-    let status = if app.oauth_busy {
-        Line::from(Span::styled(
-            "Opening your browser… finish signing in there, then return here.",
-            Style::default().fg(theme::CYAN),
-        ))
-    } else {
-        Line::from(Span::styled(
-            "Enter to open the browser · Esc to cancel",
+fn draw_add_station(f: &mut Frame, area: Rect, app: &App) {
+    let popup = centered(area, 66, 62);
+    f.render_widget(Clear, popup);
+    let block = panel("Add a station", true);
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let labels = AddStationForm::labels();
+    // Two lines per field (label + input) + a footer line.
+    let mut constraints: Vec<Constraint> =
+        (0..labels.len()).flat_map(|_| [Constraint::Length(1), Constraint::Length(1)]).collect();
+    constraints.push(Constraint::Length(1)); // spacer
+    constraints.push(Constraint::Min(1)); // hint
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    for (i, label) in labels.iter().enumerate() {
+        let focused = i == app.add_form.focus;
+        let label_area = rows[i * 2];
+        let input_area = rows[i * 2 + 1];
+
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                *label,
+                Style::default().fg(if focused { theme::TEAL } else { theme::MUTED }),
+            )),
+            label_area,
+        );
+
+        let value = app.add_form.field(i);
+        let mut spans = vec![
+            Span::styled(if focused { "› " } else { "  " }, Style::default().fg(theme::CYAN)),
+            Span::styled(value.to_string(), Style::default().fg(theme::FG)),
+        ];
+        if focused {
+            spans.push(Span::styled("█", Style::default().fg(theme::TEAL)));
+        }
+        f.render_widget(Paragraph::new(Line::from(spans)), input_area);
+    }
+
+    let hint = rows[rows.len() - 1];
+    f.render_widget(
+        Paragraph::new(Span::styled(
+            "Tab/↑↓ move · Enter create · Esc cancel   (* required)",
             Style::default().fg(theme::MUTED),
         ))
-    };
-    f.render_widget(
-        Paragraph::new(status).wrap(ratatui::widgets::Wrap { trim: true }),
-        rows[3],
+        .wrap(ratatui::widgets::Wrap { trim: true }),
+        hint,
     );
 }
 

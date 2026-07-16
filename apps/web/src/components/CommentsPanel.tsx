@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "jotai";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -39,8 +40,9 @@ function CommentItem({
   /** When set, an inline editor replaces the comment body. */
   editor?: React.ReactNode;
 }) {
+  const { t } = useTranslation("comments");
   const author = comment.author;
-  const name = author?.displayName || author?.handle || "someone";
+  const name = author?.displayName || author?.handle || t("someone");
   const segments = useMemo(
     () => segmentComment(comment.text, comment.facets),
     [comment.text, comment.facets],
@@ -77,8 +79,8 @@ function CommentItem({
               <button
                 type="button"
                 onClick={() => onEdit(comment)}
-                aria-label="Edit comment"
-                title="Edit comment"
+                aria-label={t("editComment")}
+                title={t("editComment")}
                 className="rounded-full p-1 text-foreground/30 transition-colors hover:bg-white/5 hover:text-synth-cyan"
               >
                 <IconPencil size={14} />
@@ -86,8 +88,8 @@ function CommentItem({
               <button
                 type="button"
                 onClick={() => onDelete(comment)}
-                aria-label="Delete comment"
-                title="Delete comment"
+                aria-label={t("deleteComment")}
+                title={t("deleteComment")}
                 className="rounded-full p-1 text-foreground/30 transition-colors hover:bg-danger/10 hover:text-danger"
               >
                 <IconTrash size={14} />
@@ -165,6 +167,7 @@ interface CommentsPanelProps {
 
 /** Live comments list + composer for a station. */
 export function CommentsPanel({ station, className }: CommentsPanelProps) {
+  const { t } = useTranslation(["comments", "common"]);
   const isLoggedIn = useAtomValue(isLoggedInAtom);
   const client = useAtomValue(clientAtom);
   const did = useAtomValue(didAtom);
@@ -260,7 +263,7 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
           className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-synth-panel/60 px-3 py-2.5 text-sm text-foreground/60 hover:text-foreground"
         >
           <IconLogin2 size={15} />
-          Sign in to comment
+          {t("signInToComment")}
         </button>
       )}
 
@@ -272,7 +275,7 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
         ) : comments.length === 0 ? (
           <li className="flex flex-col items-center gap-1 py-8 text-center text-sm text-foreground/40">
             <IconMessage2 size={22} className="text-foreground/30" />
-            No comments yet — say something!
+            {t("empty")}
           </li>
         ) : (
           comments.map((c) => {
@@ -317,12 +320,12 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
               <Modal.Header className="border-b border-white/10 pb-3">
                 <Modal.Heading className="flex items-center gap-1.5 font-display text-base">
                   <IconTrash size={16} className="text-danger" />
-                  Delete comment?
+                  {t("deleteConfirmTitle")}
                 </Modal.Heading>
               </Modal.Header>
               <Modal.Body className="flex flex-col gap-3 py-4">
                 <p className="text-sm text-foreground/70">
-                  This permanently deletes this one comment. It can't be undone.
+                  {t("deleteConfirmBody")}
                 </p>
                 {confirmTarget && (confirmTarget.text || confirmTarget.gif) && (
                   <div className="rounded-xl border border-white/10 bg-synth-panel/60 px-3 py-2">
@@ -333,7 +336,7 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
                     )}
                     {confirmTarget.gif?.url && (
                       <p className="mt-0.5 text-xs italic text-foreground/40">
-                        [GIF]
+                        {t("gifBadge")}
                       </p>
                     )}
                   </div>
@@ -345,7 +348,7 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
                     className="rounded-full !bg-white/5"
                     onPress={() => setConfirmTarget(null)}
                   >
-                    Cancel
+                    {t("cancel", { ns: "common" })}
                   </Button>
                   <Button
                     size="sm"
@@ -353,7 +356,7 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
                     className="rounded-full !bg-danger !text-white hover:!bg-danger/90"
                     onPress={() => confirmTarget && void performDelete(confirmTarget)}
                   >
-                    Delete
+                    {t("delete")}
                   </Button>
                 </div>
               </Modal.Body>

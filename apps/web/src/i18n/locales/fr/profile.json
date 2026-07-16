@@ -1,0 +1,60 @@
+{
+  "signInPrompt": {
+    "title": "Connectez-vous pour voir votre station",
+    "description": "Connectez-vous avec votre compte Atmosphere pour enregistrer vos favoris et ajouter vos propres stations."
+  },
+  "notFound": {
+    "title": "Profil introuvable",
+    "description": "Impossible de trouver « {{actor}} »."
+  },
+  "displayNameFallback": "Auditeur",
+  "links": {
+    "bluesky": "Ouvrir sur Bluesky",
+    "pdsls": "Voir le dépôt sur PDSls"
+  },
+  "header": {
+    "favorites_one": "favori",
+    "favorites_other": "favoris",
+    "stations_one": "station",
+    "stations_other": "stations"
+  },
+  "logout": "Se déconnecter",
+  "tabs": {
+    "sectionsLabel": "Sections du profil",
+    "favorites_one": "Favori ({{count}})",
+    "favorites_other": "Favoris ({{count}})",
+    "stations_one": "Station ({{count}})",
+    "stations_other": "Stations ({{count}})",
+    "recent_one": "Écoutés récemment ({{count}})",
+    "recent_other": "Écoutés récemment ({{count}})"
+  },
+  "filter": {
+    "placeholder": "Filtrer…",
+    "stationsLabel": "Filtrer les stations",
+    "sourceLabel": "Filtrer par source",
+    "sortLabel": "Trier"
+  },
+  "sources": {
+    "all": "Toutes les sources",
+    "custom": "Les vôtres"
+  },
+  "sort": {
+    "recent": "Récent",
+    "nameAsc": "Nom A–Z",
+    "nameDesc": "Nom Z–A"
+  },
+  "empty": {
+    "favoritesTitle": "Aucun favori pour l'instant",
+    "favoritesSelf": "Touchez le cœur d'une station pour l'enregistrer ici.",
+    "favoritesOther": "Cet utilisateur n'a ajouté aucune station en favori.",
+    "recentTitle": "Rien d'écouté pour l'instant",
+    "recentSelf": "Les stations que vous écoutez apparaîtront ici.",
+    "recentOther": "Cet utilisateur n'a encore écouté aucune station.",
+    "stationsTitle": "Aucune station pour l'instant",
+    "stationsSelf": "Ajoutez un flux non répertorié avec son nom et son URL.",
+    "stationsOther": "Cet utilisateur n'a ajouté aucune station.",
+    "addFirst": "Ajouter votre première station",
+    "noMatchesTitle": "Aucun résultat",
+    "noMatchesDescription": "Rien ne correspond à votre recherche ou à vos filtres."
+  }
+}

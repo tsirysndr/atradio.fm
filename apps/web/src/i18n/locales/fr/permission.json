@@ -1,0 +1,15 @@
+{
+  "features": {
+    "comments": "les commentaires",
+    "reactions": "les réactions",
+    "favorites": "les favoris",
+    "stations": "vos stations",
+    "status": "le statut d'écoute",
+    "audio": "les réglages audio"
+  },
+  "featuresFallback": "de nouvelles fonctionnalités",
+  "and": "et",
+  "message": "<strong>Nouvelles autorisations requises.</strong> Votre session ne donne pas accès à {{features}}. Veuillez vous déconnecter puis vous reconnecter pour continuer.",
+  "signingOut": "Déconnexion…",
+  "reauth": "Se déconnecter et se reconnecter"
+}

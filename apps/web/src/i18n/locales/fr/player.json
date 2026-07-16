@@ -1,0 +1,30 @@
+{
+  "status": {
+    "buffering": "Mise en mémoire tampon…",
+    "onAir": "À l'antenne",
+    "unavailable": "Flux indisponible"
+  },
+  "liveRadio": "Radio en direct",
+  "nowPlaying": "Lecture en cours",
+  "nothingPlaying": "Aucune lecture",
+  "liveComments": "Commentaires en direct",
+  "listeners_one": "{{count}} auditeur",
+  "listeners_other": "{{count}} auditeurs",
+  "uniqueListeners_one": "{{count}} auditeur unique",
+  "uniqueListeners_other": "{{count}} auditeurs uniques",
+  "aria": {
+    "closeFullscreen": "Fermer le lecteur plein écran",
+    "minimize": "Réduire le lecteur",
+    "openStationPage": "Ouvrir la page de la station",
+    "openFullscreen": "Ouvrir le lecteur plein écran",
+    "toggleFavorite": "Ajouter aux favoris",
+    "play": "Lire",
+    "pause": "Pause",
+    "stop": "Arrêter",
+    "mute": "Couper le son",
+    "unmute": "Rétablir le son",
+    "volume": "Volume",
+    "audioSettings": "Égaliseur et paramètres audio",
+    "comments": "Commentaires"
+  }
+}

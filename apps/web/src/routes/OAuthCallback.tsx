@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useSetAtom } from "jotai";
 import { useNavigate } from "@tanstack/react-router";
 import { Spinner } from "@heroui/react";
@@ -14,6 +15,7 @@ import { getProfile } from "@/lib/atproto/profile";
 let handled = false;
 
 export function OAuthCallback() {
+  const { t } = useTranslation("auth");
   const setSession = useSetAtom(sessionAtom);
   const setProfile = useSetAtom(authProfileAtom);
   const setLoading = useSetAtom(authLoadingAtom);
@@ -36,10 +38,10 @@ export function OAuthCallback() {
         navigate({ to: "/" });
       } catch (err) {
         consola.error("[auth] callback failed", err);
-        setError("Login failed. Please try again.");
+        setError(t("callbackError"));
       }
     })();
-  }, [setSession, setProfile, setLoading, navigate]);
+  }, [setSession, setProfile, setLoading, navigate, t]);
 
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3">
@@ -48,7 +50,7 @@ export function OAuthCallback() {
       ) : (
         <>
           <Spinner color="accent" size="lg" />
-          <p className="text-sm text-foreground/50">Signing you in…</p>
+          <p className="text-sm text-foreground/50">{t("signingIn")}</p>
         </>
       )}
     </div>

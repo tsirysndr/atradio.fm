@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, useOverlayState } from "@heroui/react";
@@ -66,6 +67,7 @@ export function CommentComposer({
   edit,
   onCancel,
 }: CommentComposerProps) {
+  const { t } = useTranslation(["comments", "common"]);
   const client = useAtomValue(clientAtom);
   const did = useAtomValue(didAtom);
   const profile = useAtomValue(authProfileAtom);
@@ -260,7 +262,7 @@ export function CommentComposer({
               }
               onKeyDown={onKeyDown}
               rows={4}
-              placeholder="Add a comment… use @ to mention"
+              placeholder={t("placeholder")}
               className="min-h-[6rem] max-h-52 w-full resize-y bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
             />
 
@@ -324,7 +326,7 @@ export function CommentComposer({
                 <button
                   type="button"
                   onClick={() => setGif(null)}
-                  aria-label="Remove GIF"
+                  aria-label={t("removeGif")}
                   className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                 >
                   <IconX size={14} />
@@ -336,7 +338,7 @@ export function CommentComposer({
               <button
                 type="button"
                 onClick={() => setPickerOpen((v) => !v)}
-                aria-label="Add a GIF"
+                aria-label={t("addGif")}
                 className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors ${
                   pickerOpen
                     ? "bg-synth-pink/20 text-synth-pink"
@@ -355,7 +357,7 @@ export function CommentComposer({
                     className="rounded-full !bg-white/5"
                     onPress={onCancel}
                   >
-                    Cancel
+                    {t("cancel", { ns: "common" })}
                   </Button>
                 )}
                 <Button
@@ -366,7 +368,7 @@ export function CommentComposer({
                   onPress={() => void submit()}
                 >
                   <IconSend size={14} />
-                  {edit ? "Save" : "Post"}
+                  {edit ? t("save", { ns: "common" }) : t("post")}
                 </Button>
               </div>
             </div>

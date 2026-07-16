@@ -1,0 +1,20 @@
+{
+  "placeholder": "Rechercher des stations, genres, villes…",
+  "closeAria": "Fermer la recherche",
+  "emptyHint": "Tapez pour rechercher parmi des milliers de stations de radio en ligne.",
+  "noResults": "Aucune station trouvée pour « {{query}} ».",
+  "source": {
+    "custom": "à vous"
+  },
+  "hints": {
+    "navigate": "naviguer",
+    "play": "lire",
+    "close": "fermer"
+  },
+  "page": {
+    "title": "La radio sociale, à votre image.",
+    "intro": "atradio.fm est une plateforme de radio en ligne sociale bâtie sur <atproto>AT Protocol</atproto>. Enregistrez, organisez, découvrez et écoutez des stations avec votre propre <account>compte portable</account>.",
+    "searchAria": "Rechercher des stations",
+    "searchPlaceholder": "Rechercher des stations, genres…"
+  }
+}

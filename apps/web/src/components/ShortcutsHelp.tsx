@@ -1,11 +1,27 @@
 import { useAtom } from "jotai";
+import { useTranslation } from "react-i18next";
 import { Modal, useOverlayState } from "@heroui/react";
 import { IconKeyboard } from "@tabler/icons-react";
 import { shortcutsOpenAtom } from "@/atoms/ui";
 import { SHORTCUTS } from "@/lib/shortcuts";
 import { ModalCloseButton } from "./ModalCloseButton";
 
+/** Maps each shortcut's English description to its translation key. */
+const DESCRIPTION_KEYS: Record<string, string> = {
+  "Open search": "openSearch",
+  "Play / pause": "playPause",
+  "Mute / unmute": "muteUnmute",
+  "Favorite current station": "favorite",
+  "Add your own station": "addStation",
+  "Equalizer & audio settings": "audioSettings",
+  "Fullscreen player": "fullscreen",
+  "Volume up / down": "volume",
+  "Show this help": "showHelp",
+  "Close dialogs / blur search": "close",
+};
+
 export function ShortcutsHelp() {
+  const { t } = useTranslation("shortcuts");
   const [isOpen, setOpen] = useAtom(shortcutsOpenAtom);
   const state = useOverlayState({ isOpen, onOpenChange: setOpen });
 
@@ -18,7 +34,7 @@ export function ShortcutsHelp() {
           <Modal.Header className="flex items-center gap-2 border-b border-white/10 pb-3">
             <IconKeyboard size={20} className="text-synth-cyan" />
             <Modal.Heading className="font-display text-lg">
-              Keyboard shortcuts
+              {t("title")}
             </Modal.Heading>
           </Modal.Header>
           <Modal.Body className="py-4">
@@ -29,7 +45,7 @@ export function ShortcutsHelp() {
                   className="flex items-center justify-between py-2.5"
                 >
                   <span className="text-sm text-foreground/70">
-                    {s.description}
+                    {t(DESCRIPTION_KEYS[s.description] ?? s.description)}
                   </span>
                   <span className="flex gap-1.5">
                     {s.keys.map((k) => (

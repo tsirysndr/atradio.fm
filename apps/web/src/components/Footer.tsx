@@ -1,3 +1,4 @@
+import { Trans, useTranslation } from "react-i18next";
 import { IconBrandBluesky, IconBrandDiscord } from "@tabler/icons-react";
 import { IconTangled } from "./IconTangled";
 
@@ -5,17 +6,25 @@ const iconLinkBase =
   "flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground";
 
 export function Footer() {
+  const { t } = useTranslation(["footer", "navbar"]);
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-white/10 bg-synth-bg/60">
-      <div className="mx-auto flex max-w-7xl flex-col items-center gap-3 px-4 py-6 text-sm text-foreground/50 sm:flex-row sm:justify-between sm:px-6">
-        <p className="text-center sm:text-left">
-          © {year} atradio.fm · Baked with{" "}
-          <span className="text-synth-pink" aria-label="love" role="img">
-            ❤️
-          </span>{" "}
-          in Antananarivo
+    <footer className="mt-10 border-t border-white/10 bg-synth-bg/60 sm:mt-16">
+      <div className="mx-auto flex max-w-7xl flex-col items-center gap-4 px-4 py-6 text-center text-xs text-foreground/50 sm:flex-row sm:justify-between sm:gap-3 sm:text-left sm:text-sm">
+        <p className="text-balance leading-relaxed">
+          {t("copyright", { year })} ·{" "}
+          <Trans
+            t={t}
+            i18nKey="tagline"
+            components={{
+              heart: (
+                <span className="text-synth-pink" aria-label="love" role="img">
+                  ❤️
+                </span>
+              ),
+            }}
+          />
         </p>
 
         <nav className="flex items-center gap-1">

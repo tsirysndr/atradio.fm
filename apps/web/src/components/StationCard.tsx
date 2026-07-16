@@ -1,4 +1,5 @@
 import { useAtomValue, useSetAtom } from "jotai";
+import { useTranslation } from "react-i18next";
 import { Button, Chip } from "@heroui/react";
 import {
   IconPlayerPlayFilled,
@@ -41,6 +42,7 @@ interface StationCardProps {
 }
 
 export function StationCard({ station, onRemove }: StationCardProps) {
+  const { t } = useTranslation("station");
   const current = useAtomValue(currentStationAtom);
   const isPlaying = useAtomValue(isPlayingAtom);
   const play = useSetAtom(playStationAtom);
@@ -91,7 +93,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
       <div className="flex flex-wrap items-center gap-1.5">
         {station.source === "custom" ? (
           <Chip size="sm" variant="soft" color="success">
-            {SOURCE_LABEL.custom}
+            {t("sourceYours")}
           </Chip>
         ) : (
           <Chip size="sm" variant="soft" className={CYAN_CHIP}>
@@ -113,7 +115,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
             size="sm"
             variant="soft"
             className="gap-1 !bg-synth-purple/10 !text-synth-purple"
-            title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
+            title={t("listeners", { count: listeners })}
           >
             <IconHeadphones size={12} />
             {listeners}
@@ -133,7 +135,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
           ) : (
             <IconPlayerPlayFilled size={16} />
           )}
-          {isActive ? "Pause" : isCurrent ? "Resume" : "Play"}
+          {isActive ? t("pause") : isCurrent ? t("resume") : t("play")}
         </Button>
 
         <Button
@@ -145,7 +147,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
               ? "!bg-synth-pink/15 hover:!bg-synth-pink/25"
               : "!bg-white/5 hover:!bg-white/10"
           }`}
-          aria-label={isFavorite ? "Remove favorite" : "Add to favorites"}
+          aria-label={isFavorite ? t("removeFavorite") : t("addFavorite")}
           onPress={() => ensureAuth(() => toggleFavorite(station))}
         >
           {isFavorite ? (
@@ -160,7 +162,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
           size="sm"
           variant="tertiary"
           className="rounded-full !bg-white/5 hover:!bg-white/10"
-          aria-label="Comments"
+          aria-label={t("comments")}
           onPress={() => openComments(station)}
         >
           <IconMessageCircle size={16} className="text-foreground/70" />
@@ -171,8 +173,8 @@ export function StationCard({ station, onRemove }: StationCardProps) {
             href={station.homepage}
             target="_blank"
             rel="noreferrer"
-            aria-label="Open station page"
-            title="Open station page"
+            aria-label={t("openStationPage")}
+            title={t("openStationPage")}
             className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-foreground/70 transition-colors hover:bg-white/10 hover:text-synth-cyan"
           >
             <IconExternalLink size={16} />
@@ -185,7 +187,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
             size="sm"
             variant="tertiary"
             className="rounded-full"
-            aria-label="Delete station"
+            aria-label={t("deleteStation")}
             onPress={() => onRemove(station)}
           >
             <IconTrash size={16} className="text-danger" />

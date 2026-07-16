@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -40,6 +41,7 @@ export function ProfilePage() {
 /* ---------------- self ---------------- */
 
 function SelfProfile() {
+  const { t } = useTranslation(["profile", "common"]);
   const { isLoggedIn, did, profile, loading, logout, openLogin } = useAuth();
   const favorites = useAtomValue(favoritesAtom);
   const stations = useAtomValue(customStationsAtom);
@@ -54,8 +56,8 @@ function SelfProfile() {
     return (
       <EmptyState
         icon={<IconUserCircle size={44} stroke={1.5} />}
-        title="Sign in to see your dial"
-        description="Log in with your Atmosphere account to save favorites and add your own stations."
+        title={t("signInPrompt.title")}
+        description={t("signInPrompt.description")}
         action={
           <Button
             variant="primary"
@@ -63,7 +65,7 @@ function SelfProfile() {
             onPress={() => openLogin(true)}
           >
             <IconLogin2 size={16} />
-            Sign in
+            {t("signIn", { ns: "common" })}
           </Button>
         }
       />
@@ -87,6 +89,7 @@ function SelfProfile() {
 /* ---------------- public (any actor) ---------------- */
 
 function PublicProfile({ actor }: { actor: string }) {
+  const { t } = useTranslation("profile");
   const profileQuery = useQuery({
     queryKey: ["profile", actor],
     queryFn: () => getProfile(actor),
@@ -108,8 +111,8 @@ function PublicProfile({ actor }: { actor: string }) {
     return (
       <EmptyState
         icon={<IconUserCircle size={44} stroke={1.5} />}
-        title="Profile not found"
-        description={`Couldn't find “${actor}”.`}
+        title={t("notFound.title")}
+        description={t("notFound.description", { actor })}
       />
     );
   }
@@ -151,6 +154,7 @@ function ProfileView({
   onAddStation,
   onLogout,
 }: ProfileViewProps) {
+  const { t } = useTranslation(["profile", "common"]);
   const [tab, setTab] = useState<"favorites" | "custom" | "recent">(
     "favorites",
   );
@@ -173,24 +177,24 @@ function ProfileView({
       [
         {
           key: "favorites" as const,
-          label: "Favorites",
+          label: t("tabs.favorites", { count: favorites.length }),
           count: favorites.length,
           icon: IconHeart,
         },
         {
           key: "custom" as const,
-          label: "Stations",
+          label: t("tabs.stations", { count: stations.length }),
           count: stations.length,
           icon: IconBroadcast,
         },
         {
           key: "recent" as const,
-          label: "Recently played",
+          label: t("tabs.recent", { count: recentlyPlayed.length }),
           count: recentlyPlayed.length,
           icon: IconHistory,
         },
       ],
-    [favorites.length, stations.length, recentlyPlayed.length],
+    [t, favorites.length, stations.length, recentlyPlayed.length],
   );
 
   const activeList =
@@ -219,7 +223,8 @@ function ProfileView({
     return list;
   }, [activeList, source, query, sort]);
 
-  const displayName = profile?.displayName || profile?.handle || "Listener";
+  const displayName =
+    profile?.displayName || profile?.handle || t("displayNameFallback");
 
   return (
     <div className="flex flex-col gap-8">
@@ -247,7 +252,7 @@ function ProfileView({
                   href={`https://bsky.app/profile/${profile.handle}`}
                   target="_blank"
                   rel="noreferrer"
-                  title="Open on Bluesky"
+                  title={t("links.bluesky")}
                   className="truncate text-sm text-synth-cyan/90 hover:text-synth-cyan hover:underline"
                 >
                   @{profile.handle}
@@ -258,7 +263,7 @@ function ProfileView({
                   href={`https://pdsls.dev/at://${profile.did}`}
                   target="_blank"
                   rel="noreferrer"
-                  title="View repo on PDSls"
+                  title={t("links.pdsls")}
                   className="text-xs text-foreground/40 hover:text-synth-cyan hover:underline"
                 >
                   pdsls ↗
@@ -270,13 +275,13 @@ function ProfileView({
                 <span className="font-semibold text-synth-cyan">
                   {favorites.length}
                 </span>{" "}
-                favorites
+                {t("header.favorites", { count: favorites.length })}
               </span>
               <span>
                 <span className="font-semibold text-synth-cyan">
                   {stations.length}
                 </span>{" "}
-                stations
+                {t("header.stations", { count: stations.length })}
               </span>
             </div>
           </div>
@@ -290,7 +295,7 @@ function ProfileView({
               onPress={onLogout}
             >
               <IconLogout size={16} />
-              Log out
+              {t("logout")}
             </Button>
           </div>
         )}
@@ -301,10 +306,10 @@ function ProfileView({
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10">
           <div
             role="tablist"
-            aria-label="Profile sections"
+            aria-label={t("tabs.sectionsLabel")}
             className="flex gap-6"
           >
-            {tabs.map(({ key, label, count, icon: Icon }) => {
+            {tabs.map(({ key, label, icon: Icon }) => {
               const active = tab === key;
               return (
                 <button
@@ -320,7 +325,7 @@ function ProfileView({
                   }`}
                 >
                   <Icon size={16} className={active ? "text-synth-pink" : ""} />
-                  {label} ({count})
+                  {label}
                 </button>
               );
             })}
@@ -333,8 +338,8 @@ function ProfileView({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Filter…"
-                aria-label="Filter stations"
+                placeholder={t("filter.placeholder")}
+                aria-label={t("filter.stationsLabel")}
                 className="h-8 w-24 bg-transparent text-xs text-foreground placeholder:text-foreground/30 focus:outline-none sm:w-32"
               />
             </div>
@@ -343,25 +348,25 @@ function ProfileView({
               onChange={(e) =>
                 setSource(e.target.value as "all" | Station["source"])
               }
-              aria-label="Filter by source"
+              aria-label={t("filter.sourceLabel")}
               className={selectClass}
             >
-              <option value="all">All sources</option>
+              <option value="all">{t("sources.all")}</option>
               <option value="radio-browser">radio-browser</option>
               <option value="tunein">TuneIn</option>
-              <option value="custom">Yours</option>
+              <option value="custom">{t("sources.custom")}</option>
             </select>
             <select
               value={sort}
               onChange={(e) =>
                 setSort(e.target.value as "recent" | "name" | "name-desc")
               }
-              aria-label="Sort"
+              aria-label={t("filter.sortLabel")}
               className={selectClass}
             >
-              <option value="recent">Recent</option>
-              <option value="name">Name A–Z</option>
-              <option value="name-desc">Name Z–A</option>
+              <option value="recent">{t("sort.recent")}</option>
+              <option value="name">{t("sort.nameAsc")}</option>
+              <option value="name-desc">{t("sort.nameDesc")}</option>
             </select>
           </div>
         </div>
@@ -371,31 +376,29 @@ function ProfileView({
             tab === "favorites" ? (
               <EmptyState
                 icon={<IconHeart size={40} stroke={1.5} />}
-                title="No favorites yet"
+                title={t("empty.favoritesTitle")}
                 description={
                   editable
-                    ? "Tap the heart on any station to save it here."
-                    : "This user hasn't favorited any stations."
+                    ? t("empty.favoritesSelf")
+                    : t("empty.favoritesOther")
                 }
               />
             ) : tab === "recent" ? (
               <EmptyState
                 icon={<IconHistory size={40} stroke={1.5} />}
-                title="Nothing played yet"
+                title={t("empty.recentTitle")}
                 description={
-                  editable
-                    ? "Stations you play will show up here."
-                    : "This user hasn't played any stations yet."
+                  editable ? t("empty.recentSelf") : t("empty.recentOther")
                 }
               />
             ) : (
               <EmptyState
                 icon={<IconBroadcast size={40} stroke={1.5} />}
-                title="No stations yet"
+                title={t("empty.stationsTitle")}
                 description={
                   editable
-                    ? "Add a stream that isn't listed with its name and URL."
-                    : "This user hasn't added any stations."
+                    ? t("empty.stationsSelf")
+                    : t("empty.stationsOther")
                 }
                 action={
                   editable ? (
@@ -405,7 +408,7 @@ function ProfileView({
                       onPress={onAddStation}
                     >
                       <IconPlus size={16} />
-                      Add your first station
+                      {t("empty.addFirst")}
                     </Button>
                   ) : undefined
                 }
@@ -414,8 +417,8 @@ function ProfileView({
           ) : visible.length === 0 ? (
             <EmptyState
               icon={<IconSearch size={40} stroke={1.5} />}
-              title="No matches"
-              description="Nothing matches your search or filters."
+              title={t("empty.noMatchesTitle")}
+              description={t("empty.noMatchesDescription")}
             />
           ) : (
             <StationGrid

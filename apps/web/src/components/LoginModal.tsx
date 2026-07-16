@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtom } from "jotai";
 import { Modal, Button, useOverlayState } from "@heroui/react";
 import { IconAt, IconBrandBluesky } from "@tabler/icons-react";
@@ -9,6 +10,7 @@ import { startLogin, startSignup } from "@/lib/atproto/session";
 import { ModalCloseButton } from "./ModalCloseButton";
 
 export function LoginModal() {
+  const { t } = useTranslation("auth");
   const [isOpen, setOpen] = useAtom(loginModalOpenAtom);
   const state = useOverlayState({ isOpen, onOpenChange: setOpen });
   const [handle, setHandle] = useState("");
@@ -38,7 +40,7 @@ export function LoginModal() {
     } catch (err) {
       consola.error("[auth] login failed", err);
       setBusy(false);
-      setError("Couldn't start login. Check your handle and try again.");
+      setError(t("loginError"));
     }
   };
 
@@ -50,7 +52,7 @@ export function LoginModal() {
     } catch (err) {
       consola.error("[auth] signup failed", err);
       setBusy(false);
-      setError("Couldn't start signup. Please try again.");
+      setError(t("signupError"));
     }
   };
 
@@ -66,7 +68,7 @@ export function LoginModal() {
             <ModalCloseButton onClose={() => setOpen(false)} />
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
-                Log in with Atmosphere account
+                {t("modalTitle")}
               </Modal.Heading>
             </Modal.Header>
             <Modal.Body className="flex flex-col gap-4 py-4">
@@ -86,7 +88,7 @@ export function LoginModal() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") void submit();
                     }}
-                    placeholder="atmosphere.handle"
+                    placeholder={t("handlePlaceholder")}
                     className="h-10 w-full bg-transparent text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
                     type="text"
                     name="atproto-handle"
@@ -106,16 +108,13 @@ export function LoginModal() {
                   isDisabled={busy || !handle.trim()}
                   onPress={() => void submit()}
                 >
-                  Log in
+                  {t("loginButton")}
                 </Button>
               </div>
 
               {/* Signup */}
               <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-synth-panel/50 p-3">
-                <p className="text-xs text-foreground/60">
-                  atradio.fm is part of the Atmosphere. Create an Atmosphere
-                  account on Bluesky to get started!
-                </p>
+                <p className="text-xs text-foreground/60">{t("signupHelper")}</p>
                 <button
                   type="button"
                   disabled={busy}
@@ -123,7 +122,7 @@ export function LoginModal() {
                   className="flex items-center justify-center gap-1.5 rounded-full bg-synth-blue/15 px-3 py-2 text-sm font-medium text-synth-blue transition-colors hover:bg-synth-blue/25 disabled:opacity-50"
                 >
                   <IconBrandBluesky size={16} />
-                  Signup via Bluesky
+                  {t("signupButton")}
                 </button>
               </div>
             </Modal.Body>

@@ -1,0 +1,60 @@
+{
+  "signInPrompt": {
+    "title": "Entre para ver a sua estação",
+    "description": "Entre com a sua conta Atmosphere para salvar favoritos e adicionar as suas próprias estações."
+  },
+  "notFound": {
+    "title": "Perfil não encontrado",
+    "description": "Não foi possível encontrar “{{actor}}”."
+  },
+  "displayNameFallback": "Ouvinte",
+  "links": {
+    "bluesky": "Abrir no Bluesky",
+    "pdsls": "Ver repositório no PDSls"
+  },
+  "header": {
+    "favorites_one": "favorito",
+    "favorites_other": "favoritos",
+    "stations_one": "estação",
+    "stations_other": "estações"
+  },
+  "logout": "Sair",
+  "tabs": {
+    "sectionsLabel": "Seções do perfil",
+    "favorites_one": "Favorito ({{count}})",
+    "favorites_other": "Favoritos ({{count}})",
+    "stations_one": "Estação ({{count}})",
+    "stations_other": "Estações ({{count}})",
+    "recent_one": "Tocadas recentemente ({{count}})",
+    "recent_other": "Tocadas recentemente ({{count}})"
+  },
+  "filter": {
+    "placeholder": "Filtrar…",
+    "stationsLabel": "Filtrar estações",
+    "sourceLabel": "Filtrar por fonte",
+    "sortLabel": "Ordenar"
+  },
+  "sources": {
+    "all": "Todas as fontes",
+    "custom": "Suas"
+  },
+  "sort": {
+    "recent": "Recentes",
+    "nameAsc": "Nome A–Z",
+    "nameDesc": "Nome Z–A"
+  },
+  "empty": {
+    "favoritesTitle": "Nenhum favorito ainda",
+    "favoritesSelf": "Toque no coração de qualquer estação para salvá-la aqui.",
+    "favoritesOther": "Este usuário não favoritou nenhuma estação.",
+    "recentTitle": "Nada tocado ainda",
+    "recentSelf": "As estações que você tocar aparecerão aqui.",
+    "recentOther": "Este usuário ainda não tocou nenhuma estação.",
+    "stationsTitle": "Nenhuma estação ainda",
+    "stationsSelf": "Adicione um stream que não esteja listado com o nome e a URL.",
+    "stationsOther": "Este usuário não adicionou nenhuma estação.",
+    "addFirst": "Adicionar a sua primeira estação",
+    "noMatchesTitle": "Nenhum resultado",
+    "noMatchesDescription": "Nada corresponde à sua pesquisa ou aos seus filtros."
+  }
+}

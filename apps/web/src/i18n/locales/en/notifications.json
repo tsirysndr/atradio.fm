@@ -1,0 +1,11 @@
+{
+  "title": "Notifications",
+  "profile": "Profile",
+  "close": "Close notifications",
+  "empty": "Nothing yet. Mentions and comments on your stations show up here.",
+  "someone": "someone",
+  "row": {
+    "mention": "<actor>{{name}}</actor> mentioned you",
+    "comment": "<actor>{{name}}</actor> commented on your station"
+  }
+}

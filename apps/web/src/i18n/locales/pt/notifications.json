@@ -1,0 +1,11 @@
+{
+  "title": "Notificações",
+  "profile": "Perfil",
+  "close": "Fechar notificações",
+  "empty": "Nada por aqui ainda. Menções e comentários nas suas estações aparecem aqui.",
+  "someone": "alguém",
+  "row": {
+    "mention": "<actor>{{name}}</actor> mencionou você",
+    "comment": "<actor>{{name}}</actor> comentou na sua estação"
+  }
+}

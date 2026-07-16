@@ -1,0 +1,17 @@
+{
+  "search": "Pesquisar",
+  "addStation": "Adicionar estação",
+  "add": "Adicionar",
+  "signIn": "Entrar",
+  "signOut": "Sair",
+  "cancel": "Cancelar",
+  "save": "Salvar",
+  "saving": "Salvando…",
+  "close": "Fechar",
+  "loading": "Carregando…",
+  "retry": "Tentar novamente",
+  "error": "Algo deu errado",
+  "language": "Idioma",
+  "shortcutsButton": "Mostrar atalhos de teclado",
+  "shortcutsButtonTitle": "Atalhos de teclado (?)"
+}
