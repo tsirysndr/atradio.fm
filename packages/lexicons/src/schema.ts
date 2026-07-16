@@ -82,6 +82,69 @@ export const actorStatusRecordSchema = z.object({
   playedAt: z.string(),
 });
 
+export const mentionSchema = z.object({
+  did: z.string(),
+  byteStart: z.number().int().min(0),
+  byteEnd: z.number().int().min(0),
+});
+
+export const gifEmbedSchema = z.object({
+  url: z.string(),
+  previewUrl: z.string().optional(),
+  alt: z.string().optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+});
+
+export const commentRecordSchema = z.object({
+  $type: z.literal("fm.atradio.comment").optional(),
+  station: stationInfoSchema,
+  // Empty allowed for GIF-only comments; the app requires text OR a gif.
+  text: z.string().max(3000),
+  facets: z.array(mentionSchema).optional(),
+  gif: gifEmbedSchema.optional(),
+  createdAt: z.string(),
+});
+
+export const commentViewSchema = z.object({
+  uri: z.string(),
+  author: actorInfoSchema.optional(),
+  station: stationInfoSchema,
+  text: z.string(),
+  facets: z.array(mentionSchema).optional(),
+  gif: gifEmbedSchema.optional(),
+  createdAt: z.string(),
+});
+
+export const commentListOutputSchema = z.object({
+  cursor: z.string().optional(),
+  total: z.number(),
+  items: z.array(commentViewSchema),
+});
+
+export const notificationViewSchema = z.object({
+  uri: z.string(),
+  reason: z.enum(["mention", "comment"]),
+  author: actorInfoSchema,
+  station: stationInfoSchema.optional(),
+  text: z.string().optional(),
+  createdAt: z.string(),
+  isRead: z.boolean(),
+});
+
+export const notificationListOutputSchema = z.object({
+  cursor: z.string().optional(),
+  unreadCount: z.number(),
+  items: z.array(notificationViewSchema),
+});
+
+export const reactionRecordSchema = z.object({
+  $type: z.literal("fm.atradio.reaction").optional(),
+  station: stationInfoSchema,
+  emoji: z.string().min(1).max(32),
+  createdAt: z.string(),
+});
+
 export const listenerCountSchema = z.object({
   stationId: z.string(),
   listeners: z.number(),

@@ -4,14 +4,24 @@ import { eq, isNull } from "drizzle-orm";
 import {
   NSID,
   actorStatusRecordSchema,
+  commentRecordSchema,
   favoriteRecordSchema,
+  reactionRecordSchema,
   stationRecordSchema,
+  type ActorInfo,
 } from "@atradio/lexicons";
 import { env } from "../env";
 import { db, schema } from "../db";
 import { getProfile, getProfiles } from "../lib/profile";
+import { publishLive } from "../live/bus";
 
-const WANTED: string[] = [NSID.favorite, NSID.station, NSID.actorStatus];
+const WANTED: string[] = [
+  NSID.favorite,
+  NSID.station,
+  NSID.actorStatus,
+  NSID.comment,
+  NSID.reaction,
+];
 const CURSOR_ID = "global";
 
 interface JetstreamEvent {
@@ -214,6 +224,178 @@ async function indexPlay(did: string, c: Commit): Promise<void> {
     .onConflictDoNothing();
 }
 
+/** Distinct mentioned DIDs from a comment's facets (excluding the author). */
+function mentionedDids(facets: { did: string }[] | undefined, author: string): string[] {
+  if (!facets?.length) return [];
+  const out = new Set<string>();
+  for (const f of facets) if (f.did && f.did !== author) out.add(f.did);
+  return [...out];
+}
+
+/**
+ * Fan out notifications for a freshly-indexed comment: one per mentioned actor,
+ * plus one for the station's owner when it's a custom station someone else made.
+ * Notifications for this comment are rebuilt from scratch each time so edits
+ * (added/removed mentions) stay consistent.
+ */
+async function fanoutCommentNotifications(
+  author: string,
+  uri: string,
+  stationId: string,
+  station: unknown,
+  text: string,
+  facets: { did: string }[] | undefined,
+  createdAt: Date,
+): Promise<void> {
+  await db
+    .delete(schema.notifications)
+    .where(eq(schema.notifications.subjectUri, uri));
+
+  const recipients = new Map<string, "mention" | "comment">();
+  for (const did of mentionedDids(facets, author)) recipients.set(did, "mention");
+
+  // The owner of a custom station gets a "comment" notification (unless they're
+  // the author or already mentioned). Owner is whoever authored the station
+  // record with this rkey.
+  if (stationId.startsWith("custom:")) {
+    const rkey = stationId.slice("custom:".length);
+    const [owner] = await db
+      .select({ did: schema.stations.did })
+      .from(schema.stations)
+      .where(eq(schema.stations.rkey, rkey))
+      .limit(1);
+    if (owner?.did && owner.did !== author && !recipients.has(owner.did)) {
+      recipients.set(owner.did, "comment");
+    }
+  }
+
+  if (recipients.size === 0) return;
+
+  const rows = [...recipients].map(([recipientDid, reason]) => ({
+    id: `${reason}:${uri}:${recipientDid}`,
+    recipientDid,
+    authorDid: author,
+    reason,
+    subjectUri: uri,
+    stationId,
+    station: station as never,
+    text,
+    createdAt,
+    indexedAt: new Date(),
+  }));
+  await db.insert(schema.notifications).values(rows).onConflictDoNothing();
+}
+
+/** Look up an actor's public snapshot from the users cache (for live events). */
+async function getActorInfo(did: string): Promise<ActorInfo> {
+  const [u] = await db
+    .select({
+      handle: schema.users.handle,
+      displayName: schema.users.displayName,
+      avatarUrl: schema.users.avatarUrl,
+    })
+    .from(schema.users)
+    .where(eq(schema.users.did, did))
+    .limit(1);
+  return {
+    did,
+    handle: u?.handle ?? undefined,
+    displayName: u?.displayName ?? undefined,
+    avatar: u?.avatarUrl ?? undefined,
+  };
+}
+
+/** Upsert a fm.atradio.comment record, (re)build notifications, broadcast live. */
+async function indexComment(did: string, c: Commit, uri: string): Promise<void> {
+  const parsed = commentRecordSchema.safeParse(c.record);
+  if (!parsed.success) return;
+  const r = parsed.data;
+  await ensureUser(did);
+  const createdAt = new Date(r.createdAt);
+  const values = {
+    uri,
+    did,
+    rkey: c.rkey,
+    stationId: r.station.stationId,
+    station: r.station,
+    text: r.text,
+    facets: r.facets ?? null,
+    gif: r.gif ?? null,
+    createdAt,
+    indexedAt: new Date(),
+  };
+  await db
+    .insert(schema.comments)
+    .values(values)
+    .onConflictDoUpdate({
+      target: schema.comments.uri,
+      set: {
+        stationId: values.stationId,
+        station: values.station,
+        text: values.text,
+        facets: values.facets,
+        gif: values.gif,
+        createdAt: values.createdAt,
+        indexedAt: values.indexedAt,
+      },
+    });
+
+  await fanoutCommentNotifications(
+    did,
+    uri,
+    r.station.stationId,
+    r.station,
+    r.text,
+    r.facets,
+    createdAt,
+  );
+
+  // Only broadcast fresh comments (creates) so an edit doesn't re-pop the feed.
+  if (c.operation === "create") {
+    publishLive(r.station.stationId, {
+      type: "comment",
+      comment: {
+        uri,
+        author: await getActorInfo(did),
+        station: r.station,
+        text: r.text,
+        facets: r.facets,
+        gif: r.gif,
+        createdAt: r.createdAt,
+      },
+    });
+  }
+}
+
+/** Store a fm.atradio.reaction record and broadcast the floating emoji live. */
+async function indexReaction(did: string, c: Commit, uri: string): Promise<void> {
+  const parsed = reactionRecordSchema.safeParse(c.record);
+  if (!parsed.success) return;
+  const r = parsed.data;
+  await ensureUser(did);
+  await db
+    .insert(schema.reactions)
+    .values({
+      uri,
+      did,
+      rkey: c.rkey,
+      stationId: r.station.stationId,
+      emoji: r.emoji,
+      createdAt: new Date(r.createdAt),
+      indexedAt: new Date(),
+    })
+    .onConflictDoNothing();
+
+  if (c.operation === "create") {
+    publishLive(r.station.stationId, {
+      type: "reaction",
+      emoji: r.emoji,
+      actor: await getActorInfo(did),
+      createdAt: r.createdAt,
+    });
+  }
+}
+
 async function processCommit(evt: JetstreamEvent): Promise<void> {
   const c = evt.commit;
   if (!c || !WANTED.includes(c.collection)) return;
@@ -224,6 +406,13 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
       await db.delete(schema.favorites).where(eq(schema.favorites.uri, uri));
     } else if (c.collection === NSID.station) {
       await db.delete(schema.stations).where(eq(schema.stations.uri, uri));
+    } else if (c.collection === NSID.comment) {
+      await db.delete(schema.comments).where(eq(schema.comments.uri, uri));
+      await db
+        .delete(schema.notifications)
+        .where(eq(schema.notifications.subjectUri, uri));
+    } else if (c.collection === NSID.reaction) {
+      await db.delete(schema.reactions).where(eq(schema.reactions.uri, uri));
     }
     // A deleted actor.status record leaves the play history intact.
     return;
@@ -233,6 +422,8 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
   if (c.collection === NSID.favorite) await indexFavorite(evt.did, c, uri);
   else if (c.collection === NSID.station) await indexStation(evt.did, c, uri);
   else if (c.collection === NSID.actorStatus) await indexPlay(evt.did, c);
+  else if (c.collection === NSID.comment) await indexComment(evt.did, c, uri);
+  else if (c.collection === NSID.reaction) await indexReaction(evt.did, c, uri);
 }
 
 async function handleEvent(evt: JetstreamEvent): Promise<void> {

@@ -2,7 +2,11 @@ import type {
   ActorStatusRecord,
   AudioSettingsData,
   AudioSettingsRecord,
+  CommentRecord,
   FavoriteRecord,
+  GifEmbed,
+  Mention,
+  ReactionRecord,
   Station,
   StationDraft,
   StationInfo,
@@ -187,4 +191,40 @@ export function buildActorStatusRecord(
     station: stationToInfo(s),
     playedAt: playedAt ?? new Date().toISOString(),
   }) as ActorStatusRecord;
+}
+
+// ---- fm.atradio.comment ----
+
+/** Build a comment record for a station, with optional mention facets + gif. */
+export function buildCommentRecord(
+  s: Station,
+  text: string,
+  opts: { facets?: Mention[]; gif?: GifEmbed; createdAt?: string } = {},
+): CommentRecord {
+  const facets = opts.facets?.length ? opts.facets : undefined;
+  const gif = opts.gif ? (clean({ ...opts.gif }) as GifEmbed) : undefined;
+  return clean({
+    $type: NSID.comment,
+    station: stationToInfo(s),
+    text,
+    facets,
+    gif,
+    createdAt: opts.createdAt ?? new Date().toISOString(),
+  }) as CommentRecord;
+}
+
+// ---- fm.atradio.reaction ----
+
+/** Build an emoji-reaction record for a station. */
+export function buildReactionRecord(
+  s: Station,
+  emoji: string,
+  createdAt?: string,
+): ReactionRecord {
+  return clean({
+    $type: NSID.reaction,
+    station: stationToInfo(s),
+    emoji,
+    createdAt: createdAt ?? new Date().toISOString(),
+  }) as ReactionRecord;
 }

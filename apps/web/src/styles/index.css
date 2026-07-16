@@ -51,6 +51,63 @@
   }
 }
 
+/* Floating emoji reaction: rise, drift sideways, scale up then fade out. */
+@keyframes reaction-float {
+  0% {
+    transform: translateY(0) translateX(0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(calc(var(--rise, 160px) * -0.08))
+      translateX(calc(var(--dx, 0px) * 0.15)) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(calc(var(--rise, 160px) * -1))
+      translateX(var(--dx, 0px)) scale(1);
+    opacity: 0;
+  }
+}
+
+.reaction-particle {
+  animation: reaction-float var(--dur, 2.4s) cubic-bezier(0.22, 0.61, 0.36, 1)
+    forwards;
+  will-change: transform, opacity;
+}
+
+/* Emoji picker popover pops in with a slight overshoot (magnify) from the bottom. */
+@keyframes emoji-pop-in {
+  0% {
+    transform: translateY(8px) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    transform: translateY(0) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.emoji-pop-in {
+  animation: emoji-pop-in 0.22s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  transform-origin: bottom center;
+}
+
+/* Hide the scrollbar on the horizontally-scrolling emoji dock. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /*
  * pocketenv palette: override HeroUI's semantic theme variables for the dark
  * theme so its components (accent buttons, overlays, focus rings, statuses …)

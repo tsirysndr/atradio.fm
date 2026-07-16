@@ -1,5 +1,8 @@
 import type {
+  CommentListOutput,
   ListenerCount,
+  LiveEvent,
+  NotificationListOutput,
   PlayView,
   StationListOutput,
   StationView,
@@ -118,4 +121,70 @@ export async function getListenerCounts(
   if (!res.ok) throw new Error(`getListenerCounts: ${res.status}`);
   const data = (await res.json()) as { counts: ListenerCount[] };
   return data.counts;
+}
+
+/** Comments on a station (newest first). */
+export async function getComments(
+  stationId: string,
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<CommentListOutput> {
+  const params = new URLSearchParams({ station: stationId });
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  const res = await fetch(`${BASE}/xrpc/fm.atradio.getComments?${params}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`getComments: ${res.status}`);
+  return (await res.json()) as CommentListOutput;
+}
+
+/** An actor's notifications + current unread count. */
+export async function getNotifications(
+  actor: string,
+  opts: { limit?: number; cursor?: string } = {},
+): Promise<NotificationListOutput> {
+  const params = new URLSearchParams({ actor });
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.cursor) params.set("cursor", opts.cursor);
+  const res = await fetch(
+    `${BASE}/xrpc/fm.atradio.getNotifications?${params}`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!res.ok) throw new Error(`getNotifications: ${res.status}`);
+  return (await res.json()) as NotificationListOutput;
+}
+
+/** Advance the actor's last-seen marker (resets the bell badge). */
+export async function updateSeen(
+  actor: string,
+  seenAt?: string,
+): Promise<{ unreadCount: number }> {
+  const res = await fetch(`${BASE}/xrpc/fm.atradio.updateSeen`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ actor, seenAt }),
+  });
+  if (!res.ok) throw new Error(`updateSeen: ${res.status}`);
+  return (await res.json()) as { unreadCount: number };
+}
+
+/**
+ * Subscribe to a station's live comment + reaction stream (SSE). Returns a
+ * cleanup function that closes the connection.
+ */
+export function subscribeLive(
+  stationId: string,
+  onEvent: (event: LiveEvent) => void,
+): () => void {
+  const url = `${BASE}/live/${encodeURIComponent(stationId)}`;
+  const es = new EventSource(url);
+  es.onmessage = (e) => {
+    try {
+      onEvent(JSON.parse(e.data) as LiveEvent);
+    } catch {
+      /* ignore malformed frames */
+    }
+  };
+  // EventSource auto-reconnects on error; nothing to do but keep it open.
+  return () => es.close();
 }

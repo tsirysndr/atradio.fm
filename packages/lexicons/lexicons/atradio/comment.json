@@ -1,0 +1,103 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.comment",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A user's comment on a radio station.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "station",
+          "text",
+          "createdAt"
+        ],
+        "properties": {
+          "station": {
+            "type": "ref",
+            "ref": "fm.atradio.defs#stationInfo"
+          },
+          "text": {
+            "type": "string",
+            "description": "The comment body (plain text).",
+            "maxLength": 3000,
+            "maxGraphemes": 300
+          },
+          "facets": {
+            "type": "array",
+            "description": "Mentions of other actors, anchored to byte ranges in `text`.",
+            "items": {
+              "type": "ref",
+              "ref": "fm.atradio.comment#mention"
+            }
+          },
+          "gif": {
+            "type": "ref",
+            "ref": "fm.atradio.comment#gif"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    },
+    "gif": {
+      "type": "object",
+      "description": "An animated GIF embedded in a comment (e.g. from Giphy).",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "Direct URL of the animated GIF/MP4.",
+          "format": "uri"
+        },
+        "previewUrl": {
+          "type": "string",
+          "description": "Smaller still/preview image URL.",
+          "format": "uri"
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "mention": {
+      "type": "object",
+      "description": "A mention of another actor within the comment text.",
+      "required": [
+        "did",
+        "byteStart",
+        "byteEnd"
+      ],
+      "properties": {
+        "did": {
+          "type": "string",
+          "format": "did"
+        },
+        "byteStart": {
+          "type": "integer",
+          "description": "Inclusive UTF-8 byte offset of the mention start.",
+          "minimum": 0
+        },
+        "byteEnd": {
+          "type": "integer",
+          "description": "Exclusive UTF-8 byte offset of the mention end.",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

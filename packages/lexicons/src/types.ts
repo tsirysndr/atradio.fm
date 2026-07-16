@@ -1,6 +1,8 @@
 export const NSID = {
   station: "fm.atradio.station",
   favorite: "fm.atradio.favorite",
+  comment: "fm.atradio.comment",
+  reaction: "fm.atradio.reaction",
   audioSettings: "fm.atradio.audio.settings",
   actorStatus: "fm.atradio.actor.status",
   getFavorites: "fm.atradio.getFavorites",
@@ -8,6 +10,9 @@ export const NSID = {
   getRecentlyPlayed: "fm.atradio.getRecentlyPlayed",
   getGlobalRecentlyPlayed: "fm.atradio.getGlobalRecentlyPlayed",
   getListenerCounts: "fm.atradio.getListenerCounts",
+  getComments: "fm.atradio.getComments",
+  getNotifications: "fm.atradio.getNotifications",
+  updateSeen: "fm.atradio.updateSeen",
 } as const;
 
 export type StationSource = "radio-browser" | "tunein" | "custom";
@@ -217,3 +222,115 @@ export interface ActorStatusRecord {
   station: StationInfo;
   playedAt: string;
 }
+
+// ---- fm.atradio.comment ----
+
+/**
+ * `fm.atradio.comment#mention` — a mention of another actor, anchored to a
+ * UTF-8 byte range within the comment `text`.
+ */
+export interface Mention {
+  did: string;
+  /** Inclusive UTF-8 byte offset of the mention start. */
+  byteStart: number;
+  /** Exclusive UTF-8 byte offset of the mention end. */
+  byteEnd: number;
+}
+
+/** `fm.atradio.comment#gif` — an animated GIF embedded in a comment. */
+export interface GifEmbed {
+  /** Direct URL of the animated GIF/MP4. */
+  url: string;
+  /** Smaller still/preview image URL. */
+  previewUrl?: string;
+  alt?: string;
+  width?: number;
+  height?: number;
+}
+
+/** `fm.atradio.comment` record — a comment on a station. */
+export interface CommentRecord {
+  $type?: typeof NSID.comment;
+  station: StationInfo;
+  text: string;
+  facets?: Mention[];
+  gif?: GifEmbed;
+  createdAt: string;
+}
+
+/** `fm.atradio.defs#commentView` — a comment paired with its uri + author. */
+export interface CommentView {
+  uri: string;
+  author?: ActorInfo;
+  station: StationInfo;
+  text: string;
+  facets?: Mention[];
+  gif?: GifEmbed;
+  createdAt: string;
+}
+
+/** Output of `fm.atradio.getComments`. */
+export interface CommentListOutput {
+  cursor?: string;
+  total: number;
+  items: CommentView[];
+}
+
+// ---- notifications ----
+
+export type NotificationReason = "mention" | "comment";
+
+/** `fm.atradio.defs#notificationView` — one notification for an actor. */
+export interface NotificationView {
+  /** URI of the subject record (the comment). */
+  uri: string;
+  reason: NotificationReason;
+  author: ActorInfo;
+  station?: StationInfo;
+  /** Snapshot of the comment text. */
+  text?: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+/** Output of `fm.atradio.getNotifications`. */
+export interface NotificationListOutput {
+  cursor?: string;
+  /** Notifications newer than the actor's last-seen time. */
+  unreadCount: number;
+  items: NotificationView[];
+}
+
+/** Output of `fm.atradio.updateSeen`. */
+export interface UpdateSeenOutput {
+  unreadCount: number;
+}
+
+// ---- fm.atradio.reaction ----
+
+/** `fm.atradio.reaction` record — an ephemeral emoji reaction to a station. */
+export interface ReactionRecord {
+  $type?: typeof NSID.reaction;
+  station: StationInfo;
+  emoji: string;
+  createdAt: string;
+}
+
+// ---- live stream (SSE) events ----
+
+/** A new comment appeared on the station being watched. */
+export interface LiveCommentEvent {
+  type: "comment";
+  comment: CommentView;
+}
+
+/** Someone reacted to the station being watched. */
+export interface LiveReactionEvent {
+  type: "reaction";
+  emoji: string;
+  actor: ActorInfo;
+  createdAt: string;
+}
+
+/** Union of events pushed over the per-station live (SSE) channel. */
+export type LiveEvent = LiveCommentEvent | LiveReactionEvent;

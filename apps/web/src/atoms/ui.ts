@@ -1,7 +1,14 @@
 import { atom } from "jotai";
+import type { Station } from "@/lib/types";
 
 /** Controls the "Add your own station" modal, shared across navbar + profile. */
 export const addStationOpenAtom = atom(false);
+
+/** Station whose comments modal is open (null = closed). */
+export const commentsStationAtom = atom<Station | null>(null);
+
+/** Controls the notifications dropdown in the topbar. */
+export const notificationsOpenAtom = atom(false);
 
 /** Controls the keyboard-shortcuts help overlay. */
 export const shortcutsOpenAtom = atom(false);

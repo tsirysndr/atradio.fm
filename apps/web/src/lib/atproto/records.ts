@@ -9,7 +9,9 @@ import {
   audioSettingsRecordSchema,
   buildActorStatusRecord,
   buildAudioSettingsRecord,
+  buildCommentRecord,
   buildFavoriteRecord,
+  buildReactionRecord,
   buildStationRecord,
   favoriteRecordToStation,
   stationRecordToStation,
@@ -17,6 +19,8 @@ import {
   type AudioSettingsData,
   type AudioSettingsRecord,
   type FavoriteRecord,
+  type GifEmbed,
+  type Mention,
   type StationRecord,
   type Station,
   type StationDraft,
@@ -167,6 +171,55 @@ export async function putActorStatus(
       },
     }),
   );
+}
+
+/** Write a comment on a station to the user's repo; returns its rkey + uri. */
+export async function putComment(
+  client: Client,
+  did: Did,
+  station: Station,
+  text: string,
+  opts: { facets?: Mention[]; gif?: GifEmbed } = {},
+): Promise<{ rkey: string; uri: string }> {
+  const rkey = tidNow();
+  await ok(
+    client.post("com.atproto.repo.putRecord", {
+      input: {
+        repo: did,
+        collection: NSID.comment as Nsid,
+        rkey,
+        record: buildCommentRecord(station, text, opts) as unknown as Record<
+          string,
+          unknown
+        >,
+      },
+    }),
+  );
+  return { rkey, uri: `at://${did}/${NSID.comment}/${rkey}` };
+}
+
+/** Write an ephemeral emoji reaction to a station; returns its rkey. */
+export async function putReaction(
+  client: Client,
+  did: Did,
+  station: Station,
+  emoji: string,
+): Promise<string> {
+  const rkey = tidNow();
+  await ok(
+    client.post("com.atproto.repo.putRecord", {
+      input: {
+        repo: did,
+        collection: NSID.reaction as Nsid,
+        rkey,
+        record: buildReactionRecord(station, emoji) as unknown as Record<
+          string,
+          unknown
+        >,
+      },
+    }),
+  );
+  return rkey;
 }
 
 /** Write the actor's singleton audio-settings record (rkey `self`). */

@@ -1,0 +1,31 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.reaction"
+defs = new Mapping<String, Record> {
+  ["main"] {
+    type = "record"
+    key = "tid"
+    description = "An ephemeral emoji reaction to a radio station."
+    `record` {
+      type = "object"
+      required = List("station", "emoji", "createdAt")
+      properties {
+        ["station"] = new Ref {
+          type = "ref"
+          ref = "fm.atradio.defs#stationInfo"
+        }
+        ["emoji"] = new StringType {
+          type = "string"
+          description = "A single emoji."
+          maxLength = 32
+          maxGraphemes = 4
+        }
+        ["createdAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+}

@@ -4,6 +4,7 @@ import {
   asc,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   lt,
@@ -12,7 +13,14 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { z } from "zod";
-import type { PlayView, StationInfo, StationView } from "@atradio/lexicons";
+import type {
+  CommentView,
+  NotificationReason,
+  NotificationView,
+  PlayView,
+  StationInfo,
+  StationView,
+} from "@atradio/lexicons";
 import { db, schema } from "../db";
 import { resolveDid } from "../lib/profile";
 import { cacheJson } from "../cache";
@@ -351,5 +359,187 @@ xrpcRouter.get(
       .where(inArray(schema.recentlyPlayed.stationId, ids))
       .groupBy(schema.recentlyPlayed.stationId);
     return res.json({ counts: rows });
+  },
+);
+
+/**
+ * GET /xrpc/fm.atradio.getComments?station=&limit=&cursor=
+ * Comments on a station, newest first, each with its author. Not cached — the
+ * live SSE stream + client polling need fresh reads right after posting.
+ */
+xrpcRouter.get(
+  "/fm.atradio.getComments",
+  async (req: Request, res: Response) => {
+    const station = String(req.query.station ?? "").trim();
+    if (!station)
+      return xrpcError(res, 400, "InvalidRequest", "station is required");
+
+    const limit = clampLimit(req.query.limit, 50);
+    const cursor =
+      typeof req.query.cursor === "string" ? new Date(req.query.cursor) : null;
+    const filter = eq(schema.comments.stationId, station);
+
+    const rows = await db
+      .select({
+        uri: schema.comments.uri,
+        did: schema.comments.did,
+        station: schema.comments.station,
+        text: schema.comments.text,
+        facets: schema.comments.facets,
+        gif: schema.comments.gif,
+        createdAt: schema.comments.createdAt,
+        indexedAt: schema.comments.indexedAt,
+        handle: schema.users.handle,
+        displayName: schema.users.displayName,
+        avatarUrl: schema.users.avatarUrl,
+      })
+      .from(schema.comments)
+      .leftJoin(schema.users, eq(schema.users.did, schema.comments.did))
+      .where(cursor ? and(filter, lt(schema.comments.createdAt, cursor)) : filter)
+      .orderBy(desc(schema.comments.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const items: CommentView[] = page.map((r) => ({
+      uri: r.uri,
+      author: {
+        did: r.did,
+        handle: r.handle ?? undefined,
+        displayName: r.displayName ?? undefined,
+        avatar: r.avatarUrl ?? undefined,
+      },
+      station: r.station,
+      text: r.text,
+      facets: r.facets ?? undefined,
+      gif: r.gif ?? undefined,
+      createdAt: (r.createdAt ?? r.indexedAt).toISOString(),
+    }));
+    const nextCursor = hasMore
+      ? (page[page.length - 1]?.createdAt ?? undefined)?.toISOString()
+      : undefined;
+
+    const [{ total }] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(schema.comments)
+      .where(filter);
+
+    return res.json({ cursor: nextCursor, total, items });
+  },
+);
+
+/**
+ * GET /xrpc/fm.atradio.getNotifications?actor=&limit=&cursor=
+ * An actor's notifications, newest first, plus the count of those newer than
+ * their last-seen marker (the topbar bell badge).
+ */
+xrpcRouter.get(
+  "/fm.atradio.getNotifications",
+  async (req: Request, res: Response) => {
+    const actor = String(req.query.actor ?? "").trim();
+    if (!actor)
+      return xrpcError(res, 400, "InvalidRequest", "actor is required");
+    const did = await resolveDid(actor);
+    if (!did) return xrpcError(res, 404, "NotFound", "actor not found");
+
+    const limit = clampLimit(req.query.limit, 30);
+    const cursor =
+      typeof req.query.cursor === "string" ? new Date(req.query.cursor) : null;
+
+    const [seen] = await db
+      .select({ lastSeenAt: schema.notificationSeen.lastSeenAt })
+      .from(schema.notificationSeen)
+      .where(eq(schema.notificationSeen.did, did))
+      .limit(1);
+    const lastSeenAt = seen?.lastSeenAt ?? null;
+
+    const filter = eq(schema.notifications.recipientDid, did);
+    const rows = await db
+      .select({
+        subjectUri: schema.notifications.subjectUri,
+        reason: schema.notifications.reason,
+        authorDid: schema.notifications.authorDid,
+        station: schema.notifications.station,
+        text: schema.notifications.text,
+        createdAt: schema.notifications.createdAt,
+        handle: schema.users.handle,
+        displayName: schema.users.displayName,
+        avatarUrl: schema.users.avatarUrl,
+      })
+      .from(schema.notifications)
+      .leftJoin(schema.users, eq(schema.users.did, schema.notifications.authorDid))
+      .where(cursor ? and(filter, lt(schema.notifications.createdAt, cursor)) : filter)
+      .orderBy(desc(schema.notifications.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const page = rows.slice(0, limit);
+    const items: NotificationView[] = page.map((r) => ({
+      uri: r.subjectUri,
+      reason: r.reason as NotificationReason,
+      author: {
+        did: r.authorDid,
+        handle: r.handle ?? undefined,
+        displayName: r.displayName ?? undefined,
+        avatar: r.avatarUrl ?? undefined,
+      },
+      station: r.station ?? undefined,
+      text: r.text ?? undefined,
+      createdAt: r.createdAt.toISOString(),
+      isRead: lastSeenAt ? r.createdAt <= lastSeenAt : false,
+    }));
+    const nextCursor = hasMore
+      ? page[page.length - 1]?.createdAt.toISOString()
+      : undefined;
+
+    const [{ unreadCount }] = await db
+      .select({ unreadCount: sql<number>`count(*)::int` })
+      .from(schema.notifications)
+      .where(
+        lastSeenAt
+          ? and(filter, gt(schema.notifications.createdAt, lastSeenAt))
+          : filter,
+      );
+
+    return res.json({ cursor: nextCursor, unreadCount, items });
+  },
+);
+
+/**
+ * POST /xrpc/fm.atradio.updateSeen  { actor, seenAt? }
+ * Advance the actor's last-seen marker so the bell badge resets to zero.
+ * (Actor-keyed, consistent with the rest of this read-mostly AppView — there is
+ * no per-request auth layer here.)
+ */
+xrpcRouter.post(
+  "/fm.atradio.updateSeen",
+  async (req: Request, res: Response) => {
+    const actor = String(req.body?.actor ?? "").trim();
+    if (!actor)
+      return xrpcError(res, 400, "InvalidRequest", "actor is required");
+    const did = await resolveDid(actor);
+    if (!did) return xrpcError(res, 404, "NotFound", "actor not found");
+
+    const seenAt =
+      typeof req.body?.seenAt === "string" ? new Date(req.body.seenAt) : new Date();
+    await db
+      .insert(schema.notificationSeen)
+      .values({ did, lastSeenAt: seenAt, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: schema.notificationSeen.did,
+        set: { lastSeenAt: seenAt, updatedAt: new Date() },
+      });
+
+    const [{ unreadCount }] = await db
+      .select({ unreadCount: sql<number>`count(*)::int` })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.recipientDid, did),
+          gt(schema.notifications.createdAt, seenAt),
+        ),
+      );
+
+    return res.json({ unreadCount });
   },
 );

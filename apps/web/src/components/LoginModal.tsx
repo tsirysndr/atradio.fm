@@ -54,7 +54,9 @@ export function LoginModal() {
 
   return (
     <Modal state={state}>
-      <Modal.Backdrop variant="blur">
+      {/* Above the fullscreen player (z-60) + emoji portal (z-70) so a login
+          prompt triggered from there isn't hidden behind them. */}
+      <Modal.Backdrop variant="blur" style={{ zIndex: 200 }}>
         <Modal.Container placement="center" size="sm">
           <Modal.Dialog className="mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface">
             <Modal.Header className="border-b border-white/10 pb-3">

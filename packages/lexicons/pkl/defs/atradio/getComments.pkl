@@ -1,0 +1,49 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.getComments"
+defs = new Mapping<String, Query> {
+  ["main"] {
+    type = "query"
+    description = "List comments on a station, most recent first."
+    parameters = new Params {
+      required = List("station")
+      properties {
+        ["station"] = new StringType {
+          type = "string"
+          description = "Source-prefixed station id (e.g. rb:uuid, custom:xyz)."
+        }
+        ["limit"] = new IntegerType {
+          type = "integer"
+          minimum = 1
+          maximum = 100
+        }
+        ["cursor"] = new StringType {
+          type = "string"
+        }
+      }
+    }
+    output {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("total", "items")
+        properties {
+          ["cursor"] = new StringType {
+            type = "string"
+          }
+          ["total"] = new IntegerType {
+            type = "integer"
+          }
+          ["items"] = new Array {
+            type = "array"
+            items = new Ref {
+              type = "ref"
+              ref = "fm.atradio.defs#commentView"
+            }
+          }
+        }
+      }
+    }
+  }
+}

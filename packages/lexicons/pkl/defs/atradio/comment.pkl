@@ -1,0 +1,92 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.comment"
+defs = new Mapping<String, Record | ObjectType> {
+  ["main"] = new Record {
+    type = "record"
+    key = "tid"
+    description = "A user's comment on a radio station."
+    `record` {
+      type = "object"
+      required = List("station", "text", "createdAt")
+      properties {
+        ["station"] = new Ref {
+          type = "ref"
+          ref = "fm.atradio.defs#stationInfo"
+        }
+        ["text"] = new StringType {
+          type = "string"
+          description = "The comment body (plain text)."
+          maxLength = 3000
+          maxGraphemes = 300
+        }
+        ["facets"] = new Array {
+          type = "array"
+          items = new Ref {
+            type = "ref"
+            ref = "fm.atradio.comment#mention"
+          }
+        }
+        ["gif"] = new Ref {
+          type = "ref"
+          ref = "fm.atradio.comment#gif"
+        }
+        ["createdAt"] = new StringType {
+          type = "string"
+          format = "datetime"
+        }
+      }
+    }
+  }
+  ["gif"] = new ObjectType {
+    type = "object"
+    description = "An animated GIF embedded in a comment (e.g. from Giphy)."
+    required = List("url")
+    properties {
+      ["url"] = new StringType {
+        type = "string"
+        description = "Direct URL of the animated GIF/MP4."
+        format = "uri"
+      }
+      ["previewUrl"] = new StringType {
+        type = "string"
+        description = "Smaller still/preview image URL."
+        format = "uri"
+      }
+      ["alt"] = new StringType {
+        type = "string"
+        maxLength = 512
+      }
+      ["width"] = new IntegerType {
+        type = "integer"
+        minimum = 0
+      }
+      ["height"] = new IntegerType {
+        type = "integer"
+        minimum = 0
+      }
+    }
+  }
+  ["mention"] = new ObjectType {
+    type = "object"
+    description = "A mention of another actor within the comment text."
+    required = List("did", "byteStart", "byteEnd")
+    properties {
+      ["did"] = new StringType {
+        type = "string"
+        format = "did"
+      }
+      ["byteStart"] = new IntegerType {
+        type = "integer"
+        description = "Inclusive UTF-8 byte offset of the mention start."
+        minimum = 0
+      }
+      ["byteEnd"] = new IntegerType {
+        type = "integer"
+        description = "Exclusive UTF-8 byte offset of the mention end."
+        minimum = 0
+      }
+    }
+  }
+}

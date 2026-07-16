@@ -11,6 +11,7 @@ import {
 import { addStationOpenAtom, openSearchPaletteAtom } from "@/atoms/ui";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "./NotificationBell";
 
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
@@ -97,6 +98,8 @@ export function Navbar() {
             <span className="hidden sm:inline">Add station</span>
             <span className="sm:hidden">Add</span>
           </Button>
+
+          {isLoggedIn && <NotificationBell />}
 
           {isLoggedIn ? (
             <Link

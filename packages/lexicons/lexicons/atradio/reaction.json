@@ -1,0 +1,35 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.reaction",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "An ephemeral emoji reaction to a radio station.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "station",
+          "emoji",
+          "createdAt"
+        ],
+        "properties": {
+          "station": {
+            "type": "ref",
+            "ref": "fm.atradio.defs#stationInfo"
+          },
+          "emoji": {
+            "type": "string",
+            "description": "A single emoji.",
+            "maxLength": 32,
+            "maxGraphemes": 4
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "datetime"
+          }
+        }
+      }
+    }
+  }
+}

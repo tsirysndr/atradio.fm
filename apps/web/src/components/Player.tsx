@@ -16,6 +16,7 @@ import {
   IconChevronUp,
   IconChevronDown,
   IconExternalLink,
+  IconMessageCircle,
 } from "@tabler/icons-react";
 import type Hls from "hls.js";
 import type { TrackMetadata } from "rockbox-wasm";
@@ -30,7 +31,11 @@ import {
   type StreamInfo,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
-import { audioSettingsOpenAtom, playerFullscreenAtom } from "@/atoms/ui";
+import {
+  audioSettingsOpenAtom,
+  commentsStationAtom,
+  playerFullscreenAtom,
+} from "@/atoms/ui";
 import {
   applyAudioSettings,
   useAudioSettingsSnapshot,
@@ -45,6 +50,8 @@ import { proxiedImageUrl } from "@/lib/images";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
 import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
+import { StationReactions } from "./StationReactions";
+import { CommentsPanel } from "./CommentsPanel";
 
 const STATUS_TEXT: Record<string, string> = {
   idle: "",
@@ -84,6 +91,7 @@ export function Player() {
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
   const openAudioSettings = useSetAtom(audioSettingsOpenAtom);
+  const openComments = useSetAtom(commentsStationAtom);
   const ensureAuth = useRequireAuth();
   const audioSettings = useAudioSettingsSnapshot();
   const listeners = useListenerCount(station?.id);
@@ -113,6 +121,17 @@ export function Player() {
   useEffect(() => {
     if (!station) setExpanded(false);
   }, [station]);
+
+  // Lock the page body scroll while fullscreen is open, so only the player's
+  // own scrollbar shows (a single one, on the screen's right edge).
+  useEffect(() => {
+    if (!expanded) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [expanded]);
 
   // Esc closes the fullscreen view.
   useEffect(() => {
@@ -454,21 +473,22 @@ export function Player() {
 
   const fullscreen = station ? (
     <div
-      className={`fixed inset-0 z-[60] transition-opacity duration-300 ${
+      className={`fixed inset-0 z-[60] overflow-y-auto overscroll-contain transition-opacity duration-300 ${
         expanded ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
       aria-hidden={!expanded}
     >
-      {/* Tap-anywhere backdrop */}
+      {/* Tap-anywhere backdrop — fixed so it stays put while the panel scrolls,
+          keeping the single scrollbar on the screen's right edge. */}
       <button
         type="button"
         aria-label="Close fullscreen player"
         onClick={() => setExpanded(false)}
-        className="absolute inset-0 h-full w-full cursor-default bg-synth-bg/90 backdrop-blur-2xl"
+        className="fixed inset-0 h-full w-full cursor-default bg-synth-bg/90 backdrop-blur-2xl"
       />
 
       <div
-        className={`relative mx-auto flex h-full w-full max-w-md flex-col overflow-y-auto px-5 pt-4 transition-transform duration-300 sm:px-6 ${
+        className={`relative mx-auto flex min-h-full w-full max-w-md flex-col px-5 pt-4 transition-transform duration-300 sm:px-6 ${
           expanded ? "translate-y-0" : "translate-y-4"
         }`}
         style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
@@ -639,6 +659,24 @@ export function Player() {
             </Slider>
           </div>
         </div>
+
+        {expanded && (
+          <>
+            {/* Emoji reactions — animated, real time */}
+            <div className="mt-7 flex justify-center">
+              <StationReactions station={station} variant="full" />
+            </div>
+
+            {/* Live comments */}
+            <div className="mt-7 border-t border-white/10 pt-5">
+              <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground/80">
+                <IconMessageCircle size={16} className="text-synth-pink" />
+                Live comments
+              </h3>
+              <CommentsPanel station={station} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   ) : null;
@@ -755,7 +793,10 @@ export function Player() {
               </Button>
             </div>
 
-            {/* Favorite + equalizer + volume */}
+            {/* Reactions — smiley opens an animated emoji picker, real time */}
+            {station && <StationReactions station={station} variant="mini" />}
+
+            {/* Favorite + comments + equalizer + volume */}
             <div className="flex items-center gap-2">
               {station && (
                 <Button
@@ -771,6 +812,19 @@ export function Player() {
                   ) : (
                     <IconHeart size={16} className="text-foreground/70" />
                   )}
+                </Button>
+              )}
+
+              {station && (
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="tertiary"
+                  className="rounded-full"
+                  aria-label="Comments"
+                  onPress={() => openComments(station)}
+                >
+                  <IconMessageCircle size={16} className="text-foreground/70" />
                 </Button>
               )}
 

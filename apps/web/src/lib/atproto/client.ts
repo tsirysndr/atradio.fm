@@ -8,7 +8,7 @@ import { actorResolver } from "./resolver";
  * public in AT Proto, so `repo:<nsid>` effectively grants read+write for our own
  * data without asking for broad access to the whole repo.
  */
-export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus}`;
+export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus} repo:${NSID.comment} repo:${NSID.reaction}`;
 
 /** Production origin (client-metadata + redirect must live here). */
 const PROD_ORIGIN = "https://atradio.fm";

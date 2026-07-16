@@ -8,6 +8,7 @@ import {
   IconExternalLink,
   IconTrash,
   IconHeadphones,
+  IconMessageCircle,
 } from "@tabler/icons-react";
 import type { Station } from "@/lib/types";
 import { useListenerCount } from "@/hooks/useListenerCount";
@@ -18,6 +19,7 @@ import {
   togglePlayAtom,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
+import { commentsStationAtom } from "@/atoms/ui";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
@@ -45,6 +47,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
   const togglePlay = useSetAtom(togglePlayAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
+  const openComments = useSetAtom(commentsStationAtom);
   const ensureAuth = useRequireAuth();
 
   const isCurrent = current?.id === station.id;
@@ -150,6 +153,17 @@ export function StationCard({ station, onRemove }: StationCardProps) {
           ) : (
             <IconHeart size={16} className="text-foreground/70" />
           )}
+        </Button>
+
+        <Button
+          isIconOnly
+          size="sm"
+          variant="tertiary"
+          className="rounded-full !bg-white/5 hover:!bg-white/10"
+          aria-label="Comments"
+          onPress={() => openComments(station)}
+        >
+          <IconMessageCircle size={16} className="text-foreground/70" />
         </Button>
 
         {station.homepage && (

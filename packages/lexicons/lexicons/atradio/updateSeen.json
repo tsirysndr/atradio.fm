@@ -1,0 +1,45 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.updateSeen",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Mark an actor's notifications as seen up to now, resetting their unread count.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "actor"
+          ],
+          "properties": {
+            "actor": {
+              "type": "string",
+              "description": "DID or handle of the recipient.",
+              "format": "at-identifier"
+            },
+            "seenAt": {
+              "type": "string",
+              "description": "Time to mark seen up to (defaults to now).",
+              "format": "datetime"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "unreadCount"
+          ],
+          "properties": {
+            "unreadCount": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  }
+}

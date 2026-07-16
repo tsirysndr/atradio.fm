@@ -1,0 +1,41 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.updateSeen"
+defs = new Mapping<String, Procedure> {
+  ["main"] {
+    type = "procedure"
+    description = "Mark an actor's notifications as seen up to now, resetting their unread count."
+    input = new Input {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("actor")
+        properties {
+          ["actor"] = new StringType {
+            type = "string"
+            description = "DID or handle of the recipient."
+            format = "at-identifier"
+          }
+          ["seenAt"] = new StringType {
+            type = "string"
+            description = "Time to mark seen up to (defaults to now)."
+            format = "datetime"
+          }
+        }
+      }
+    }
+    output {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("unreadCount")
+        properties {
+          ["unreadCount"] = new IntegerType {
+            type = "integer"
+          }
+        }
+      }
+    }
+  }
+}

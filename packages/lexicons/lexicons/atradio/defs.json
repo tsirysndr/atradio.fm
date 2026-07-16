@@ -157,6 +157,89 @@
           "minimum": 0
         }
       }
+    },
+    "commentView": {
+      "type": "object",
+      "description": "A comment on a station, paired with its record uri and author.",
+      "required": [
+        "uri",
+        "station",
+        "text",
+        "createdAt"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "at-uri"
+        },
+        "author": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#actorInfo"
+        },
+        "station": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#stationInfo"
+        },
+        "text": {
+          "type": "string"
+        },
+        "facets": {
+          "type": "array",
+          "items": {
+            "type": "ref",
+            "ref": "fm.atradio.comment#mention"
+          }
+        },
+        "gif": {
+          "type": "ref",
+          "ref": "fm.atradio.comment#gif"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime"
+        }
+      }
+    },
+    "notificationView": {
+      "type": "object",
+      "description": "A single notification for an actor.",
+      "required": [
+        "uri",
+        "reason",
+        "author",
+        "createdAt",
+        "isRead"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "description": "URI of the subject record (the comment).",
+          "format": "at-uri"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this notification exists: mention | comment."
+        },
+        "author": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#actorInfo"
+        },
+        "station": {
+          "type": "ref",
+          "ref": "fm.atradio.defs#stationInfo"
+        },
+        "text": {
+          "type": "string",
+          "description": "Snapshot of the comment text."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "datetime"
+        },
+        "isRead": {
+          "type": "boolean"
+        }
+      }
     }
   }
 }

@@ -4,7 +4,9 @@ import { IconKeyboard } from "@tabler/icons-react";
 import { currentStationAtom } from "@/atoms/player";
 import { Navbar } from "./Navbar";
 import { Player } from "./Player";
+import { PlayerReactionRain } from "./PlayerReactionRain";
 import { AddStationModal } from "./AddStationModal";
+import { CommentsModal } from "./CommentsModal";
 import { ShortcutsHelp } from "./ShortcutsHelp";
 import { SearchPalette } from "./SearchPalette";
 import { LoginModal } from "./LoginModal";
@@ -40,7 +42,9 @@ export function Layout() {
       </button>
 
       <Player />
+      <PlayerReactionRain />
       <AddStationModal />
+      <CommentsModal />
       <ShortcutsHelp />
       <SearchPalette />
       <LoginModal />

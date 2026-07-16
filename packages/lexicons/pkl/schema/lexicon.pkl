@@ -94,4 +94,5 @@ defs: Mapping<String, Procedure>
   | Mapping<String, Query>
   | Mapping<String, Array>
   | Mapping<String, ObjectType | Array>
+  | Mapping<String, Record | ObjectType>
   | Null = null

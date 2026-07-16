@@ -1,0 +1,55 @@
+{
+  "lexicon": 1,
+  "id": "fm.atradio.getComments",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "List comments on a station, most recent first.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "station"
+        ],
+        "properties": {
+          "station": {
+            "type": "string",
+            "description": "Source-prefixed station id (e.g. rb:uuid, custom:xyz)."
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "cursor": {
+            "type": "string"
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "total",
+            "items"
+          ],
+          "properties": {
+            "cursor": {
+              "type": "string"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "fm.atradio.defs#commentView"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

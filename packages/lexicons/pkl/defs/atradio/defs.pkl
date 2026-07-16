@@ -142,4 +142,76 @@ defs = new Mapping<String, ObjectType> {
       }
     }
   }
+  ["commentView"] {
+    type = "object"
+    description = "A comment on a station, paired with its record uri and author."
+    required = List("uri", "station", "text", "createdAt")
+    properties {
+      ["uri"] = new StringType {
+        type = "string"
+        format = "at-uri"
+      }
+      ["author"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.defs#actorInfo"
+      }
+      ["station"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.defs#stationInfo"
+      }
+      ["text"] = new StringType {
+        type = "string"
+      }
+      ["facets"] = new Array {
+        type = "array"
+        items = new Ref {
+          type = "ref"
+          ref = "fm.atradio.comment#mention"
+        }
+      }
+      ["gif"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.comment#gif"
+      }
+      ["createdAt"] = new StringType {
+        type = "string"
+        format = "datetime"
+      }
+    }
+  }
+  ["notificationView"] {
+    type = "object"
+    description = "A single notification for an actor."
+    required = List("uri", "reason", "author", "createdAt", "isRead")
+    properties {
+      ["uri"] = new StringType {
+        type = "string"
+        description = "URI of the subject record (the comment)."
+        format = "at-uri"
+      }
+      ["reason"] = new StringType {
+        type = "string"
+        description = "Why this notification exists: mention | comment."
+      }
+      ["author"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.defs#actorInfo"
+      }
+      ["station"] = new Ref {
+        type = "ref"
+        ref = "fm.atradio.defs#stationInfo"
+      }
+      ["text"] = new StringType {
+        type = "string"
+        description = "Snapshot of the comment text."
+      }
+      ["createdAt"] = new StringType {
+        type = "string"
+        format = "datetime"
+      }
+      ["isRead"] = new BooleanType {
+        type = "boolean"
+      }
+    }
+  }
 }

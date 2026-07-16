@@ -15,6 +15,13 @@
       "when": 1784090738293,
       "tag": "0001_lucky_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784193707510,
+      "tag": "0002_cuddly_dakota_north",
+      "breakpoints": true
     }
   ]
 }

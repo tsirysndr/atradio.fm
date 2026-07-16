@@ -1,0 +1,51 @@
+amends "../../schema/lexicon.pkl"
+
+lexicon = 1
+id = "fm.atradio.getNotifications"
+defs = new Mapping<String, Query> {
+  ["main"] {
+    type = "query"
+    description = "List an actor's notifications, most recent first, with the current unread count."
+    parameters = new Params {
+      required = List("actor")
+      properties {
+        ["actor"] = new StringType {
+          type = "string"
+          description = "DID or handle of the recipient."
+          format = "at-identifier"
+        }
+        ["limit"] = new IntegerType {
+          type = "integer"
+          minimum = 1
+          maximum = 100
+        }
+        ["cursor"] = new StringType {
+          type = "string"
+        }
+      }
+    }
+    output {
+      encoding = "application/json"
+      schema = new ObjectType {
+        type = "object"
+        required = List("unreadCount", "items")
+        properties {
+          ["cursor"] = new StringType {
+            type = "string"
+          }
+          ["unreadCount"] = new IntegerType {
+            type = "integer"
+            description = "Number of notifications newer than the actor's last-seen time."
+          }
+          ["items"] = new Array {
+            type = "array"
+            items = new Ref {
+              type = "ref"
+              ref = "fm.atradio.defs#notificationView"
+            }
+          }
+        }
+      }
+    }
+  }
+}
