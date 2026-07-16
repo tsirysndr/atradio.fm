@@ -8,6 +8,7 @@
     "start": "tsx src/index.ts",
     "start:server": "tsx src/bin/server.ts",
     "start:consumer": "tsx src/bin/consumer.ts",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "db:generate": "drizzle-kit generate",
@@ -37,6 +38,7 @@
     "@types/ws": "^8.5.13",
     "drizzle-kit": "^0.30.1",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
   }
 }

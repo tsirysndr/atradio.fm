@@ -46,6 +46,12 @@ describe("proxyTuneInUrl", () => {
 describe("searchStations", () => {
   it("normalizes radio-browser stations", async () => {
     mockFetch((url) => {
+      if (url.includes("/json/servers")) {
+        return new Response(
+          JSON.stringify([{ name: "de1.api.radio-browser.info" }]),
+          { status: 200 },
+        );
+      }
       if (url.includes("radio-browser")) {
         return new Response(JSON.stringify([RB_STATION]), { status: 200 });
       }
@@ -63,6 +69,12 @@ describe("searchStations", () => {
 
   it("reports a failed provider instead of throwing", async () => {
     mockFetch((url) => {
+      if (url.includes("/json/servers")) {
+        return new Response(
+          JSON.stringify([{ name: "de1.api.radio-browser.info" }]),
+          { status: 200 },
+        );
+      }
       if (url.includes("radio-browser")) {
         return new Response(JSON.stringify([RB_STATION]), { status: 200 });
       }
@@ -77,6 +89,12 @@ describe("searchStations", () => {
 
   it("dedupes stations that share a stream url", async () => {
     mockFetch((url) => {
+      if (url.includes("/json/servers")) {
+        return new Response(
+          JSON.stringify([{ name: "de1.api.radio-browser.info" }]),
+          { status: 200 },
+        );
+      }
       if (url.includes("radio-browser")) {
         return new Response(
           JSON.stringify([RB_STATION, { ...RB_STATION, stationuuid: "dup" }]),

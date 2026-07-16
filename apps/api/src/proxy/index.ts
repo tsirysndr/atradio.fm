@@ -2,6 +2,11 @@ import { Router, type Request, type Response } from "express";
 import { Readable } from "node:stream";
 import { consola } from "consola";
 import { cacheGet, cacheSet } from "../cache";
+import {
+  isPlaylistUrl,
+  isUnwrappablePlaylist,
+  parseFirstStreamUrl,
+} from "../lib/playlist";
 
 export const proxyRouter = Router();
 
@@ -81,7 +86,7 @@ proxyRouter.get("/stream", async (req: Request, res: Response) => {
   // proxy would pipe the playlist *text* to the decoder, which can't play it —
   // the station just fails silently. (HLS `.m3u8` is handled client-side and
   // must NOT be unwrapped: its segment URIs resolve against the manifest URL.)
-  const target = /\.(pls|m3u)(\?|$)/i.test(rawTarget)
+  const target = isUnwrappablePlaylist(rawTarget)
     ? await resolvePlaylist(rawTarget)
     : rawTarget;
 
@@ -128,25 +133,18 @@ proxyRouter.get("/stream", async (req: Request, res: Response) => {
 /* ------------------------------- ICY proxy ------------------------------ */
 
 async function resolvePlaylist(target: string): Promise<string> {
-  if (!/\.(pls|m3u|m3u8)(\?|$)/i.test(target)) return target;
+  if (!isPlaylistUrl(target)) return target;
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), 5000);
   try {
     const res = await fetch(target, { redirect: "follow", signal: ctrl.signal });
     if (!res.ok) return target;
-    const body = await res.text();
-    const pls = body.match(/^\s*File\d+\s*=\s*(\S+)/im);
-    if (pls) return pls[1].trim();
-    for (const line of body.split(/\r?\n/)) {
-      const s = line.trim();
-      if (s && !s.startsWith("#") && /^https?:\/\//i.test(s)) return s;
-    }
+    return parseFirstStreamUrl(await res.text()) ?? target;
   } catch {
-    /* fall through */
+    return target;
   } finally {
     clearTimeout(t);
   }
-  return target;
 }
 
 async function readIcyTitle(rawTarget: string): Promise<string | null> {
