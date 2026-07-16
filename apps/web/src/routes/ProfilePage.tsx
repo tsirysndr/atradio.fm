@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Button, Spinner } from "@heroui/react";
+import { Button } from "@heroui/react";
 import {
   IconHeart,
   IconBroadcast,
@@ -25,6 +25,7 @@ import * as appview from "@/lib/appview";
 import { infoToStation } from "@atradio/lexicons";
 import { StationGrid } from "@/components/StationGrid";
 import { EmptyState } from "@/components/EmptyState";
+import { ProfileSkeleton } from "@/components/Skeletons";
 import type { Station } from "@/lib/types";
 
 export function ProfilePage() {
@@ -46,7 +47,7 @@ function SelfProfile() {
   const openAddStation = useSetAtom(addStationOpenAtom);
 
   if (loading) {
-    return <CenteredSpinner />;
+    return <ProfileSkeleton />;
   }
 
   if (!isLoggedIn) {
@@ -101,7 +102,7 @@ function PublicProfile({ actor }: { actor: string }) {
   });
 
   if (profileQuery.isLoading) {
-    return <CenteredSpinner />;
+    return <ProfileSkeleton />;
   }
   if (profileQuery.isError || !profileQuery.data) {
     return (
@@ -424,14 +425,6 @@ function ProfileView({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function CenteredSpinner() {
-  return (
-    <div className="flex min-h-[50vh] items-center justify-center">
-      <Spinner color="accent" size="lg" />
     </div>
   );
 }

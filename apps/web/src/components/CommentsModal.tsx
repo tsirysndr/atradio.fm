@@ -5,6 +5,7 @@ import { commentsStationAtom } from "@/atoms/ui";
 import { MOBILE_FULLSCREEN_BODY, MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { StationLogo } from "./StationLogo";
 import { CommentsPanel } from "./CommentsPanel";
+import { ModalCloseButton } from "./ModalCloseButton";
 
 /** Comments for any station, opened from station cards + the miniplayer. */
 export function CommentsModal() {
@@ -21,8 +22,9 @@ export function CommentsModal() {
       <Modal.Backdrop variant="blur">
         <Modal.Container placement="center" size="md">
           <Modal.Dialog
-            className={`mx-4 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg flex-col border border-white/10 bg-synth-surface ${MOBILE_FULLSCREEN_DIALOG}`}
+            className={`relative mx-4 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg flex-col border border-white/10 bg-synth-surface ${MOBILE_FULLSCREEN_DIALOG}`}
           >
+            <ModalCloseButton onClose={() => setStation(null)} />
             {station && (
               <>
                 <Modal.Header className="flex items-center gap-3 border-b border-white/10 pb-3">

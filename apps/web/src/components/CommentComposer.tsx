@@ -17,6 +17,7 @@ import {
   searchActorsTypeahead,
 } from "@/lib/atproto/richtext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { getCaretCoordinates } from "@/lib/caret";
 import { isVideoUrl, type MediaResult } from "@/lib/api/klipy";
 import { MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { MediaPicker } from "./MediaPicker";
@@ -85,6 +86,8 @@ export function CommentComposer({
   const [mention, setMention] = useState<{ start: number; query: string } | null>(
     null,
   );
+  // Pixel position (within the textarea box) to anchor the popup under the caret.
+  const [caret, setCaret] = useState<{ top: number; left: number } | null>(null);
   const [activeIdx, setActiveIdx] = useState(0);
   const debouncedQuery = useDebouncedValue(mention?.query ?? "", 200);
 
@@ -96,19 +99,30 @@ export function CommentComposer({
   });
   const popupOpen = mention !== null && suggestions.length > 0;
 
-  const syncMention = (value: string, caret: number) => {
-    setMention(activeMentionToken(value, caret));
+  const syncMention = (value: string, caretPos: number) => {
+    const token = activeMentionToken(value, caretPos);
+    setMention(token);
     setActiveIdx(0);
+    const el = textareaRef.current;
+    if (token && el) {
+      // Anchor the popup under the line the `@` sits on.
+      const c = getCaretCoordinates(el, token.start);
+      const maxLeft = Math.max(0, el.clientWidth - 256);
+      setCaret({ top: c.top + c.height, left: Math.min(c.left, maxLeft) });
+    } else {
+      setCaret(null);
+    }
   };
 
   const insertMention = (handle: string) => {
     if (!mention) return;
     const el = textareaRef.current;
-    const caret = el?.selectionStart ?? text.length;
+    const caretPos = el?.selectionStart ?? text.length;
     const next =
-      text.slice(0, mention.start) + `@${handle} ` + text.slice(caret);
+      text.slice(0, mention.start) + `@${handle} ` + text.slice(caretPos);
     setText(next);
     setMention(null);
+    setCaret(null);
     requestAnimationFrame(() => {
       const pos = mention.start + handle.length + 2;
       el?.focus();
@@ -223,7 +237,7 @@ export function CommentComposer({
         )}
 
         <div className="flex-1">
-          <div className="rounded-2xl border border-white/10 bg-synth-panel focus-within:border-synth-cyan/60">
+          <div className="relative rounded-2xl border border-white/10 bg-synth-panel focus-within:border-synth-cyan/60">
             <textarea
               ref={textareaRef}
               value={text}
@@ -249,6 +263,49 @@ export function CommentComposer({
               placeholder="Add a comment… use @ to mention"
               className="min-h-[6rem] max-h-52 w-full resize-y bg-transparent px-3 py-2.5 text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
             />
+
+            {/* Mention suggestions — anchored just under the caret line. */}
+            {popupOpen && caret && (
+              <ul
+                className="absolute z-30 max-h-56 w-64 max-w-[calc(100%-0.5rem)] overflow-y-auto rounded-xl border border-white/10 bg-synth-surface shadow-2xl shadow-black/50"
+                style={{ top: caret.top, left: caret.left }}
+              >
+                {suggestions.map((s, i) => (
+                  <li key={s.did}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        insertMention(s.handle);
+                      }}
+                      className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
+                        i === activeIdx ? "bg-white/10" : "hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-synth-panel">
+                        {s.avatar ? (
+                          <img
+                            src={s.avatar}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <IconMoodSmile size={14} className="text-foreground/40" />
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-foreground">
+                          {s.displayName || s.handle}
+                        </span>
+                        <span className="block truncate text-xs text-foreground/40">
+                          @{s.handle}
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
 
             {gif && (
               <div className="relative mx-3 mb-2 w-fit max-w-[12rem] overflow-hidden rounded-xl border border-white/10">
@@ -316,42 +373,6 @@ export function CommentComposer({
           </div>
         </div>
       </div>
-
-      {/* Mention suggestions popup */}
-      {popupOpen && (
-        <ul className="absolute left-10 top-full z-20 mt-1 w-64 overflow-hidden rounded-xl border border-white/10 bg-synth-surface shadow-2xl shadow-black/50">
-          {suggestions.map((s, i) => (
-            <li key={s.did}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  insertMention(s.handle);
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${
-                  i === activeIdx ? "bg-white/10" : "hover:bg-white/5"
-                }`}
-              >
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-synth-panel">
-                  {s.avatar ? (
-                    <img src={s.avatar} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <IconMoodSmile size={14} className="text-foreground/40" />
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-foreground">
-                    {s.displayName || s.handle}
-                  </span>
-                  <span className="block truncate text-xs text-foreground/40">
-                    @{s.handle}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
 
       {/* Media (GIF/sticker/clip/meme) picker — a nested HeroUI modal so it gets
           its own focus scope (typing + clicks work above the comments modal) and

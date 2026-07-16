@@ -6,6 +6,7 @@ import { consola } from "consola";
 import { loginModalOpenAtom } from "@/atoms/ui";
 import { MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { startLogin, startSignup } from "@/lib/atproto/session";
+import { ModalCloseButton } from "./ModalCloseButton";
 
 export function LoginModal() {
   const [isOpen, setOpen] = useAtom(loginModalOpenAtom);
@@ -60,8 +61,9 @@ export function LoginModal() {
       <Modal.Backdrop variant="blur" style={{ zIndex: 200 }}>
         <Modal.Container placement="center" size="sm">
           <Modal.Dialog
-            className={`mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface max-sm:justify-center ${MOBILE_FULLSCREEN_DIALOG}`}
+            className={`relative mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface max-sm:justify-center ${MOBILE_FULLSCREEN_DIALOG}`}
           >
+            <ModalCloseButton onClose={() => setOpen(false)} />
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
                 Log in with Atmosphere account

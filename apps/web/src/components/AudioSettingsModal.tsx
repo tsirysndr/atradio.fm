@@ -7,6 +7,7 @@ import {
   type RockboxPlayer,
 } from "rockbox-wasm";
 import { audioSettingsOpenAtom } from "@/atoms/ui";
+import { ModalCloseButton } from "./ModalCloseButton";
 import {
   EQ_CUTOFFS,
   bassAtom,
@@ -198,9 +199,12 @@ export function AudioSettingsModal() {
 
   return (
     <Modal state={state}>
-      <Modal.Backdrop variant="blur">
+      {/* Above the fullscreen player (z-60) + emoji portal (z-70) so it isn't
+          hidden behind them when opened from the player. */}
+      <Modal.Backdrop variant="blur" style={{ zIndex: 200 }}>
         <Modal.Container placement="center" size="lg" scroll="inside">
-          <Modal.Dialog className="mx-4 max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl border border-white/10 bg-synth-surface max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
+          <Modal.Dialog className="relative mx-4 max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl border border-white/10 bg-synth-surface max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
+            <ModalCloseButton onClose={() => setOpen(false)} />
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
                 Audio settings

@@ -9,7 +9,7 @@ import {
   IconTrash,
   IconPencil,
 } from "@tabler/icons-react";
-import { Button, Modal, Spinner, useOverlayState } from "@heroui/react";
+import { Button, Modal, useOverlayState } from "@heroui/react";
 import { consola } from "consola";
 import type { CommentView, LiveEvent } from "@atradio/lexicons";
 import type { Station } from "@/lib/types";
@@ -22,6 +22,7 @@ import { segmentComment } from "@/lib/atproto/richtext";
 import { timeAgo } from "@/lib/time";
 import { isVideoUrl } from "@/lib/api/klipy";
 import { CommentComposer } from "./CommentComposer";
+import { CommentsSkeleton } from "./Skeletons";
 
 /** Render one comment: author, segmented text w/ mention links, optional GIF. */
 function CommentItem({
@@ -255,8 +256,8 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
 
       <ul className="flex flex-col gap-4">
         {isLoading && comments.length === 0 ? (
-          <li className="flex justify-center py-6">
-            <Spinner color="accent" size="sm" />
+          <li>
+            <CommentsSkeleton />
           </li>
         ) : comments.length === 0 ? (
           <li className="flex flex-col items-center gap-1 py-8 text-center text-sm text-foreground/40">

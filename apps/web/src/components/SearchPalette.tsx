@@ -5,6 +5,7 @@ import {
   IconSearch,
   IconPlayerPlayFilled,
   IconCornerDownLeft,
+  IconX,
 } from "@tabler/icons-react";
 import { searchPaletteOpenAtom, searchPaletteQueryAtom } from "@/atoms/ui";
 import { customStationsAtom } from "@/atoms/customStations";
@@ -93,7 +94,7 @@ export function SearchPalette() {
     <Modal state={state}>
       <Modal.Backdrop variant="blur">
         <Modal.Container placement="top" size="lg">
-          <Modal.Dialog className="mx-4 mt-[8vh] w-[calc(100vw-2rem)] max-w-xl overflow-hidden border border-white/10 bg-overlay !p-0 shadow-2xl max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
+          <Modal.Dialog className="mx-4 mt-[8vh] w-[calc(100vw-2rem)] max-w-xl overflow-hidden border border-white/10 bg-overlay !p-0 shadow-2xl max-sm:!m-0 max-sm:!flex max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!flex-col max-sm:!rounded-none">
             {/* Search field */}
             <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3.5">
               <IconSearch
@@ -115,10 +116,22 @@ export function SearchPalette() {
                 spellCheck={false}
               />
               {isFetching && <InlineLoader width={60} />}
+              {/* Mobile close (no backdrop to tap when fullscreen). */}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close search"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/60 hover:bg-white/5 hover:text-foreground sm:hidden"
+              >
+                <IconX size={18} />
+              </button>
             </div>
 
             {/* Results */}
-            <div ref={listRef} className="max-h-[52vh] overflow-y-auto p-2">
+            <div
+              ref={listRef}
+              className="max-h-[52vh] overflow-y-auto p-2 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1"
+            >
               {!hasQuery ? (
                 <p className="px-3 py-8 text-center text-sm text-foreground/40">
                   Type to search thousands of internet radio stations.

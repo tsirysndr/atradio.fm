@@ -114,12 +114,12 @@ export function RecentlyPlayedRow() {
   if (items.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-3">
+    <section className="flex w-full min-w-0 flex-col gap-3">
       <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
         <IconHistory size={18} className="text-synth-magenta" />
         Recently played on atradio.fm
       </h2>
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="-mx-1 flex w-full min-w-0 max-w-full gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item, i) => (
           <PlayCard key={item.actor?.did ?? `${item.playedAt}-${i}`} item={item} />
         ))}
