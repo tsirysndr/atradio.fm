@@ -161,12 +161,14 @@ export function NotificationBell() {
                 Profile
               </Link>
             </div>
-            <div className="flex-1 overflow-y-auto sm:flex-none">
+            <div className="flex flex-1 flex-col overflow-y-auto sm:flex-none">
               {items.length === 0 ? (
-                <p className="px-3 py-10 text-center text-sm text-foreground/40">
-                  Nothing yet. Mentions and comments on your stations show up
-                  here.
-                </p>
+                <div className="flex flex-1 items-center justify-center px-6 py-10 sm:flex-none sm:py-10">
+                  <p className="text-center text-sm text-foreground/40">
+                    Nothing yet. Mentions and comments on your stations show up
+                    here.
+                  </p>
+                </div>
               ) : (
                 items.map((n) => (
                   <NotificationRow
