@@ -29,17 +29,21 @@ jobs:
 
       - uses: cachix/install-nix-action@v30
         with:
+          # Authenticate flake-input fetches to github.com so they use the
+          # higher rate limit and are more resilient to transient failures.
           extra_nix_config: |
             experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
 
       - uses: cachix/cachix-action@v15
         with:
           name: tsirysndr
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      # Build the root default package (delegates to the ./cli sub-flake).
+      # Build the root default package (built from the ./cli source).
+      # Retry once to ride out transient github.com 5xx while fetching inputs.
       - name: nix build
-        run: nix build -L
+        run: nix build -L || (sleep 15 && nix build -L)
 
       - name: nix flake check
         run: nix flake check -L
