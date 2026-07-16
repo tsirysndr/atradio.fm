@@ -61,7 +61,10 @@ export function StationReactions({
   const [hovered, setHovered] = useState<number | null>(null);
   const closeTimer = useRef<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const pillRef = useRef<HTMLDivElement>(null);
   const [anchor, setAnchor] = useState<{ cx: number; top: number } | null>(null);
+  /** Clamped screen-x for the picker's center (keeps it on-screen). */
+  const [pickerLeft, setPickerLeft] = useState<number | null>(null);
 
   const triggerSize = variant === "full" ? "h-11 w-11" : "h-9 w-9";
   const iconSize = variant === "full" ? 24 : 20;
@@ -92,6 +95,19 @@ export function StationReactions({
     };
   }, [open, measure]);
 
+  // Center the picker on the trigger, but clamp so it never runs off either
+  // screen edge (a wide row anchored to an edge button would otherwise overflow).
+  useLayoutEffect(() => {
+    if (!open || !anchor) return;
+    const w = pillRef.current?.offsetWidth ?? 0;
+    const margin = 8;
+    const half = w / 2;
+    const vw = window.innerWidth;
+    setPickerLeft(
+      Math.max(margin + half, Math.min(anchor.cx, vw - margin - half)),
+    );
+  }, [open, anchor, hovered]);
+
   const openNow = () => {
     if (closeTimer.current) window.clearTimeout(closeTimer.current);
     measure();
@@ -118,47 +134,46 @@ export function StationReactions({
   const picker =
     open && anchor
       ? createPortal(
-          // Full-width, screen-centered so a wide row never runs off either
-          // edge; lifted above the trigger. Single horizontal row that scrolls
-          // on narrow screens (never wraps / grows vertically).
+          // Centered on the trigger (clamped on-screen), lifted above it. Single
+          // horizontal row; scrolls on narrow screens (never wraps).
           <div
-            className="pointer-events-auto fixed inset-x-0 z-[70] flex -translate-y-full justify-center px-3"
-            style={{ top: anchor.top - 8 }}
+            className="pointer-events-auto fixed z-[70] -translate-x-1/2 -translate-y-full"
+            style={{ left: pickerLeft ?? anchor.cx, top: anchor.top - 10 }}
             onMouseEnter={openNow}
             onMouseLeave={closeSoon}
           >
-            <div className="emoji-pop-in no-scrollbar max-w-full overflow-x-auto rounded-full border border-white/10 bg-synth-surface/95 px-2.5 pb-2 pt-9 shadow-2xl shadow-black/60 backdrop-blur-xl">
-              <div
-                onMouseLeave={() => setHovered(null)}
-                className="mx-auto flex w-max items-end gap-0.5"
-              >
-                {QUICK_EMOJIS.map((emoji, i) => {
-                  // Dock falloff: hovered = biggest, neighbors shrink by distance.
-                  const dist = hovered === null ? 99 : Math.abs(i - hovered);
-                  const scale =
-                    dist === 0 ? 1.55 : dist === 1 ? 1.3 : dist === 2 ? 1.12 : 1;
-                  const lift =
-                    dist === 0 ? 8 : dist === 1 ? 4 : dist === 2 ? 1 : 0;
-                  return (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onMouseEnter={() => setHovered(i)}
-                      onFocus={() => setHovered(i)}
-                      onClick={() => react(emoji)}
-                      aria-label={`React ${emoji}`}
-                      style={{
-                        transform: `translateY(-${lift}px) scale(${scale})`,
-                        transition:
-                          "transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
-                      }}
-                      className="flex h-9 w-8 shrink-0 origin-bottom items-center justify-center text-2xl active:scale-110"
-                    >
-                      {emoji}
-                    </button>
-                  );
-                })}
-              </div>
+            <div
+              ref={pillRef}
+              onMouseLeave={() => setHovered(null)}
+              // Symmetric top/bottom padding keeps the resting row vertically
+              // centered; the generous top room lets a magnified emoji pop up
+              // (macOS-dock style) without being clipped by the x-scroll.
+              className="emoji-pop-in no-scrollbar flex max-w-[calc(100vw-1rem)] items-center gap-0.5 overflow-x-auto rounded-3xl border border-white/10 bg-synth-surface/95 px-3 py-7 shadow-2xl shadow-black/60 backdrop-blur-xl"
+            >
+              {QUICK_EMOJIS.map((emoji, i) => {
+                // Dock falloff: hovered = biggest, neighbors shrink by distance.
+                const dist = hovered === null ? 99 : Math.abs(i - hovered);
+                const scale =
+                  dist === 0 ? 1.6 : dist === 1 ? 1.32 : dist === 2 ? 1.12 : 1;
+                const lift = dist === 0 ? 6 : dist === 1 ? 3 : dist === 2 ? 1 : 0;
+                return (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onMouseEnter={() => setHovered(i)}
+                    onFocus={() => setHovered(i)}
+                    onClick={() => react(emoji)}
+                    aria-label={`React ${emoji}`}
+                    style={{
+                      transform: `translateY(-${lift}px) scale(${scale})`,
+                      transition: "transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
+                    }}
+                    className="flex h-9 w-8 shrink-0 origin-bottom items-center justify-center text-2xl active:scale-110"
+                  >
+                    {emoji}
+                  </button>
+                );
+              })}
             </div>
           </div>,
           document.body,

@@ -198,6 +198,40 @@ export async function putComment(
   return { rkey, uri: `at://${did}/${NSID.comment}/${rkey}` };
 }
 
+/** Edit one of the user's own comments: overwrite the record at its rkey,
+ *  preserving its original createdAt (so ordering doesn't jump). */
+export async function updateComment(
+  client: Client,
+  did: Did,
+  uri: string,
+  station: Station,
+  text: string,
+  opts: { facets?: Mention[]; gif?: GifEmbed; createdAt?: string } = {},
+): Promise<void> {
+  await ok(
+    client.post("com.atproto.repo.putRecord", {
+      input: {
+        repo: did,
+        collection: NSID.comment as Nsid,
+        rkey: rkeyFromUri(uri),
+        record: buildCommentRecord(station, text, opts) as unknown as Record<
+          string,
+          unknown
+        >,
+      },
+    }),
+  );
+}
+
+/** Delete one of the user's own comments (by its at-uri). */
+export async function deleteComment(
+  client: Client,
+  did: Did,
+  uri: string,
+): Promise<void> {
+  await deleteAtradioRecord(client, did, NSID.comment, rkeyFromUri(uri));
+}
+
 /** Write an ephemeral emoji reaction to a station; returns its rkey. */
 export async function putReaction(
   client: Client,

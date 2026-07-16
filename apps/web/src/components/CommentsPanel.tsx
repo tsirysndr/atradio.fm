@@ -2,21 +2,42 @@ import { useMemo, useState } from "react";
 import { useAtomValue } from "jotai";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { IconMessage2, IconMoodSmile, IconLogin2 } from "@tabler/icons-react";
+import {
+  IconMessage2,
+  IconMoodSmile,
+  IconLogin2,
+  IconTrash,
+  IconPencil,
+} from "@tabler/icons-react";
 import { Spinner } from "@heroui/react";
+import { consola } from "consola";
 import type { CommentView, LiveEvent } from "@atradio/lexicons";
 import type { Station } from "@/lib/types";
-import { isLoggedInAtom } from "@/atoms/auth";
+import { clientAtom, didAtom, isLoggedInAtom } from "@/atoms/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { useStationLive } from "@/hooks/useStationLive";
 import { getComments } from "@/lib/appview";
+import { deleteComment } from "@/lib/atproto/records";
 import { segmentComment } from "@/lib/atproto/richtext";
 import { timeAgo } from "@/lib/time";
 import { isVideoUrl } from "@/lib/api/klipy";
 import { CommentComposer } from "./CommentComposer";
 
 /** Render one comment: author, segmented text w/ mention links, optional GIF. */
-function CommentItem({ comment }: { comment: CommentView }) {
+function CommentItem({
+  comment,
+  canModify,
+  onEdit,
+  onDelete,
+  editor,
+}: {
+  comment: CommentView;
+  canModify: boolean;
+  onEdit: (comment: CommentView) => void;
+  onDelete: (comment: CommentView) => void;
+  /** When set, an inline editor replaces the comment body. */
+  editor?: React.ReactNode;
+}) {
   const author = comment.author;
   const name = author?.displayName || author?.handle || "someone";
   const segments = useMemo(
@@ -25,7 +46,7 @@ function CommentItem({ comment }: { comment: CommentView }) {
   );
 
   return (
-    <li className="flex gap-2.5">
+    <li className="group flex gap-2.5">
       <Link
         to="/profile/$actor"
         params={{ actor: author?.handle ?? author?.did ?? "" }}
@@ -50,47 +71,75 @@ function CommentItem({ comment }: { comment: CommentView }) {
           <span className="truncate text-xs text-foreground/40">
             {timeAgo(comment.createdAt)}
           </span>
+          {canModify && !editor && (
+            <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={() => onEdit(comment)}
+                aria-label="Edit comment"
+                title="Edit comment"
+                className="rounded-full p-1 text-foreground/30 transition-colors hover:bg-white/5 hover:text-synth-cyan"
+              >
+                <IconPencil size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(comment)}
+                aria-label="Delete comment"
+                title="Delete comment"
+                className="rounded-full p-1 text-foreground/30 transition-colors hover:bg-danger/10 hover:text-danger"
+              >
+                <IconTrash size={14} />
+              </button>
+            </span>
+          )}
         </div>
 
-        {comment.text && (
-          <p className="whitespace-pre-wrap break-words text-sm text-foreground/85">
-            {segments.map((seg, i) =>
-              seg.type === "mention" ? (
-                <Link
-                  key={i}
-                  to="/profile/$actor"
-                  params={{ actor: seg.did }}
-                  className="font-medium text-synth-cyan hover:underline"
-                >
-                  {seg.value}
-                </Link>
-              ) : (
-                <span key={i}>{seg.value}</span>
-              ),
+        {editor ? (
+          <div className="mt-1.5">{editor}</div>
+        ) : (
+          <>
+            {comment.text && (
+              <p className="whitespace-pre-wrap break-words text-sm text-foreground/85">
+                {segments.map((seg, i) =>
+                  seg.type === "mention" ? (
+                    <Link
+                      key={i}
+                      to="/profile/$actor"
+                      params={{ actor: seg.did }}
+                      className="font-medium text-synth-cyan hover:underline"
+                    >
+                      {seg.value}
+                    </Link>
+                  ) : (
+                    <span key={i}>{seg.value}</span>
+                  ),
+                )}
+              </p>
             )}
-          </p>
-        )}
 
-        {comment.gif?.url && (
-          <div className="mt-1.5 w-fit max-w-[14rem] overflow-hidden rounded-xl border border-white/10">
-            {isVideoUrl(comment.gif.url) ? (
-              <video
-                src={comment.gif.url}
-                className="w-full"
-                autoPlay
-                loop
-                muted
-                playsInline
-              />
-            ) : (
-              <img
-                src={comment.gif.url}
-                alt={comment.gif.alt ?? ""}
-                loading="lazy"
-                className="w-full"
-              />
+            {comment.gif?.url && (
+              <div className="mt-1.5 w-fit max-w-[14rem] overflow-hidden rounded-xl border border-white/10">
+                {isVideoUrl(comment.gif.url) ? (
+                  <video
+                    src={comment.gif.url}
+                    className="w-full"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <img
+                    src={comment.gif.url}
+                    alt={comment.gif.alt ?? ""}
+                    loading="lazy"
+                    className="w-full"
+                  />
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </li>
@@ -106,10 +155,16 @@ interface CommentsPanelProps {
 /** Live comments list + composer for a station. */
 export function CommentsPanel({ station, className }: CommentsPanelProps) {
   const isLoggedIn = useAtomValue(isLoggedInAtom);
+  const client = useAtomValue(clientAtom);
+  const did = useAtomValue(didAtom);
   const { openLogin } = useAuth();
 
   // Comments added locally (optimistic + live SSE), newest first.
   const [local, setLocal] = useState<CommentView[]>([]);
+  // URIs the user just deleted (filtered out until the server catches up).
+  const [deleted, setDeleted] = useState<Set<string>>(new Set());
+  // The comment currently being edited inline (by uri).
+  const [editingUri, setEditingUri] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["comments", station.id],
@@ -126,16 +181,42 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
     );
   });
 
+  /** Insert or replace a comment in the local (optimistic/live) list. */
+  const upsertLocal = (c: CommentView) =>
+    setLocal((prev) => {
+      const rest = prev.filter((x) => x.uri !== c.uri);
+      return [c, ...rest];
+    });
+
+  const handleDelete = async (comment: CommentView) => {
+    if (!client || !did) return;
+    setDeleted((prev) => new Set(prev).add(comment.uri));
+    setLocal((prev) => prev.filter((x) => x.uri !== comment.uri));
+    if (editingUri === comment.uri) setEditingUri(null);
+    try {
+      await deleteComment(client, did, comment.uri);
+    } catch (err) {
+      consola.error("[comments] delete failed", err);
+      // Roll back so it reappears rather than silently vanishing.
+      setDeleted((prev) => {
+        const next = new Set(prev);
+        next.delete(comment.uri);
+        return next;
+      });
+    }
+  };
+
   const comments = useMemo(() => {
     const byUri = new Map<string, CommentView>();
     for (const c of data?.items ?? []) byUri.set(c.uri, c);
     // Local (optimistic/live) wins over the server copy.
     for (const c of local) byUri.set(c.uri, c);
+    for (const uri of deleted) byUri.delete(uri);
     return [...byUri.values()].sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
-  }, [data, local]);
+  }, [data, local, deleted]);
 
   return (
     <div className={`flex flex-col gap-3 ${className ?? ""}`}>
@@ -170,7 +251,37 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
             No comments yet — say something!
           </li>
         ) : (
-          comments.map((c) => <CommentItem key={c.uri} comment={c} />)
+          comments.map((c) => {
+            const mine = !!did && c.author?.did === did;
+            const editor =
+              mine && editingUri === c.uri ? (
+                <CommentComposer
+                  station={station}
+                  autoFocus
+                  edit={{
+                    uri: c.uri,
+                    createdAt: c.createdAt,
+                    text: c.text,
+                    gif: c.gif,
+                  }}
+                  onCancel={() => setEditingUri(null)}
+                  onPosted={(updated) => {
+                    setEditingUri(null);
+                    upsertLocal(updated);
+                  }}
+                />
+              ) : undefined;
+            return (
+              <CommentItem
+                key={c.uri}
+                comment={c}
+                canModify={mine}
+                onEdit={(cc) => setEditingUri(cc.uri)}
+                onDelete={handleDelete}
+                editor={editor}
+              />
+            );
+          })
         )}
       </ul>
     </div>

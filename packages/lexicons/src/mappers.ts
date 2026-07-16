@@ -195,7 +195,9 @@ export function buildActorStatusRecord(
 
 // ---- fm.atradio.comment ----
 
-/** Build a comment record for a station, with optional mention facets + gif. */
+/** Build a comment record for a station, with optional mention facets + gif.
+ *  `text` is always included (even empty, for GIF-only comments) so `clean`
+ *  doesn't strip it — the lexicon requires the field to be present. */
 export function buildCommentRecord(
   s: Station,
   text: string,
@@ -203,14 +205,16 @@ export function buildCommentRecord(
 ): CommentRecord {
   const facets = opts.facets?.length ? opts.facets : undefined;
   const gif = opts.gif ? (clean({ ...opts.gif }) as GifEmbed) : undefined;
-  return clean({
-    $type: NSID.comment,
-    station: stationToInfo(s),
+  return {
+    ...(clean({
+      $type: NSID.comment,
+      station: stationToInfo(s),
+      facets,
+      gif,
+      createdAt: opts.createdAt ?? new Date().toISOString(),
+    }) as Omit<CommentRecord, "text">),
     text,
-    facets,
-    gif,
-    createdAt: opts.createdAt ?? new Date().toISOString(),
-  }) as CommentRecord;
+  };
 }
 
 // ---- fm.atradio.reaction ----

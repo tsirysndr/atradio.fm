@@ -572,7 +572,7 @@ export function Player() {
         </div>
 
         {/* Controls */}
-        <div className="flex flex-col items-center gap-5 pb-2">
+        <div className="mt-8 flex flex-col items-center gap-5 pb-2 sm:mt-10">
           <div className="flex items-center gap-4">
             <Button
               isIconOnly

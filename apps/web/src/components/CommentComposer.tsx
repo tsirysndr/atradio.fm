@@ -4,17 +4,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Button, Modal, useOverlayState } from "@heroui/react";
 import { IconGif, IconSend, IconX, IconMoodSmile } from "@tabler/icons-react";
 import { consola } from "consola";
-import { stationToInfo, type CommentView } from "@atradio/lexicons";
+import {
+  stationToInfo,
+  type CommentView,
+  type GifEmbed,
+} from "@atradio/lexicons";
 import type { Station } from "@/lib/types";
 import { clientAtom, didAtom, authProfileAtom } from "@/atoms/auth";
-import { putComment } from "@/lib/atproto/records";
+import { putComment, updateComment } from "@/lib/atproto/records";
 import {
   resolveMentionFacets,
   searchActorsTypeahead,
 } from "@/lib/atproto/richtext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import type { MediaResult } from "@/lib/api/klipy";
+import { isVideoUrl, type MediaResult } from "@/lib/api/klipy";
 import { MediaPicker } from "./MediaPicker";
+
+/** Adapt a stored GIF embed back into the picker's MediaResult shape. */
+function gifEmbedToMedia(g: GifEmbed): MediaResult {
+  return { ...g, id: g.url, isVideo: isVideoUrl(g.url) };
+}
 
 /** Find the `@token` the caret currently sits in (for the mention popup). */
 function activeMentionToken(
@@ -39,23 +48,31 @@ function activeMentionToken(
 
 interface CommentComposerProps {
   station: Station;
-  /** Called with the freshly-created comment so the list can prepend it. */
+  /** Called with the created/edited comment so the list can prepend/replace it. */
   onPosted: (comment: CommentView) => void;
   autoFocus?: boolean;
+  /** When set, the composer edits this existing comment instead of creating one. */
+  edit?: { uri: string; createdAt: string; text: string; gif?: GifEmbed };
+  /** Shown as a Cancel action (edit mode). */
+  onCancel?: () => void;
 }
 
 export function CommentComposer({
   station,
   onPosted,
   autoFocus,
+  edit,
+  onCancel,
 }: CommentComposerProps) {
   const client = useAtomValue(clientAtom);
   const did = useAtomValue(didAtom);
   const profile = useAtomValue(authProfileAtom);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [text, setText] = useState("");
-  const [gif, setGif] = useState<MediaResult | null>(null);
+  const [text, setText] = useState(edit?.text ?? "");
+  const [gif, setGif] = useState<MediaResult | null>(
+    edit?.gif ? gifEmbedToMedia(edit.gif) : null,
+  );
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerState = useOverlayState({
@@ -115,10 +132,23 @@ export function CommentComposer({
             height: gif.height,
           }
         : undefined;
-      const { uri } = await putComment(client, did, station, body, {
-        facets,
-        gif: gifEmbed,
-      });
+      let uri: string;
+      let createdAt: string;
+      if (edit) {
+        uri = edit.uri;
+        createdAt = edit.createdAt;
+        await updateComment(client, did, edit.uri, station, body, {
+          facets,
+          gif: gifEmbed,
+          createdAt: edit.createdAt,
+        });
+      } else {
+        createdAt = new Date().toISOString();
+        ({ uri } = await putComment(client, did, station, body, {
+          facets,
+          gif: gifEmbed,
+        }));
+      }
       onPosted({
         uri,
         author: {
@@ -131,11 +161,13 @@ export function CommentComposer({
         text: body,
         facets: facets.length ? facets : undefined,
         gif: gifEmbed,
-        createdAt: new Date().toISOString(),
+        createdAt,
       });
-      setText("");
-      setGif(null);
-      setMention(null);
+      if (!edit) {
+        setText("");
+        setGif(null);
+        setMention(null);
+      }
     } catch (err) {
       consola.error("[comments] post failed", err);
     } finally {
@@ -178,13 +210,16 @@ export function CommentComposer({
   return (
     <div className="relative flex flex-col gap-2">
       <div className="flex items-start gap-2">
-        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-synth-panel">
-          {avatar ? (
-            <img src={avatar} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <IconMoodSmile size={16} className="text-foreground/50" />
-          )}
-        </span>
+        {/* Avatar is redundant when editing inline under an existing comment. */}
+        {!edit && (
+          <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-synth-panel">
+            {avatar ? (
+              <img src={avatar} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <IconMoodSmile size={16} className="text-foreground/50" />
+            )}
+          </span>
+        )}
 
         <div className="flex-1">
           <div className="rounded-2xl border border-white/10 bg-synth-panel focus-within:border-synth-cyan/60">
@@ -254,16 +289,28 @@ export function CommentComposer({
                 GIF
               </button>
 
-              <Button
-                size="sm"
-                variant="primary"
-                className="gap-1 rounded-full"
-                isDisabled={!canSubmit}
-                onPress={() => void submit()}
-              >
-                <IconSend size={14} />
-                Post
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {edit && onCancel && (
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    className="rounded-full !bg-white/5"
+                    onPress={onCancel}
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="gap-1 rounded-full"
+                  isDisabled={!canSubmit}
+                  onPress={() => void submit()}
+                >
+                  <IconSend size={14} />
+                  {edit ? "Save" : "Post"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
