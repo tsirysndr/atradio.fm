@@ -3,30 +3,42 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    crane.url = "github:ipetkov/crane";
     flake-utils.url = "github:numtide/flake-utils";
-
-    # The CLI is a self-contained sub-flake; the root re-exports it so
-    # `nix build`, `nix run`, and `nix profile install github:tsirysndr/atradio.fm`
-    # all resolve to the CLI. Add more sub-flakes here as the repo grows.
-    cli = {
-      url = "path:./cli";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-utils.follows = "flake-utils";
+    advisory-db = {
+      url = "github:rustsec/advisory-db";
+      flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, cli, ... }:
-    flake-utils.lib.eachDefaultSystem (system: {
-      # Root default = the CLI (only package for now).
-      packages = {
-        default = cli.packages.${system}.default;
-        atradio = cli.packages.${system}.default;
-      };
+  # The root default package IS the CLI. We build it directly from the ./cli
+  # source (sharing cli/package.nix with cli/flake.nix) rather than importing
+  # the sub-flake — a `path:./cli` input can't be locked inside a git repo.
+  outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = import nixpkgs { inherit system; };
+        craneLib = crane.mkLib pkgs;
 
-      apps.default = cli.apps.${system}.default;
+        atradio = import ./cli/package.nix {
+          inherit craneLib pkgs advisory-db;
+          inherit (pkgs) lib;
+          src = craneLib.cleanCargoSource ./cli;
+        };
+      in
+      {
+        checks = atradio.checks;
 
-      devShells.default = cli.devShells.${system}.default;
+        packages = {
+          default = atradio.atradio;
+          atradio = atradio.atradio;
+        };
 
-      checks = cli.checks.${system};
-    });
+        apps.default = flake-utils.lib.mkApp {
+          drv = atradio.atradio;
+          name = "atradio";
+        };
+
+        devShells.default = atradio.devShell;
+      });
 }
