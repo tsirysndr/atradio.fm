@@ -39,6 +39,8 @@ enum Msg {
     Comments(Vec<crate::appview::CommentView>),
     Notifications { items: Vec<crate::appview::NotificationView>, unread: u32 },
     SignedIn(crate::atproto::Profile),
+    /// The OAuth flow finished (success or failure); clear the busy state.
+    OAuthDone,
     Toast(String),
 }
 
@@ -168,6 +170,13 @@ fn apply_msg(msg: Msg, app: &mut App) {
             app.did = Some(p.did);
             app.method = Some(p.method);
             app.pds = p.pds;
+            app.overlay = Overlay::None;
+        }
+        Msg::OAuthDone => {
+            app.oauth_busy = false;
+            if app.overlay == Overlay::SignIn {
+                app.overlay = Overlay::None;
+            }
         }
         Msg::Toast(t) => app.toast.set(t),
     }
@@ -197,6 +206,7 @@ fn handle_event(
     match app.overlay {
         Overlay::Search => return handle_search_keys(key.code, app, player, atproto, tx),
         Overlay::Compose => return handle_compose_keys(key.code, app, atproto, tx),
+        Overlay::SignIn => return handle_signin_keys(key.code, app, appview, atproto, tx),
         Overlay::None => {}
     }
 
@@ -285,7 +295,7 @@ fn handle_event(
             }
         }
         KeyCode::Char('f') => favorite_selected(app, atproto, tx),
-        KeyCode::Char('s') => toggle_signin(app, appview, atproto, tx),
+        KeyCode::Char('s') => toggle_signin(app, atproto),
         KeyCode::Up | KeyCode::Char('k') => move_up(app),
         KeyCode::Down | KeyCode::Char('j') => move_down(app),
         KeyCode::Left => {
@@ -381,13 +391,8 @@ fn start_playing(
     }
 }
 
-/// Sign in (app password from env) or sign out, depending on current state.
-fn toggle_signin(
-    app: &mut App,
-    appview: &AppView,
-    atproto: &Arc<Atproto>,
-    tx: &mpsc::UnboundedSender<Msg>,
-) {
+/// Open the OAuth sign-in modal, or sign out when already signed in.
+fn toggle_signin(app: &mut App, atproto: &Arc<Atproto>) {
     if app.logged_in {
         atproto.logout();
         app.logged_in = false;
@@ -406,40 +411,78 @@ fn toggle_signin(
         return;
     }
 
-    let Some((id, pw)) = app.env_creds.clone() else {
-        app.toast
-            .set("Set ATPROTO_IDENTIFIER + ATPROTO_APP_PASSWORD, or run `atradio login --oauth`.");
-        return;
-    };
+    // Prefill the prompt with a known identifier, if any.
+    app.signin_input = app
+        .env_creds
+        .as_ref()
+        .map(|(id, _)| id.clone())
+        .unwrap_or_default();
+    app.overlay = Overlay::SignIn;
+}
 
-    app.toast.set("Signing in…");
-    let at = atproto.clone();
-    let av = appview.clone();
-    let tx = tx.clone();
-    tokio::spawn(async move {
-        match at.login_password(&id, &pw).await {
-            Ok(profile) => {
-                let handle = profile.handle.clone();
-                let _ = tx.send(Msg::Toast(format!("✓ Signed in as {}", profile.label())));
-                let _ = tx.send(Msg::SignedIn(profile));
-                // Load the now-available personalized lists.
-                if let Ok(out) = av.favorites(&handle, 100).await {
-                    let _ = tx.send(Msg::Favorites(
-                        out.items.into_iter().map(|v| v.station).collect(),
-                    ));
-                }
-                if let Ok(out) = av.notifications(&handle, 50).await {
-                    let _ = tx.send(Msg::Notifications {
-                        items: out.items,
-                        unread: out.unread_count,
-                    });
-                }
-            }
-            Err(e) => {
-                let _ = tx.send(Msg::Toast(format!("sign-in failed: {e}")));
-            }
+/// Keys for the OAuth sign-in modal.
+fn handle_signin_keys(
+    code: KeyCode,
+    app: &mut App,
+    appview: &AppView,
+    atproto: &Arc<Atproto>,
+    tx: &mpsc::UnboundedSender<Msg>,
+) {
+    if app.oauth_busy {
+        // Ignore edits while the browser flow is running; Esc still dismisses.
+        if code == KeyCode::Esc {
+            app.overlay = Overlay::None;
         }
-    });
+        return;
+    }
+    match code {
+        KeyCode::Esc => {
+            app.overlay = Overlay::None;
+        }
+        KeyCode::Enter => {
+            let input = app.signin_input.trim().to_string();
+            if input.is_empty() {
+                app.toast.set("Enter a handle, DID, or PDS URL.");
+                return;
+            }
+            app.oauth_busy = true;
+            app.toast.set("Opening browser to sign in…");
+            let at = atproto.clone();
+            let av = appview.clone();
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                match at.login_oauth(Some(&input)).await {
+                    Ok(profile) => {
+                        let handle = profile.handle.clone();
+                        let _ = tx.send(Msg::Toast(format!("✓ Signed in as {}", profile.label())));
+                        let _ = tx.send(Msg::SignedIn(profile));
+                        if let Ok(out) = av.favorites(&handle, 100).await {
+                            let _ = tx.send(Msg::Favorites(
+                                out.items.into_iter().map(|v| v.station).collect(),
+                            ));
+                        }
+                        if let Ok(out) = av.notifications(&handle, 50).await {
+                            let _ = tx.send(Msg::Notifications {
+                                items: out.items,
+                                unread: out.unread_count,
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Msg::Toast(format!("sign-in failed: {e}")));
+                    }
+                }
+                let _ = tx.send(Msg::OAuthDone);
+            });
+        }
+        KeyCode::Backspace => {
+            app.signin_input.pop();
+        }
+        KeyCode::Char(c) => {
+            app.signin_input.push(c);
+        }
+        _ => {}
+    }
 }
 
 fn favorite_selected(app: &mut App, atproto: &Arc<Atproto>, tx: &mpsc::UnboundedSender<Msg>) {

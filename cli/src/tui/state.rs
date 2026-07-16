@@ -31,6 +31,8 @@ pub enum Overlay {
     Search,
     /// Comment composer.
     Compose,
+    /// OAuth sign-in prompt (enter a handle / DID / PDS URL).
+    SignIn,
 }
 
 /// Home has several horizontally-laid lists; this tracks focus.
@@ -113,6 +115,12 @@ pub struct App {
     // ---- compose overlay ----
     pub compose_text: String,
 
+    // ---- sign-in overlay ----
+    /// Handle / DID / PDS URL typed into the OAuth sign-in prompt.
+    pub signin_input: String,
+    /// True while an OAuth flow is in progress (browser opened).
+    pub oauth_busy: bool,
+
     // ---- comments / notifications ----
     pub comments: Vec<CommentView>,
     pub comments_selected: usize,
@@ -160,6 +168,8 @@ impl App {
             search_selected: 0,
             search_dirty: false,
             compose_text: String::new(),
+            signin_input: String::new(),
+            oauth_busy: false,
             comments: Vec::new(),
             comments_selected: 0,
             notifications: Vec::new(),

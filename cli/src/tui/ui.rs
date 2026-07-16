@@ -42,6 +42,7 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
     match app.overlay {
         Overlay::Search => draw_search(f, f.area(), app),
         Overlay::Compose => draw_compose(f, f.area(), app),
+        Overlay::SignIn => draw_signin(f, f.area(), app),
         Overlay::None => {}
     }
 }
@@ -328,7 +329,7 @@ fn draw_profile(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(block, area);
 
     if !app.logged_in {
-        let msg = "Not signed in. Press s to sign in (set ATPROTO_IDENTIFIER + ATPROTO_APP_PASSWORD, or run `atradio login --oauth`).";
+        let msg = "Not signed in. Press s to sign in with OAuth in your browser.";
         f.render_widget(
             Paragraph::new(msg)
                 .wrap(ratatui::widgets::Wrap { trim: true })
@@ -404,7 +405,7 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ("n", "notifications"),
         ("e", "equalizer & DSP settings"),
         ("p", "your profile"),
-        ("s", "sign in / sign out"),
+        ("s", "sign in (OAuth) / sign out"),
         ("h", "home"),
         ("?", "this help"),
         ("q / Esc", "quit / close overlay"),
@@ -588,6 +589,59 @@ fn draw_compose(f: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(theme::MUTED),
         )),
         rows[1],
+    );
+}
+
+fn draw_signin(f: &mut Frame, area: Rect, app: &App) {
+    let popup = centered(area, 62, 40);
+    f.render_widget(Clear, popup);
+    let block = panel("Sign in with OAuth", true);
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(1), // prompt label
+            Constraint::Length(1), // input
+            Constraint::Length(1), // spacer
+            Constraint::Min(1),    // status / hint
+        ])
+        .split(inner);
+
+    f.render_widget(
+        Paragraph::new(Span::styled(
+            "Handle, DID, or PDS URL:",
+            Style::default().fg(theme::MUTED),
+        )),
+        rows[0],
+    );
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("@ ", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
+            Span::styled(&app.signin_input, Style::default().fg(theme::FG)),
+            Span::styled(
+                if app.oauth_busy { "" } else { "█" },
+                Style::default().fg(theme::TEAL),
+            ),
+        ])),
+        rows[1],
+    );
+
+    let status = if app.oauth_busy {
+        Line::from(Span::styled(
+            "Opening your browser… finish signing in there, then return here.",
+            Style::default().fg(theme::CYAN),
+        ))
+    } else {
+        Line::from(Span::styled(
+            "Enter to open the browser · Esc to cancel",
+            Style::default().fg(theme::MUTED),
+        ))
+    };
+    f.render_widget(
+        Paragraph::new(status).wrap(ratatui::widgets::Wrap { trim: true }),
+        rows[3],
     );
 }
 
