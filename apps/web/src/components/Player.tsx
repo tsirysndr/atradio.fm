@@ -40,6 +40,7 @@ import { useListenerCount } from "@/hooks/useListenerCount";
 import { ensureRockboxReady, getRockboxPlayer } from "@/lib/audio/rockbox";
 import { resolveStream, proxiedStreamUrl } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
+import { SILENT_AUDIO_DATA_URI } from "@/lib/audio/silence";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
 import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
@@ -91,6 +92,8 @@ export function Player() {
   const [expanded, setExpanded] = useAtom(playerFullscreenAtom);
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  /** Silent loop anchoring the Media Session on the Web Audio (engine) path. */
+  const silentRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const engineRef = useRef<Engine | null>(null);
   const currentUrlRef = useRef<string | null>(null);
@@ -357,6 +360,95 @@ export function Player() {
     setStreamInfo(null);
   };
 
+  // ── Media Session — OS/lock-screen metadata + transport controls ────────
+  // Keep the latest stop closure in a ref so the action handlers register once.
+  const handleStopRef = useRef(handleStop);
+  handleStopRef.current = handleStop;
+
+  // Register transport action handlers a single time.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator))
+      return;
+    const ms = navigator.mediaSession;
+    const set = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        ms.setActionHandler(action, handler);
+      } catch {
+        /* action unsupported in this browser */
+      }
+    };
+    set("play", () => setIsPlaying(true));
+    set("pause", () => setIsPlaying(false));
+    set("stop", () => handleStopRef.current());
+    // Live radio: no seeking or track navigation.
+    for (const a of [
+      "previoustrack",
+      "nexttrack",
+      "seekbackward",
+      "seekforward",
+      "seekto",
+    ] as MediaSessionAction[]) {
+      set(a, null);
+    }
+    return () => {
+      for (const a of ["play", "pause", "stop"] as MediaSessionAction[]) {
+        set(a, null);
+      }
+    };
+  }, [setIsPlaying]);
+
+  // Publish "now playing" metadata — station + track + artwork, mirroring the
+  // miniplayer. Updates whenever the station or track title changes.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator))
+      return;
+    const ms = navigator.mediaSession;
+    if (!station) {
+      ms.metadata = null;
+      return;
+    }
+    const artwork = station.favicon
+      ? [96, 128, 192, 256, 384, 512].map((s) => ({
+          src: station.favicon as string,
+          sizes: `${s}x${s}`,
+        }))
+      : [];
+    ms.metadata = new MediaMetadata({
+      title: nowPlaying || station.name,
+      artist: nowPlaying ? station.name : station.genre || "Live radio",
+      album: station.name,
+      artwork,
+    });
+  }, [station, nowPlaying]);
+
+  // Mirror play/pause state so OS controls show the right button.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator))
+      return;
+    navigator.mediaSession.playbackState = !station
+      ? "none"
+      : isPlaying
+        ? "playing"
+        : "paused";
+  }, [station, isPlaying]);
+
+  // Keep the silent Media Session anchor playing while the engine (Web Audio)
+  // owns playback — the native <audio> path already exposes a media element, so
+  // the anchor is only needed when it doesn't.
+  useEffect(() => {
+    const el = silentRef.current;
+    if (!el) return;
+    const nativeHasElement = !!audioRef.current?.currentSrc;
+    if (station && isPlaying && !nativeHasElement) {
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+    }
+  }, [station, isPlaying, status]);
+
   const fullscreen = station ? (
     <div
       className={`fixed inset-0 z-[60] transition-opacity duration-300 ${
@@ -563,6 +655,9 @@ export function Player() {
           if (audioRef.current?.ended) setIsPlaying(false);
         }}
       />
+
+      {/* Silent Media Session anchor for the Web Audio (engine) path. */}
+      <audio ref={silentRef} src={SILENT_AUDIO_DATA_URI} loop preload="auto" />
 
       <div
         className={`pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 transition-transform duration-300 ${
