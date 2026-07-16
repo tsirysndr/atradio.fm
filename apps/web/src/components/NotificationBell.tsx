@@ -1,12 +1,11 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   IconBell,
   IconAt,
   IconMessage2,
   IconMoodSmile,
-  IconArrowLeft,
 } from "@tabler/icons-react";
 import { infoToStation, type NotificationView } from "@atradio/lexicons";
 import { didAtom, isLoggedInAtom } from "@/atoms/auth";
@@ -14,7 +13,7 @@ import { commentsStationAtom, notificationsOpenAtom } from "@/atoms/ui";
 import { getNotifications, updateSeen } from "@/lib/appview";
 import { timeAgo } from "@/lib/time";
 
-function NotificationRow({
+export function NotificationRow({
   n,
   onOpenStation,
 }: {
@@ -69,6 +68,7 @@ export function NotificationBell() {
   const did = useAtomValue(didAtom);
   const [open, setOpen] = useAtom(notificationsOpenAtom);
   const setCommentsStation = useSetAtom(commentsStationAtom);
+  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const { data } = useQuery({
@@ -84,11 +84,8 @@ export function NotificationBell() {
   const unread = data?.unreadCount ?? 0;
   const items = data?.items ?? [];
 
-  const handleToggle = () => {
-    const next = !open;
-    setOpen(next);
-    // Opening resets the unread badge (server marks seen, badge → 0).
-    if (next && unread > 0) {
+  const markSeen = () => {
+    if (unread > 0) {
       qc.setQueryData(
         ["notifications", did],
         (old: typeof data) => (old ? { ...old, unreadCount: 0 } : old),
@@ -97,6 +94,22 @@ export function NotificationBell() {
         .then(() => qc.invalidateQueries({ queryKey: ["notifications", did] }))
         .catch(() => {});
     }
+  };
+
+  const handleClick = () => {
+    // Mobile: navigate to a dedicated full-screen notifications page so the
+    // view mounts fresh and truly fills the screen. Desktop: anchored dropdown.
+    const isDesktop =
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 640px)").matches;
+    if (!isDesktop) {
+      markSeen();
+      void navigate({ to: "/notifications" });
+      return;
+    }
+    const next = !open;
+    setOpen(next);
+    if (next) markSeen();
   };
 
   const openStation = (n: NotificationView) => {
@@ -108,7 +121,7 @@ export function NotificationBell() {
     <div className="relative">
       <button
         type="button"
-        onClick={handleToggle}
+        onClick={handleClick}
         aria-label="Notifications"
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground"
       >
@@ -125,31 +138,17 @@ export function NotificationBell() {
 
       {open && (
         <>
-          {/* Click-away backdrop — desktop only (mobile is a full screen). */}
+          {/* Click-away backdrop. */}
           <button
             type="button"
             aria-label="Close notifications"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 hidden cursor-default sm:block"
+            className="fixed inset-0 z-40 cursor-default"
           />
-          {/*
-            Mobile: a dedicated full-app screen. Desktop: an anchored dropdown.
-          */}
-          <div className="fixed inset-0 z-[100] flex flex-col bg-synth-bg sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:h-auto sm:max-h-[70vh] sm:w-[min(92vw,22rem)] sm:overflow-hidden sm:rounded-2xl sm:border sm:border-white/10 sm:bg-synth-surface sm:shadow-2xl sm:shadow-black/50">
-            <div
-              className="flex items-center justify-between border-b border-white/10 px-4 py-3.5 sm:px-3 sm:py-2.5"
-              style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
-            >
-              <span className="flex items-center gap-2 font-display text-base font-semibold sm:gap-1.5 sm:text-sm">
-                {/* Back button — the full-screen mobile view has no backdrop. */}
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="Back"
-                  className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full text-foreground/70 hover:bg-white/5 hover:text-foreground sm:hidden"
-                >
-                  <IconArrowLeft size={20} />
-                </button>
+          {/* Desktop: an anchored dropdown (mobile uses the /notifications route). */}
+          <div className="absolute right-0 top-full z-50 mt-2 flex max-h-[70vh] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-synth-surface shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
+              <span className="flex items-center gap-1.5 font-display text-sm font-semibold">
                 <IconBell size={16} className="text-synth-pink" />
                 Notifications
               </span>
@@ -161,14 +160,12 @@ export function NotificationBell() {
                 Profile
               </Link>
             </div>
-            <div className="flex flex-1 flex-col overflow-y-auto sm:flex-none">
+            <div className="overflow-y-auto">
               {items.length === 0 ? (
-                <div className="flex flex-1 items-center justify-center px-6 py-10 sm:flex-none sm:py-10">
-                  <p className="text-center text-sm text-foreground/40">
-                    Nothing yet. Mentions and comments on your stations show up
-                    here.
-                  </p>
-                </div>
+                <p className="px-6 py-10 text-center text-sm text-foreground/40">
+                  Nothing yet. Mentions and comments on your stations show up
+                  here.
+                </p>
               ) : (
                 items.map((n) => (
                   <NotificationRow
