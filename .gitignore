@@ -13,3 +13,7 @@ coverage
 
 # rockbox-wasm runtime, mirrored from node_modules by apps/web/vite.config.ts
 apps/web/public/rockbox
+
+# Rust (cli/ — the atradio TUI crate)
+target
+**/*.rs.bk

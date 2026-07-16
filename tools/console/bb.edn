@@ -27,5 +27,11 @@
 
   lexicons:gen  {:doc "Generate lexicon JSON from Pkl" :task (shell {:dir (str root "/packages/lexicons")} "bun" "run" "pkl:gen")}
 
+  cli:build     {:doc "Build the atradio CLI (release)" :task (shell {:dir (str root "/cli")} "cargo" "build" "--release")}
+  cli:run       {:doc "Run the atradio TUI" :task (shell {:dir (str root "/cli")} "cargo" "run")}
+  cli:login     {:doc "Sign in via the atradio CLI" :task (shell {:dir (str root "/cli")} "cargo" "run" "--" "login")}
+  cli:whoami    {:doc "Show the signed-in account" :task (shell {:dir (str root "/cli")} "cargo" "run" "--" "whoami")}
+  cli:gen       {:doc "Regenerate the CLI's Rust lexicon bindings" :task (shell {:dir (str root "/cli")} "bash" "scripts/gen-lexicons.sh")}
+
   repl          {:doc "Launch the interactive Clojure + rebel console"
                  :task (clojure "-M:console")}}}

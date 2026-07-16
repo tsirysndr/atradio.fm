@@ -1,0 +1,261 @@
+//! atproto integration via jacquard: app-password + OAuth login, and record
+//! writes to the user's PDS (favorites, comments, play status).
+//!
+//! Reads are served by the public AppView ([`crate::appview`]); this module is
+//! only for identity and writes, which require an authenticated session.
+
+pub mod profile;
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use anyhow::{anyhow, Context, Result};
+use jacquard::client::credential_session::{
+    CredentialLoginOptions, CredentialResumeResult, CredentialSession,
+};
+use jacquard::client::{Agent, AgentSessionExt, FileAuthStore};
+use jacquard::common::session::SessionHint;
+use jacquard::identity::JacquardResolver;
+use jacquard::types::string::{Datetime, UriValue};
+use jacquard_common::types::recordkey::{RecordKey, Rkey};
+
+use crate::appview::StationInfo;
+use crate::fm_atradio::actor::status::Status as ActorStatus;
+use crate::fm_atradio::comment::Comment;
+use crate::fm_atradio::favorite::Favorite;
+use crate::fm_atradio::StationInfo as GenStation;
+
+pub use profile::Profile;
+
+/// The atproto client: owns credential material and a handle resolver.
+type Resolver = JacquardResolver<reqwest::Client>;
+
+#[derive(Clone)]
+pub struct Atproto {
+    store: Arc<FileAuthStore>,
+    resolver: Arc<Resolver>,
+    session_path: PathBuf,
+}
+
+impl Atproto {
+    pub fn new(session_path: PathBuf) -> Self {
+        let store = Arc::new(FileAuthStore::new(
+            session_path.to_string_lossy().to_string(),
+        ));
+        let resolver = Arc::new(JacquardResolver::new(
+            reqwest::Client::new(),
+            Default::default(),
+        ));
+        Self {
+            store,
+            resolver,
+            session_path,
+        }
+    }
+
+    /// The locally-cached identity, if logged in.
+    pub fn profile(&self) -> Option<Profile> {
+        Profile::load(&self.session_path)
+    }
+
+    /// The `actor` to use for personalized AppView reads (handle or DID).
+    pub fn actor(&self) -> Option<String> {
+        self.profile().map(|p| p.handle)
+    }
+
+    pub fn is_logged_in(&self) -> bool {
+        self.profile().is_some()
+    }
+
+    /// Log out: drop the cached session + profile.
+    pub fn logout(&self) {
+        Profile::clear(&self.session_path);
+        let _ = std::fs::remove_file(&self.session_path);
+    }
+
+    // ---- auth ------------------------------------------------------------
+
+    /// Log in with an app password. Persists the session + profile.
+    pub async fn login_password(&self, identifier: &str, password: &str) -> Result<Profile> {
+        let session = CredentialSession::new(self.store.clone(), self.resolver.clone());
+        let hint = SessionHint::from_optional_input(Some(identifier));
+
+        let auth = match session.resume(&hint).await.map_err(to_anyhow)? {
+            CredentialResumeResult::Resumed(auth) => auth,
+            CredentialResumeResult::LoginRequired(challenge) => session
+                .login_from_challenge(
+                    challenge,
+                    CredentialLoginOptions {
+                        password: password.to_string().into(),
+                        identifier: Some(identifier.to_string().into()),
+                        allow_takendown: None,
+                        auth_factor_token: None,
+                        pds: None,
+                    },
+                )
+                .await
+                .map_err(to_anyhow)?,
+        };
+
+        let profile = Profile {
+            did: auth.did.to_string(),
+            handle: auth.handle.to_string(),
+            pds: auth.pds.as_ref().map(|u| u.to_string()),
+            method: "password".into(),
+        };
+        profile.save(&self.session_path)?;
+        Ok(profile)
+    }
+
+    /// Log in via OAuth, opening the browser to the user's PDS. Persists the
+    /// session + profile.
+    pub async fn login_oauth(&self, input: Option<&str>) -> Result<Profile> {
+        use jacquard::oauth::atproto::AtprotoClientMetadata;
+        use jacquard::oauth::client::OAuthClient;
+        use jacquard::oauth::loopback::LoopbackConfig;
+        use jacquard::oauth::scopes::Scopes;
+        use jacquard::oauth::types::AuthorizeOptions;
+
+        let client_data = jacquard::oauth::session::ClientData {
+            keyset: None,
+            config: AtprotoClientMetadata::default_localhost(),
+        };
+        // OAuthClient takes an owned store; make a fresh file-backed one at the
+        // same path so it shares the session with the credential path.
+        let store = FileAuthStore::new(self.session_path.to_string_lossy().to_string());
+        let oauth = OAuthClient::new(store, client_data, reqwest::Client::new());
+        let hint = SessionHint::from_optional_input(input);
+        let scopes = Scopes::builder().atproto().build().map_err(to_anyhow)?;
+
+        let session = match oauth
+            .resume_or_login_with_local_server(
+                &hint,
+                AuthorizeOptions::default().with_scopes(scopes.clone()),
+                LoopbackConfig::default(),
+            )
+            .await
+            .map_err(to_anyhow)?
+        {
+            Some(session) => session,
+            None => {
+                let who = input.ok_or_else(|| {
+                    anyhow!("pass a handle, DID, or PDS URL to start OAuth login")
+                })?;
+                oauth
+                    .login_with_local_server(
+                        who.to_string(),
+                        AuthorizeOptions::default().with_scopes(scopes),
+                        LoopbackConfig::default(),
+                    )
+                    .await
+                    .map_err(to_anyhow)?
+            }
+        };
+
+        let agent: Agent<_> = Agent::from(session);
+        let (did, handle) = agent
+            .info()
+            .await
+            .ok_or_else(|| anyhow!("OAuth session missing identity"))?;
+        let profile = Profile {
+            did: did.to_string(),
+            handle: handle.map(|h| h.to_string()).unwrap_or_default(),
+            pds: None,
+            method: "oauth".into(),
+        };
+        profile.save(&self.session_path)?;
+        Ok(profile)
+    }
+
+    // ---- writes (require a resumed app-password session) -----------------
+
+    /// Resume the stored app-password session into an authenticated agent.
+    async fn agent(&self) -> Result<Agent<CredentialSession<FileAuthStore, Resolver>>> {
+        let session = CredentialSession::new(self.store.clone(), self.resolver.clone());
+        let actor = self.actor();
+        let hint = SessionHint::from_optional_input(actor.as_deref());
+        match session.resume(&hint).await.map_err(to_anyhow)? {
+            CredentialResumeResult::Resumed(_) => Ok(Agent::from(session)),
+            CredentialResumeResult::LoginRequired(_) => Err(anyhow!(
+                "not signed in — run `atradio login` with an app password to post"
+            )),
+        }
+    }
+
+    /// Favorite a station. Returns the created record URI.
+    pub async fn favorite(&self, station: &StationInfo) -> Result<String> {
+        let record = Favorite::new()
+            .station(gen_station(station))
+            .created_at(Datetime::now())
+            .build();
+        let out = self
+            .agent()
+            .await?
+            .create_record(record, None)
+            .await
+            .map_err(to_anyhow)
+            .context("create favorite")?;
+        Ok(out.uri.to_string())
+    }
+
+    /// Post a comment on a station. Returns the created record URI.
+    pub async fn comment(&self, station: &StationInfo, text: &str) -> Result<String> {
+        let record = Comment::new()
+            .station(gen_station(station))
+            .text(text.to_string())
+            .created_at(Datetime::now())
+            .build();
+        let out = self
+            .agent()
+            .await?
+            .create_record(record, None)
+            .await
+            .map_err(to_anyhow)
+            .context("create comment")?;
+        Ok(out.uri.to_string())
+    }
+
+    /// Update the actor's play-status singleton (so you appear in the
+    /// recently-played / listener-count feeds).
+    pub async fn set_play_status(&self, station: &StationInfo) -> Result<()> {
+        let record = ActorStatus::new()
+            .station(gen_station(station))
+            .played_at(Datetime::now())
+            .build();
+        let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
+        self.agent()
+            .await?
+            .put_record(rkey, record)
+            .await
+            .map_err(to_anyhow)
+            .context("update play status")?;
+        Ok(())
+    }
+}
+
+/// Convert our wire `StationInfo` into the generated (lexicon) `StationInfo`.
+fn gen_station(s: &StationInfo) -> GenStation {
+    GenStation::new()
+        .station_id(s.station_id.clone())
+        .name(s.name.clone())
+        .stream_url(parse_uri(&s.stream_url).unwrap_or_else(|| UriValue::Any(s.stream_url.clone().into())))
+        .source(s.source.clone())
+        .maybe_description(s.description.clone().map(Into::into))
+        .maybe_genre(s.genre.clone().map(Into::into))
+        .maybe_homepage(s.homepage.as_deref().and_then(parse_uri))
+        .maybe_logo(s.logo.as_deref().and_then(parse_uri))
+        .maybe_country(s.country.clone().map(Into::into))
+        .maybe_language(s.language.clone().map(Into::into))
+        .maybe_codec(s.codec.clone().map(Into::into))
+        .bitrate(s.bitrate.map(|b| b as i64))
+        .build()
+}
+
+/// Parse a URL string into a lexicon `UriValue`, dropping anything invalid.
+fn parse_uri(s: &str) -> Option<UriValue> {
+    UriValue::new_owned(s).ok()
+}
+
+fn to_anyhow<E: std::fmt::Display>(e: E) -> anyhow::Error {
+    anyhow!("{e}")
+}

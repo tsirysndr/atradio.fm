@@ -25,6 +25,7 @@
 (defn- web! [& args] (run* "apps/web" args))
 (defn- api! [& args] (run* "apps/api" args))
 (defn- lex! [& args] (run* "packages/lexicons" args))
+(defn- cli! [& args] (run* "cli" args))
 
 ;; ---- workspace-wide (turbo) ----
 (defn install "Install all workspace deps" [] (root! "bun" "install"))
@@ -53,6 +54,15 @@
 ;; ---- lexicons ----
 (defn gen-lexicons "Generate lexicon JSON from Pkl" [] (lex! "bun" "run" "pkl:gen"))
 
+;; ---- cli / TUI (the `atradio` Rust crate) ----
+(defn cli-build "Build the atradio CLI (release)" [] (cli! "cargo" "build" "--release"))
+(defn cli-run "Run the atradio TUI" [] (cli! "cargo" "run" "--"))
+(defn cli-search "Search stations: (cli-search \"lofi\")" [q] (cli! "cargo" "run" "--" "search" q))
+(defn cli-play "Play a stream URL or query: (cli-play \"jazz\")" [t] (cli! "cargo" "run" "--" "play" t))
+(defn cli-login "Sign in (app password via env, or --oauth)" [] (cli! "cargo" "run" "--" "login"))
+(defn cli-whoami "Show the signed-in account" [] (cli! "cargo" "run" "--" "whoami"))
+(defn cli-gen-lexicons "Regenerate the CLI's Rust lexicon bindings" [] (cli! "bash" "scripts/gen-lexicons.sh"))
+
 (def ^:private commands
   [["(install)"       "Install all workspace deps"]
    ["(dev)"           "Run every app in dev"]
@@ -73,6 +83,13 @@
    ["(db-up)"         "Start local Postgres (docker)"]
    ["(db-down)"       "Stop local Postgres (docker)"]
    ["(gen-lexicons)"  "Generate lexicon JSON from Pkl"]
+   ["(cli-build)"     "Build the atradio CLI (release)"]
+   ["(cli-run)"       "Run the atradio TUI"]
+   ["(cli-search q)"  "Search stations from the CLI"]
+   ["(cli-play t)"    "Play a stream URL or query"]
+   ["(cli-login)"     "Sign in via the CLI"]
+   ["(cli-whoami)"    "Show the signed-in account"]
+   ["(cli-gen-lexicons)" "Regenerate CLI lexicon bindings"]
    ["(help)"          "Show this list"]])
 
 (defn help "List all console commands" []
