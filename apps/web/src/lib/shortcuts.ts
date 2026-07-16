@@ -11,6 +11,7 @@ export const SHORTCUTS: ShortcutHelp[] = [
   { keys: ["F"], description: "Favorite current station" },
   { keys: ["A"], description: "Add your own station" },
   { keys: ["E"], description: "Equalizer & audio settings" },
+  { keys: ["P"], description: "Fullscreen player" },
   { keys: ["↑", "↓"], description: "Volume up / down" },
   { keys: ["?"], description: "Show this help" },
   { keys: ["Esc"], description: "Close dialogs / blur search" },

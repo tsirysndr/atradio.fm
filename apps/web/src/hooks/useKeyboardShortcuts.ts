@@ -14,6 +14,7 @@ import {
   shortcutsOpenAtom,
   openSearchPaletteAtom,
   loginModalOpenAtom,
+  playerFullscreenAtom,
 } from "@/atoms/ui";
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -42,6 +43,7 @@ export function useKeyboardShortcuts() {
   const openLogin = useSetAtom(loginModalOpenAtom);
   const isLoggedIn = useAtomValue(isLoggedInAtom);
   const [shortcutsOpen, setShortcutsOpen] = useAtom(shortcutsOpenAtom);
+  const [fullscreen, setFullscreen] = useAtom(playerFullscreenAtom);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -50,10 +52,11 @@ export function useKeyboardShortcuts() {
 
       const typing = isTypingTarget(e.target);
 
-      // Escape works everywhere: blur inputs, close the help overlay.
+      // Escape works everywhere: blur inputs, close overlays.
       if (e.key === "Escape") {
         if (typing && e.target instanceof HTMLElement) e.target.blur();
         if (shortcutsOpen) setShortcutsOpen(false);
+        if (fullscreen) setFullscreen(false);
         return;
       }
 
@@ -96,6 +99,14 @@ export function useKeyboardShortcuts() {
         case "E":
           setAudioSettingsOpen((v) => !v);
           break;
+        case "p":
+        case "P":
+          // Toggle the fullscreen player — only meaningful with a station.
+          if (currentStation) {
+            e.preventDefault();
+            setFullscreen((v) => !v);
+          }
+          break;
         case "ArrowUp":
           e.preventDefault();
           setVolume((v) => clamp(v + 0.05));
@@ -129,5 +140,7 @@ export function useKeyboardShortcuts() {
     isLoggedIn,
     shortcutsOpen,
     setShortcutsOpen,
+    fullscreen,
+    setFullscreen,
   ]);
 }

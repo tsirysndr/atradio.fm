@@ -15,6 +15,9 @@ export const loginModalOpenAtom = atom(false);
 /** Controls the advanced audio settings (EQ / DSP) modal. */
 export const audioSettingsOpenAtom = atom(false);
 
+/** Controls the fullscreen ("now playing") player view. */
+export const playerFullscreenAtom = atom(false);
+
 /** Seed query for the palette (e.g. when opened from a category tile). */
 export const searchPaletteQueryAtom = atom("");
 

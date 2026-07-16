@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Button, Slider } from "@heroui/react";
 import {
@@ -30,7 +30,7 @@ import {
   type StreamInfo,
 } from "@/atoms/player";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
-import { audioSettingsOpenAtom } from "@/atoms/ui";
+import { audioSettingsOpenAtom, playerFullscreenAtom } from "@/atoms/ui";
 import {
   applyAudioSettings,
   useAudioSettingsSnapshot,
@@ -86,8 +86,9 @@ export function Player() {
   const audioSettings = useAudioSettingsSnapshot();
   const listeners = useListenerCount(station?.id);
 
-  /** Fullscreen ("now playing") view toggle. */
-  const [expanded, setExpanded] = useState(false);
+  /** Fullscreen ("now playing") view toggle — shared so the `P` shortcut can
+   *  open it too. */
+  const [expanded, setExpanded] = useAtom(playerFullscreenAtom);
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -564,11 +565,11 @@ export function Player() {
       />
 
       <div
-        className={`fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 transition-transform duration-300 ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 transition-transform duration-300 ${
           station ? "translate-y-0" : "translate-y-[calc(100%+1.5rem)]"
         }`}
       >
-        <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-synth-surface/60 shadow-2xl shadow-black/40 backdrop-blur-2xl">
+        <div className="pointer-events-auto mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-synth-surface/40 shadow-2xl shadow-black/40 backdrop-blur-2xl">
           {status === "loading" && (
             <div className="h-0.5 w-full overflow-hidden bg-transparent">
               <div className="h-full w-1/3 animate-pulse-bars bg-gradient-to-r from-synth-pink to-synth-cyan" />
