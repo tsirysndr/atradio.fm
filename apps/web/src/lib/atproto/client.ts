@@ -7,6 +7,10 @@ import { actorResolver } from "./resolver";
  * permissions for exactly our `fm.atradio.*` collections. Record reads are
  * public in AT Proto, so `repo:<nsid>` effectively grants read+write for our own
  * data without asking for broad access to the whole repo.
+ *
+ * IMPORTANT: keep this in sync with the `scope` field in
+ * `public/client-metadata.json` — the authorization server rejects any scope
+ * requested here that isn't also declared there (`invalid_scope`).
  */
 export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus} repo:${NSID.comment} repo:${NSID.reaction}`;
 
