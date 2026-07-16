@@ -27,10 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Same installer as tsirysndr/fin (whose CI is green): it wires
-      # github.token into Nix's fetcher config automatically, so flake-input
-      # tarball downloads are authenticated and far less 503-prone than the
-      # anonymous api.github.com path cachix/install-nix-action ends up on.
       - uses: DeterminateSystems/nix-installer-action@v16
 
       - uses: cachix/cachix-action@v17
