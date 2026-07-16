@@ -108,10 +108,20 @@ function CommentItem({
                       key={i}
                       to="/profile/$actor"
                       params={{ actor: seg.did }}
-                      className="font-medium text-synth-cyan hover:underline"
+                      className="rounded font-semibold text-synth-purple hover:underline"
                     >
                       {seg.value}
                     </Link>
+                  ) : seg.type === "link" ? (
+                    <a
+                      key={i}
+                      href={seg.href}
+                      target="_blank"
+                      rel="noreferrer noopener nofollow"
+                      className="break-all font-medium text-synth-blue underline decoration-synth-blue/40 underline-offset-2 hover:decoration-synth-blue"
+                    >
+                      {seg.value}
+                    </a>
                   ) : (
                     <span key={i}>{seg.value}</span>
                   ),

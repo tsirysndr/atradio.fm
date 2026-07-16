@@ -75,17 +75,37 @@ export async function resolveMentionFacets(text: string): Promise<Mention[]> {
 
 export type CommentSegment =
   | { type: "text"; value: string }
-  | { type: "mention"; value: string; did: string };
+  | { type: "mention"; value: string; did: string }
+  | { type: "link"; value: string; href: string };
+
+/** Matches http(s) URLs; the capture excludes common trailing punctuation. */
+const URL_RE = /https?:\/\/[^\s<]+[^\s<.,:;!?)\]}'"]/g;
+
+/** Split a plain-text run into text + link segments (URLs → clickable). */
+function splitLinks(text: string): CommentSegment[] {
+  const out: CommentSegment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    const start = m.index ?? 0;
+    const url = m[0];
+    if (start > last) out.push({ type: "text", value: text.slice(last, start) });
+    out.push({ type: "link", value: url, href: url });
+    last = start + url.length;
+  }
+  if (last < text.length) out.push({ type: "text", value: text.slice(last) });
+  return out;
+}
 
 /**
- * Split a comment's text into plain + mention segments using its facets, so the
- * UI can render mentions as links. Byte offsets are mapped back onto the string.
+ * Split a comment's text into plain + mention + link segments. Mentions come
+ * from the record's facets (byte ranges); URLs are detected in the remaining
+ * plain-text runs. Byte offsets are mapped back onto the string.
  */
 export function segmentComment(
   text: string,
   facets: Mention[] | undefined,
 ): CommentSegment[] {
-  if (!facets?.length) return [{ type: "text", value: text }];
+  if (!facets?.length) return splitLinks(text);
   const bytes = encoder.encode(text);
   const sorted = [...facets].sort((a, b) => a.byteStart - b.byteStart);
   const segments: CommentSegment[] = [];
@@ -94,10 +114,9 @@ export function segmentComment(
     if (f.byteStart < cursor || f.byteEnd > bytes.length || f.byteEnd <= f.byteStart)
       continue;
     if (f.byteStart > cursor) {
-      segments.push({
-        type: "text",
-        value: decoder.decode(bytes.slice(cursor, f.byteStart)),
-      });
+      segments.push(
+        ...splitLinks(decoder.decode(bytes.slice(cursor, f.byteStart))),
+      );
     }
     segments.push({
       type: "mention",
@@ -107,7 +126,7 @@ export function segmentComment(
     cursor = f.byteEnd;
   }
   if (cursor < bytes.length) {
-    segments.push({ type: "text", value: decoder.decode(bytes.slice(cursor)) });
+    segments.push(...splitLinks(decoder.decode(bytes.slice(cursor))));
   }
   return segments;
 }

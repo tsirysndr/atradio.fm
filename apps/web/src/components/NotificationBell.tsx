@@ -6,6 +6,7 @@ import {
   IconAt,
   IconMessage2,
   IconMoodSmile,
+  IconArrowLeft,
 } from "@tabler/icons-react";
 import { infoToStation, type NotificationView } from "@atradio/lexicons";
 import { didAtom, isLoggedInAtom } from "@/atoms/auth";
@@ -124,17 +125,32 @@ export function NotificationBell() {
 
       {open && (
         <>
-          {/* Click-away backdrop */}
+          {/* Click-away backdrop — desktop only (mobile is a full screen). */}
           <button
             type="button"
             aria-label="Close notifications"
             onClick={() => setOpen(false)}
-            className="fixed inset-0 z-40 cursor-default"
+            className="fixed inset-0 z-40 hidden cursor-default sm:block"
           />
-          <div className="absolute right-0 z-50 mt-2 flex max-h-[70vh] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-white/10 bg-synth-surface shadow-2xl shadow-black/50">
-            <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
-              <span className="flex items-center gap-1.5 font-display text-sm font-semibold">
-                <IconBell size={15} className="text-synth-pink" />
+          {/*
+            Mobile: a dedicated full-app screen. Desktop: an anchored dropdown.
+          */}
+          <div className="fixed inset-0 z-[100] flex flex-col bg-synth-bg sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:z-50 sm:mt-2 sm:h-auto sm:max-h-[70vh] sm:w-[min(92vw,22rem)] sm:overflow-hidden sm:rounded-2xl sm:border sm:border-white/10 sm:bg-synth-surface sm:shadow-2xl sm:shadow-black/50">
+            <div
+              className="flex items-center justify-between border-b border-white/10 px-4 py-3.5 sm:px-3 sm:py-2.5"
+              style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
+            >
+              <span className="flex items-center gap-2 font-display text-base font-semibold sm:gap-1.5 sm:text-sm">
+                {/* Back button — the full-screen mobile view has no backdrop. */}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="Back"
+                  className="-ml-1 flex h-8 w-8 items-center justify-center rounded-full text-foreground/70 hover:bg-white/5 hover:text-foreground sm:hidden"
+                >
+                  <IconArrowLeft size={20} />
+                </button>
+                <IconBell size={16} className="text-synth-pink" />
                 Notifications
               </span>
               <Link
@@ -145,7 +161,7 @@ export function NotificationBell() {
                 Profile
               </Link>
             </div>
-            <div className="overflow-y-auto">
+            <div className="flex-1 overflow-y-auto sm:flex-none">
               {items.length === 0 ? (
                 <p className="px-3 py-10 text-center text-sm text-foreground/40">
                   Nothing yet. Mentions and comments on your stations show up
