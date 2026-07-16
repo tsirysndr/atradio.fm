@@ -119,7 +119,7 @@ export function RecentlyPlayedRow() {
         <IconHistory size={18} className="text-synth-magenta" />
         Recently played on atradio.fm
       </h2>
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item, i) => (
           <PlayCard key={item.actor?.did ?? `${item.playedAt}-${i}`} item={item} />
         ))}
