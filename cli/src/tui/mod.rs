@@ -36,6 +36,8 @@ enum Msg {
     Popular(Vec<StationInfo>),
     Favorites(Vec<StationInfo>),
     Stations(Vec<StationInfo>),
+    RecentGlobal { stations: Vec<StationInfo>, actors: Vec<String> },
+    ProfileRecent(Vec<StationInfo>),
     SearchResults { query: String, items: Vec<StationInfo> },
     Comments(Vec<crate::appview::CommentView>),
     Notifications { items: Vec<crate::appview::NotificationView>, unread: u32 },
@@ -88,9 +90,11 @@ pub async fn run(config: Config) -> Result<()> {
     // Kick off initial loads.
     spawn_load_trending(&appview, &tx);
     spawn_load_popular(&appview, &tx);
+    spawn_load_recent_global(&appview, &tx);
     if let Some(actor) = atproto.actor() {
         spawn_load_favorites(&appview, &tx, actor.clone());
         spawn_load_stations(&appview, &tx, actor.clone());
+        spawn_load_profile_recent(&appview, &tx, actor.clone());
         spawn_load_notifications(&appview, &tx, actor);
     }
 
@@ -152,6 +156,7 @@ pub async fn run(config: Config) -> Result<()> {
                     if let Some(actor) = atproto.actor() {
                         spawn_load_favorites(&appview, &tx, actor.clone());
                         spawn_load_stations(&appview, &tx, actor.clone());
+                        spawn_load_profile_recent(&appview, &tx, actor.clone());
                         spawn_load_notifications(&appview, &tx, actor);
                     }
                 }
@@ -177,6 +182,16 @@ fn apply_msg(msg: Msg, app: &mut App) {
         Msg::Popular(items) => app.popular = items,
         Msg::Favorites(items) => app.favorites = items,
         Msg::Stations(items) => app.stations = items,
+        Msg::RecentGlobal { stations, actors } => {
+            app.recent = stations;
+            app.recent_actors = actors;
+        }
+        Msg::ProfileRecent(items) => {
+            app.profile_recent = items;
+            if app.profile_recent_selected >= app.profile_recent.len() {
+                app.profile_recent_selected = app.profile_recent.len().saturating_sub(1);
+            }
+        }
         Msg::SearchResults { query, items } => {
             // Ignore stale responses.
             if query == app.search_query || app.search_query.is_empty() {
@@ -227,7 +242,9 @@ fn handle_event(
     }
 
     match app.overlay {
-        Overlay::Search => return handle_search_keys(key.code, app, player, atproto, tx),
+        Overlay::Search => {
+            return handle_search_keys(key.code, app, player, browser, atproto, appview, tx)
+        }
         Overlay::Compose => return handle_compose_keys(key.code, app, atproto, tx),
         Overlay::SignIn => return handle_signin_keys(key.code, app),
         Overlay::AddStation => return handle_add_station_keys(key, app, appview, atproto, tx),
@@ -261,10 +278,15 @@ fn handle_event(
         }
         KeyCode::Char('3') => {
             app.view = View::Home;
-            app.home_tab = HomeTab::Favorites;
+            app.home_tab = HomeTab::Recent;
             app.selected = 0;
         }
         KeyCode::Char('4') => {
+            app.view = View::Home;
+            app.home_tab = HomeTab::Favorites;
+            app.selected = 0;
+        }
+        KeyCode::Char('5') => {
             app.view = View::Home;
             app.home_tab = HomeTab::Yours;
             app.selected = 0;
@@ -360,6 +382,9 @@ fn move_up(app: &mut App) {
         View::Home => {
             app.selected = app.selected.saturating_sub(1);
         }
+        View::Profile => {
+            app.profile_recent_selected = app.profile_recent_selected.saturating_sub(1);
+        }
         _ => {}
     }
 }
@@ -377,6 +402,12 @@ fn move_down(app: &mut App) {
                 app.selected += 1;
             }
         }
+        View::Profile => {
+            let len = app.profile_recent.len();
+            if len > 0 && app.profile_recent_selected + 1 < len {
+                app.profile_recent_selected += 1;
+            }
+        }
         _ => {}
     }
 }
@@ -386,16 +417,18 @@ fn play_selected(
     player: &Arc<Player>,
     browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
-    _appview: &AppView,
+    appview: &AppView,
     tx: &mpsc::UnboundedSender<Msg>,
 ) {
-    if app.view != View::Home {
-        return;
-    }
-    let Some(station) = app.selected_station().cloned() else {
+    let station = match app.view {
+        View::Home => app.selected_station().cloned(),
+        View::Profile => app.profile_recent.get(app.profile_recent_selected).cloned(),
+        _ => None,
+    };
+    let Some(station) = station else {
         return;
     };
-    start_playing(app, player, browser, atproto, tx, station);
+    start_playing(app, player, browser, atproto, appview, tx, station);
 }
 
 fn start_playing(
@@ -403,6 +436,7 @@ fn start_playing(
     player: &Arc<Player>,
     browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
+    appview: &AppView,
     tx: &mpsc::UnboundedSender<Msg>,
     station: StationInfo,
 ) {
@@ -410,19 +444,31 @@ fn start_playing(
     app.toast.set(format!("▶ {}", station.name));
     app.current = Some(station.clone());
 
-    // Register the play with radio-browser (click count) and the AppView
-    // (actor status → recently-played), best-effort.
+    // Register the play with radio-browser (click count), best-effort.
     let b = browser.clone();
     let sid = station.station_id.clone();
     tokio::spawn(async move { b.register_click(&sid).await });
 
+    // Update actor status (→ recently-played) and refresh the feeds after.
     if atproto.is_logged_in() {
         let at = atproto.clone();
+        let av = appview.clone();
         let s = station.clone();
         let tx2 = tx.clone();
+        let actor = atproto.actor();
         tokio::spawn(async move {
-            if let Err(e) = at.set_play_status(&s).await {
-                let _ = tx2.send(Msg::Toast(format!("play status: {e}")));
+            match at.set_play_status(&s).await {
+                Err(e) => {
+                    let _ = tx2.send(Msg::Toast(format!("play status: {e}")));
+                }
+                Ok(()) => {
+                    // Give the AppView a beat to index the play off the firehose.
+                    tokio::time::sleep(Duration::from_millis(1500)).await;
+                    spawn_load_recent_global(&av, &tx2);
+                    if let Some(actor) = actor {
+                        spawn_load_profile_recent(&av, &tx2, actor);
+                    }
+                }
             }
         });
     }
@@ -586,7 +632,9 @@ fn handle_search_keys(
     code: KeyCode,
     app: &mut App,
     player: &Arc<Player>,
+    browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
+    appview: &AppView,
     tx: &mpsc::UnboundedSender<Msg>,
 ) {
     match code {
@@ -598,18 +646,7 @@ fn handle_search_keys(
             if let Some((_, s)) = ranked.get(app.search_selected) {
                 let station = (*s).clone();
                 app.overlay = Overlay::None;
-                // Reuse the play path (no browser handle here; play directly).
-                player.play_url(&station.stream_url);
-                app.toast.set(format!("▶ {}", station.name));
-                app.current = Some(station.clone());
-                if atproto.is_logged_in() {
-                    let at = atproto.clone();
-                    let tx2 = tx.clone();
-                    tokio::spawn(async move {
-                        let _ = at.set_play_status(&station).await;
-                        let _ = tx2;
-                    });
-                }
+                start_playing(app, player, browser, atproto, appview, tx, station);
             }
         }
         KeyCode::Up => {
@@ -705,6 +742,32 @@ fn spawn_load_favorites(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, acto
     tokio::spawn(async move {
         if let Ok(out) = av.favorites(&actor, 100).await {
             let _ = tx.send(Msg::Favorites(out.items.into_iter().map(|v| v.station).collect()));
+        }
+    });
+}
+
+fn spawn_load_recent_global(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>) {
+    let av = appview.clone();
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Ok(items) = av.global_recently_played(50).await {
+            let mut stations = Vec::with_capacity(items.len());
+            let mut actors = Vec::with_capacity(items.len());
+            for p in items {
+                actors.push(p.actor.as_ref().map(|a| a.name()).unwrap_or_default());
+                stations.push(p.station);
+            }
+            let _ = tx.send(Msg::RecentGlobal { stations, actors });
+        }
+    });
+}
+
+fn spawn_load_profile_recent(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, actor: String) {
+    let av = appview.clone();
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Ok(items) = av.recently_played(&actor, 30).await {
+            let _ = tx.send(Msg::ProfileRecent(items.into_iter().map(|p| p.station).collect()));
         }
     });
 }

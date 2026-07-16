@@ -87,43 +87,42 @@ impl AddStationForm {
 pub enum HomeTab {
     Trending,
     Popular,
+    /// Global "who's listening" — recently played across atradio.fm.
+    Recent,
     Favorites,
     /// The connected user's own stations.
     Yours,
 }
 
 impl HomeTab {
-    pub fn all() -> [HomeTab; 4] {
-        [
-            HomeTab::Trending,
-            HomeTab::Popular,
-            HomeTab::Favorites,
-            HomeTab::Yours,
-        ]
+    pub const ORDER: [HomeTab; 5] = [
+        HomeTab::Trending,
+        HomeTab::Popular,
+        HomeTab::Recent,
+        HomeTab::Favorites,
+        HomeTab::Yours,
+    ];
+
+    pub fn all() -> [HomeTab; 5] {
+        Self::ORDER
     }
     pub fn label(self) -> &'static str {
         match self {
             HomeTab::Trending => "Trending",
             HomeTab::Popular => "Popular",
+            HomeTab::Recent => "Recent",
             HomeTab::Favorites => "Favorites",
             HomeTab::Yours => "Yours",
         }
     }
+    fn index(self) -> usize {
+        Self::ORDER.iter().position(|t| *t == self).unwrap_or(0)
+    }
     pub fn next(self) -> HomeTab {
-        match self {
-            HomeTab::Trending => HomeTab::Popular,
-            HomeTab::Popular => HomeTab::Favorites,
-            HomeTab::Favorites => HomeTab::Yours,
-            HomeTab::Yours => HomeTab::Trending,
-        }
+        Self::ORDER[(self.index() + 1) % Self::ORDER.len()]
     }
     pub fn prev(self) -> HomeTab {
-        match self {
-            HomeTab::Trending => HomeTab::Yours,
-            HomeTab::Popular => HomeTab::Trending,
-            HomeTab::Favorites => HomeTab::Popular,
-            HomeTab::Yours => HomeTab::Favorites,
-        }
+        Self::ORDER[(self.index() + Self::ORDER.len() - 1) % Self::ORDER.len()]
     }
 }
 
@@ -162,6 +161,14 @@ pub struct App {
     pub favorites: Vec<StationInfo>,
     /// The connected user's own stations.
     pub stations: Vec<StationInfo>,
+    /// Global recently-played stations (aligned 1:1 with `recent_actors`).
+    pub recent: Vec<StationInfo>,
+    /// Who played each `recent` station (display label, same index).
+    pub recent_actors: Vec<String>,
+    /// The connected user's own recently-played (for the profile view).
+    pub profile_recent: Vec<StationInfo>,
+    /// Selection index within the profile's recently-played list.
+    pub profile_recent_selected: usize,
     pub selected: usize,
 
     // ---- search overlay ----
@@ -226,6 +233,10 @@ impl App {
             popular: Vec::new(),
             favorites: Vec::new(),
             stations: Vec::new(),
+            recent: Vec::new(),
+            recent_actors: Vec::new(),
+            profile_recent: Vec::new(),
+            profile_recent_selected: 0,
             selected: 0,
             search_query: String::new(),
             search_results: Vec::new(),
@@ -261,6 +272,7 @@ impl App {
         match self.home_tab {
             HomeTab::Trending => &self.trending,
             HomeTab::Popular => &self.popular,
+            HomeTab::Recent => &self.recent,
             HomeTab::Favorites => &self.favorites,
             HomeTab::Yours => &self.stations,
         }
@@ -304,15 +316,5 @@ impl App {
 
     pub fn volume_pct(&self) -> u16 {
         (self.volume * 100.0).round() as u16
-    }
-
-    /// The connected user's display label: "Display Name (@handle)" when a
-    /// display name is known, otherwise "@handle".
-    pub fn user_label(&self) -> Option<String> {
-        let handle = self.handle.as_ref()?;
-        Some(match self.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
-            Some(name) => format!("{name} (@{handle})"),
-            None => format!("@{handle}"),
-        })
     }
 }
