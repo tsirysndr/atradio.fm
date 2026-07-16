@@ -15,8 +15,9 @@ import { useAuth } from "@/hooks/useAuth";
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
 
+// Hidden on the crowded mobile navbar; shown from `sm` up.
 const iconLinkBase =
-  "flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground";
+  "hidden h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground sm:flex";
 
 /** Tangled's knot mark. */
 function IconTangled({ size = 18 }: { size?: number }) {
