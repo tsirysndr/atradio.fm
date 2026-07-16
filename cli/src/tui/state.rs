@@ -96,9 +96,9 @@ pub enum HomeTab {
 
 impl HomeTab {
     pub const ORDER: [HomeTab; 5] = [
-        HomeTab::Trending,
         HomeTab::Popular,
         HomeTab::Recent,
+        HomeTab::Trending,
         HomeTab::Favorites,
         HomeTab::Yours,
     ];
