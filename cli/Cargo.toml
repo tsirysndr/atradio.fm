@@ -2,20 +2,17 @@
 name = "atradio"
 version = "0.1.0"
 edition = "2021"
-description = "atradio.fm in your terminal — a synthwave TUI radio player on the AT Protocol"
+description = "atradio.fm in your terminal — a TUI radio player on the AT Protocol"
 # NOTE: rockbox-playback is GPL-2.0-or-later; linking it makes this binary GPL.
 license = "GPL-2.0-or-later"
-authors.workspace = true
-repository.workspace = true
+authors = ["Tsiry Sandratraina <tsiry.sndr@rocksky.app>"]
+repository = "https://github.com/tsirysndr/atradio.fm"
 
 [[bin]]
 name = "atradio"
 path = "src/main.rs"
 
 [dependencies]
-# atproto (auth + PDS writes). Minimal `api` feature = com.atproto only
-# (createSession + repo.putRecord); we skip the 646-lexicon Bluesky/community
-# codegen. `loopback` enables the OAuth browser login flow.
 jacquard = { version = "0.12", default-features = false, features = [
     "api",
     "dns",
@@ -23,8 +20,6 @@ jacquard = { version = "0.12", default-features = false, features = [
     "cache",
     "loopback",
 ] }
-# Direct deps so the code generated from our lexicons (which references these by
-# crate name) resolves. Same versions jacquard already pulls in.
 jacquard-common = "0.12"
 jacquard-lexicon = "0.12"
 jacquard-derive = "0.12"
@@ -61,3 +56,8 @@ mpris-server = "0.8"
 default = ["fm_atradio"]
 # Gates the code generated from packages/lexicons/lexicons/atradio.
 fm_atradio = []
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

@@ -1,0 +1,14 @@
+Package: atradio
+Version: 0.1.0
+Section: sound
+Priority: optional
+Architecture: arm64
+Maintainer: Tsiry Sandratraina <tsiry.sndr@rocksky.app>
+Homepage: https://github.com/tsirysndr/atradio.fm
+Depends: libc6, libasound2
+Description: A TUI radio player on the AT Protocol
+ atradio brings atradio.fm to your terminal: browse trending / popular
+ stations, fuzzy-search the whole radio-browser directory, play live
+ streams with a full Rockbox DSP/equalizer chain, and — when signed in —
+ favorite stations and post comments to your own PDS. On Linux the player
+ is exposed over MPRIS for media-key and desktop integration.

@@ -17,3 +17,8 @@ apps/web/public/rockbox
 # Rust (cli/ — the atradio TUI crate)
 target
 **/*.rs.bk
+
+# cli/dist holds source-controlled packaging templates (deb/rpm/homebrew),
+# not build output — keep it despite the `dist` rule above.
+!cli/dist
+!cli/dist/**

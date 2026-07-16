@@ -1,21 +1,107 @@
 # atradio
 
-`atradio.fm` in your terminal — a synthwave TUI radio player on the AT Protocol.
+`atradio.fm` in your terminal — a TUI radio player on the AT Protocol.
 
 A native Rust client for [atradio.fm](https://atradio.fm): browse trending /
-popular stations, fuzzy-search the whole radio-browser directory, play live
-streams with a full Rockbox DSP/equalizer chain, and — when signed in —
-favorite stations and post comments to your own PDS.
+popular / recently-played stations, fuzzy-search the whole radio-browser
+directory, play live streams with a full Rockbox DSP/equalizer chain, and —
+when signed in — favorite stations, add your own, and post comments to your PDS.
 
-## Build
+![atradio](preview.png)
+
+## Install
+
+Prebuilt release tarballs, `.deb`, and `.rpm` packages are attached to every
+[GitHub release](https://github.com/tsirysndr/atradio.fm/releases), named
+`atradio-<version>-<os>-<arch>.tar.gz` (`macos-amd64`, `macos-aarch64`,
+`linux-amd64`, `linux-aarch64`) — each contains the binary, README, and LICENSE.
+
+### macOS / Linux — Homebrew
 
 ```bash
-cargo build --release        # from the repo root, or from cli/
-./target/release/atradio      # launch the TUI
+brew install tsirysndr/tap/atradio
+```
+
+### Linux — Debian / Ubuntu
+
+Direct `.deb`:
+
+```bash
+# amd64
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.1.0_amd64.deb
+sudo apt install ./atradio_0.1.0_amd64.deb
+
+# arm64 (Raspberry Pi 4/5, Apple-silicon VM, …)
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.1.0_arm64.deb
+sudo apt install ./atradio_0.1.0_arm64.deb
+```
+
+Or via the Gemfury apt repo (auto-updates with `apt upgrade`):
+
+```bash
+echo "deb [trusted=yes] https://apt.fury.io/tsiry/ /" \
+  | sudo tee /etc/apt/sources.list.d/tsiry.list
+sudo apt update && sudo apt install atradio
+```
+
+### Linux — Fedora / RHEL / openSUSE
+
+Direct `.rpm`:
+
+```bash
+sudo dnf install \
+  https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.1.0-1.x86_64.rpm
+```
+
+Or via the Gemfury dnf/yum repo:
+
+```bash
+sudo tee /etc/yum.repos.d/tsiry.repo <<'EOF'
+[tsiry]
+name=tsiry
+baseurl=https://yum.fury.io/tsiry/
+enabled=1
+gpgcheck=0
+EOF
+sudo dnf install atradio
+```
+
+### Nix
+
+```bash
+# Optional: use the binary cache to skip building.
+cachix use tsirysndr
+
+# One-off run:
+nix run github:tsirysndr/atradio.fm
+
+# Install into your user profile:
+nix profile install github:tsirysndr/atradio.fm
+
+# Dev shell (rust toolchain + build deps):
+nix develop github:tsirysndr/atradio.fm
+```
+
+### From source (Cargo)
+
+```bash
+# Runtime/build deps: a C toolchain (for the Rockbox codecs) + ALSA on Linux.
+sudo apt-get install -y build-essential pkg-config libasound2-dev   # Debian/Ubuntu
+
+cargo install --git https://github.com/tsirysndr/atradio.fm --bin atradio
+```
+
+## Build (from a checkout)
+
+```bash
+cd cli
+cargo build --release
+./target/release/atradio          # launch the TUI
 ```
 
 Building compiles the vendored Rockbox codecs, so a C toolchain is required
-(clang/gcc). macOS uses CoreAudio; Linux needs ALSA dev headers.
+(clang/gcc). macOS uses CoreAudio; Linux needs ALSA dev headers
+(`libasound2-dev`).
 
 > **License note:** this crate links `rockbox-playback` (GPL-2.0-or-later), so
 > the compiled `atradio` binary is GPL-2.0-or-later.
@@ -36,44 +122,47 @@ atradio logout
 
 ## Signing in
 
-Reads / posts to the AppView are public; **favoriting and commenting require a
-session.** Two ways to authenticate:
+Reads to the AppView are public; **favoriting, commenting, adding stations, and
+appearing in recently-played require a session.** Two ways to authenticate:
 
 - **App password** — set env vars, then `atradio login`:
   ```bash
   export ATPROTO_IDENTIFIER="you.bsky.social"
   export ATPROTO_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
   ```
-- **OAuth** — `atradio login --oauth you.bsky.social` opens your PDS in the
-  browser.
+- **OAuth** — `atradio login --oauth you.bsky.social`, or press `s` in the TUI
+  to open the sign-in modal, which completes the flow in your browser.
 
-The session + a small profile cache are stored under
-`~/.config/atradio/` (also `settings.toml` for volume + DSP).
+The session + a small profile cache are stored under `~/.config/atradio/`
+(also `settings.toml` for volume + DSP).
 
 ## Keybindings (TUI)
 
-| Key | Action |
-| --- | --- |
-| `↑`/`↓` `j`/`k` | move selection |
-| `←`/`→` `Tab` | switch list / home tab |
-| `Enter` | play the selected station |
-| `Space` | play / pause |
-| `+` / `-` | volume up / down (or adjust the focused DSP value) |
-| `m` | mute |
-| `/` | fuzzy station search (fzf-style) |
-| `f` | favorite the selected/current station |
-| `c` / `a` | comments / add a comment |
-| `n` | notifications |
-| `e` | equalizer & DSP settings |
-| `h` · `?` | home · help |
-| `q` / `Esc` | quit / close overlay |
+| Key             | Action                                                   |
+| --------------- | -------------------------------------------------------- |
+| `↑`/`↓` `j`/`k` | move selection                                           |
+| `←`/`→` `Tab`   | switch home tab                                          |
+| `1` … `5`       | tabs: Trending / Popular / Recent / Favorites / Yours    |
+| `Enter`         | play the selected station                                |
+| `Space`         | play / pause · `m` mute · `+`/`-` volume (or adjust DSP) |
+| `/`             | fuzzy station search                                     |
+| `f`             | favorite the selected/current station                   |
+| `A`             | add a custom station (when signed in)                    |
+| `c` / `a`       | comments / add a comment                                 |
+| `n`             | notifications                                            |
+| `p`             | your profile (with playable recently-played)             |
+| `e`             | equalizer & DSP settings                                 |
+| `s`             | sign in (OAuth) / sign out                               |
+| `h` · `?`       | home · help                                              |
+| `q` / `Esc`     | quit / close overlay                                     |
 
 ## Equalizer & DSP
 
-Press `e` for the full Rockbox chain, mirroring the web app: a 10-band
-equalizer, bass/treble tone, crossfeed, perceptual bass, Haas surround, a
-compressor, and channel mode / stereo width. Changes apply live and persist to
-`settings.toml`.
+Press `e` for the full Rockbox chain: a 10-band equalizer, bass/treble tone,
+crossfeed, perceptual bass, Haas surround, a compressor, and channel mode /
+stereo width. Changes apply live and persist to `settings.toml`. DSP stays
+**local** — the native EQ bands (32 Hz–16 kHz) differ from the web build's, so
+they are not synced to your PDS.
 
 ## Platform notes
 

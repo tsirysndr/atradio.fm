@@ -1,0 +1,172 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    # The CLI is a self-contained crate under cli/; run all build steps there.
+    defaults:
+      run:
+        working-directory: cli
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macos-amd64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - label: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - label: linux-amd64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - label: linux-aarch64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+          key: ${{ matrix.target }}
+
+      - name: Install Linux build deps
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} --bin atradio
+
+      - name: Package tarball
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag || github.ref_name }}"
+          name="atradio-${version}-${{ matrix.label }}"
+          rm -rf dist/staging && mkdir -p dist/staging
+          cp "target/${{ matrix.target }}/release/atradio" dist/staging/
+          cp README.md LICENSE dist/staging/
+          tar -C dist/staging -czf "dist/${name}.tar.gz" .
+          shasum -a 256 "dist/${name}.tar.gz" | awk '{print $1}' > "dist/${name}.tar.gz.sha256"
+
+      - name: Install packaging tools
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get install -y dpkg-dev rpm
+
+      - name: Build .deb
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag || github.ref_name }}"
+          version_no_v="${version#v}"
+          case "${{ matrix.label }}" in
+            linux-amd64)    deb_arch=amd64 ;;
+            linux-aarch64)  deb_arch=arm64 ;;
+          esac
+          pkg_root="dist/debian/${deb_arch}"
+          install -Dm0755 "target/${{ matrix.target }}/release/atradio" "${pkg_root}/usr/local/bin/atradio"
+          sed -i "s/^Version: .*/Version: ${version_no_v}/" "${pkg_root}/DEBIAN/control"
+          dpkg-deb --build --root-owner-group "${pkg_root}" "dist/atradio_${version_no_v}_${deb_arch}.deb"
+
+      - name: Build .rpm
+        if: matrix.label == 'linux-amd64'
+        run: |
+          set -euo pipefail
+          version="${{ inputs.tag || github.ref_name }}"
+          version_no_v="${version#v}"
+          src_root="dist/rpm/amd64"
+          install -Dm0755 "target/${{ matrix.target }}/release/atradio" "${src_root}/usr/local/bin/atradio"
+          sed -i "s/^Version:        .*/Version:        ${version_no_v}/" "${src_root}/atradio.spec"
+          top="$(pwd)/dist/rpmbuild"
+          mkdir -p "${top}"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          rm -rf "${top}/SOURCES/amd64" && cp -r "${src_root}" "${top}/SOURCES/amd64"
+          rpmbuild \
+            --define "_topdir ${top}" \
+            --define "_sourcedir ${top}/SOURCES" \
+            --target x86_64 \
+            -bb "${src_root}/atradio.spec"
+          find "${top}/RPMS" -name '*.rpm' -exec mv {} dist/ \;
+
+      - name: Checksum packages
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for f in dist/*.deb dist/*.rpm; do
+            shasum -a 256 "$f" | awk '{print $1}' > "$f.sha256"
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: |
+            cli/dist/*.tar.gz*
+            cli/dist/*.deb*
+            cli/dist/*.rpm*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: dist/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Check Gemfury secrets
+        id: gemfury
+        env:
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+          FURY_ACCOUNT: ${{ secrets.FURY_ACCOUNT }}
+        run: |
+          if [ -n "${FURY_TOKEN}" ] && [ -n "${FURY_ACCOUNT}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "FURY_TOKEN / FURY_ACCOUNT not set — skipping Gemfury push."
+          fi
+
+      - name: Push .deb / .rpm to Gemfury
+        if: steps.gemfury.outputs.available == 'true'
+        env:
+          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+          FURY_ACCOUNT: ${{ secrets.FURY_ACCOUNT }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for pkg in dist/*.deb dist/*.rpm; do
+            echo "Uploading ${pkg} to Gemfury (${FURY_ACCOUNT})…"
+            curl -fsS -F package=@"${pkg}" \
+              "https://${FURY_TOKEN}@push.fury.io/${FURY_ACCOUNT}/"
+          done
