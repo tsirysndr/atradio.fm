@@ -29,6 +29,26 @@ pub struct NowPlaying {
     pub station: String,
     pub bitrate: u32,
     pub sample_rate: u32,
+    /// Decoded codec, e.g. "mp3", "aac".
+    pub codec: String,
+}
+
+impl NowPlaying {
+    /// A compact "format" line, e.g. "MP3 · 128 kbps · 44.1 kHz". Empty when
+    /// nothing is decoding yet.
+    pub fn format_line(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if !self.codec.trim().is_empty() {
+            parts.push(self.codec.to_uppercase());
+        }
+        if self.bitrate > 0 {
+            parts.push(format!("{} kbps", self.bitrate));
+        }
+        if self.sample_rate > 0 {
+            parts.push(format!("{:.1} kHz", self.sample_rate as f32 / 1000.0));
+        }
+        parts.join(" · ")
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -126,15 +146,23 @@ impl Player {
             PlaybackState::Paused => State::Paused,
             PlaybackState::Stopped => State::Stopped,
         };
-        let (title, artist, station, bitrate, sample_rate) = match st.metadata.as_ref() {
+        let (title, artist, station, bitrate, sample_rate, codec) = match st.metadata.as_ref() {
             Some(m) => (
                 m.title.clone(),
                 m.artist.clone(),
                 m.album.clone(),
                 m.bitrate,
                 m.sample_rate,
+                m.codec.clone(),
             ),
-            None => (String::new(), String::new(), String::new(), 0, 0),
+            None => (
+                String::new(),
+                String::new(),
+                String::new(),
+                0,
+                0,
+                String::new(),
+            ),
         };
         NowPlaying {
             state,
@@ -144,6 +172,7 @@ impl Player {
             station,
             bitrate,
             sample_rate,
+            codec,
         }
     }
 }

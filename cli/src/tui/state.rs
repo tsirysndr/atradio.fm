@@ -17,6 +17,8 @@ pub enum View {
     Comments,
     /// Notifications.
     Notifications,
+    /// The connected user's profile.
+    Profile,
     /// Keybindings help.
     Help,
 }
@@ -129,6 +131,14 @@ pub struct App {
     // ---- identity ----
     pub logged_in: bool,
     pub handle: Option<String>,
+    /// Optional display name of the connected user.
+    pub display_name: Option<String>,
+    pub did: Option<String>,
+    /// Sign-in method: "password" | "oauth".
+    pub method: Option<String>,
+    pub pds: Option<String>,
+    /// App-password credentials from the environment, for in-TUI sign-in.
+    pub env_creds: Option<(String, String)>,
 
     pub toast: Toast,
     matcher: SkimMatcherV2,
@@ -161,6 +171,11 @@ impl App {
             dsp_row: 0,
             logged_in,
             handle,
+            display_name: None,
+            did: None,
+            method: None,
+            pds: None,
+            env_creds: None,
             toast: Toast::default(),
             matcher: SkimMatcherV2::default(),
         }
@@ -213,5 +228,15 @@ impl App {
 
     pub fn volume_pct(&self) -> u16 {
         (self.volume * 100.0).round() as u16
+    }
+
+    /// The connected user's display label: "Display Name (@handle)" when a
+    /// display name is known, otherwise "@handle".
+    pub fn user_label(&self) -> Option<String> {
+        let handle = self.handle.as_ref()?;
+        Some(match self.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
+            Some(name) => format!("{name} (@{handle})"),
+            None => format!("@{handle}"),
+        })
     }
 }

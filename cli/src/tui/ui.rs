@@ -33,6 +33,7 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         View::Dsp => draw_dsp(f, root[1], app),
         View::Comments => draw_comments(f, root[1], app),
         View::Notifications => draw_notifications(f, root[1], app),
+        View::Profile => draw_profile(f, root[1], app),
         View::Help => draw_help(f, root[1]),
     }
     draw_player(f, root[2], app, np);
@@ -48,7 +49,7 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
 fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(10), Constraint::Length(28)])
+        .constraints([Constraint::Min(10), Constraint::Length(40)])
         .split(area);
 
     let brand = Line::from(vec![
@@ -61,14 +62,14 @@ fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
         cols[0],
     );
 
-    let who = match &app.handle {
-        Some(h) => Line::from(vec![
+    let who = match app.user_label() {
+        Some(label) => Line::from(vec![
             bell(app.unread),
-            Span::styled(format!(" @{h} "), Style::default().fg(theme::GREEN)),
+            Span::styled(format!(" {} ", truncate(&label, 34)), Style::default().fg(theme::GREEN)),
         ]),
         None => Line::from(vec![
             bell(app.unread),
-            Span::styled(" guest ", Style::default().fg(theme::MUTED)),
+            Span::styled(" guest · s to sign in ", Style::default().fg(theme::MUTED)),
         ]),
     };
     f.render_widget(
@@ -110,16 +111,16 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
         .constraints([Constraint::Length(1), Constraint::Min(3)])
         .split(area);
 
-    // Tabs.
+    // Tabs (numbered 1–3 for quick jumps).
     let mut spans: Vec<Span> = Vec::new();
-    for t in HomeTab::all() {
+    for (i, t) in HomeTab::all().into_iter().enumerate() {
         let active = t == app.home_tab;
         let style = if active {
             Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme::MUTED)
         };
-        spans.push(Span::styled(format!(" {} ", t.label()), style));
+        spans.push(Span::styled(format!(" {} {} ", i + 1, t.label()), style));
         spans.push(Span::raw(" "));
     }
     f.render_widget(Paragraph::new(Line::from(spans)), rows[0]);
@@ -321,6 +322,68 @@ fn draw_notifications(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(Paragraph::new(lines), inner);
 }
 
+fn draw_profile(f: &mut Frame, area: Rect, app: &App) {
+    let block = panel("Profile", true);
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if !app.logged_in {
+        let msg = "Not signed in. Press s to sign in (set ATPROTO_IDENTIFIER + ATPROTO_APP_PASSWORD, or run `atradio login --oauth`).";
+        f.render_widget(
+            Paragraph::new(msg)
+                .wrap(ratatui::widgets::Wrap { trim: true })
+                .style(Style::default().fg(theme::MUTED)),
+            inner,
+        );
+        return;
+    }
+
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Big display name + handle header.
+    if let Some(name) = app.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
+        lines.push(Line::from(Span::styled(
+            name.to_string(),
+            Style::default().fg(theme::FG).add_modifier(Modifier::BOLD),
+        )));
+    }
+    if let Some(h) = &app.handle {
+        lines.push(Line::from(Span::styled(
+            format!("@{h}"),
+            Style::default().fg(theme::GREEN),
+        )));
+    }
+    lines.push(Line::from(""));
+
+    let mut field = |label: &str, value: &str| {
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {label:<10}"), Style::default().fg(theme::MUTED)),
+            Span::styled(value.to_string(), Style::default().fg(theme::FG)),
+        ]));
+    };
+    if let Some(did) = &app.did {
+        field("DID", did);
+    }
+    if let Some(m) = &app.method {
+        field("Signed in", if m.is_empty() { "password" } else { m });
+    }
+    if let Some(pds) = &app.pds {
+        field("PDS", pds);
+    }
+    field("Favorites", &app.favorites.len().to_string());
+    if let Some(cur) = &app.current {
+        field("Listening", &cur.name);
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Press s to sign out.",
+        Style::default().fg(theme::MUTED),
+    )));
+
+    f.render_widget(Paragraph::new(lines), inner);
+}
+
 fn draw_help(f: &mut Frame, area: Rect) {
     let block = panel("Keybindings", true);
     let inner = block.inner(area);
@@ -328,7 +391,8 @@ fn draw_help(f: &mut Frame, area: Rect) {
 
     let keys = [
         ("↑/↓ j/k", "move selection"),
-        ("←/→ Tab", "switch list / tab"),
+        ("←/→ Tab", "switch home tab"),
+        ("1 / 2 / 3", "jump to Trending / Popular / Favorites"),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
@@ -339,6 +403,8 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ("a", "add a comment"),
         ("n", "notifications"),
         ("e", "equalizer & DSP settings"),
+        ("p", "your profile"),
+        ("s", "sign in / sign out"),
         ("h", "home"),
         ("?", "this help"),
         ("q / Esc", "quit / close overlay"),
@@ -378,13 +444,18 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
                 rows[0],
             );
             let now = np.line().unwrap_or_else(|| "—".into());
-            f.render_widget(
-                Paragraph::new(Line::from(vec![
-                    Span::styled("♪ ", Style::default().fg(theme::CYAN)),
-                    Span::styled(truncate(&now, 60), Style::default().fg(theme::CYAN)),
-                ])),
-                rows[1],
-            );
+            let mut spans = vec![
+                Span::styled("♪ ", Style::default().fg(theme::CYAN)),
+                Span::styled(truncate(&now, 48), Style::default().fg(theme::CYAN)),
+            ];
+            let fmt = np.format_line();
+            if !fmt.is_empty() {
+                spans.push(Span::styled(
+                    format!("   [{fmt}]"),
+                    Style::default().fg(theme::INDIGO),
+                ));
+            }
+            f.render_widget(Paragraph::new(Line::from(spans)), rows[1]);
         }
         None => {
             f.render_widget(
@@ -421,7 +492,7 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         );
         return;
     }
-    let hint = "  /=search  e=eq  c=comments  n=notifs  f=fav  Space=play/pause  ?=help  q=quit";
+    let hint = "  1/2/3=tabs  /=search  e=eq  c=comments  n=notifs  p=profile  f=fav  s=sign in/out  Space=play/pause  ?=help  q=quit";
     f.render_widget(
         Paragraph::new(Span::styled(hint, Style::default().fg(theme::MUTED)))
             .style(Style::default().bg(theme::BG)),

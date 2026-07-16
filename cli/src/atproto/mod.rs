@@ -97,8 +97,10 @@ impl Atproto {
                 .map_err(to_anyhow)?,
         };
 
+        let did = auth.did.to_string();
         let profile = Profile {
-            did: auth.did.to_string(),
+            display_name: fetch_display_name(&did).await,
+            did,
             handle: auth.handle.to_string(),
             pds: auth.pds.as_ref().map(|u| u.to_string()),
             method: "password".into(),
@@ -157,8 +159,10 @@ impl Atproto {
             .info()
             .await
             .ok_or_else(|| anyhow!("OAuth session missing identity"))?;
+        let did = did.to_string();
         let profile = Profile {
-            did: did.to_string(),
+            display_name: fetch_display_name(&did).await,
+            did,
             handle: handle.map(|h| h.to_string()).unwrap_or_default(),
             pds: None,
             method: "oauth".into(),
@@ -258,4 +262,21 @@ fn parse_uri(s: &str) -> Option<UriValue> {
 
 fn to_anyhow<E: std::fmt::Display>(e: E) -> anyhow::Error {
     anyhow!("{e}")
+}
+
+/// Best-effort lookup of an actor's display name from the public Bluesky
+/// AppView (the same source atradio's own AppView uses). Returns None on any
+/// failure so login never blocks on it.
+async fn fetch_display_name(actor: &str) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ProfileOut {
+        #[serde(default)]
+        display_name: Option<String>,
+    }
+    let url = format!(
+        "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={actor}"
+    );
+    let out: ProfileOut = reqwest::get(&url).await.ok()?.json().await.ok()?;
+    out.display_name.filter(|d| !d.trim().is_empty())
 }

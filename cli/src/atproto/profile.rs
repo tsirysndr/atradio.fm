@@ -11,10 +11,22 @@ pub struct Profile {
     pub did: String,
     pub handle: String,
     #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
     pub pds: Option<String>,
     /// "password" | "oauth".
     #[serde(default)]
     pub method: String,
+}
+
+impl Profile {
+    /// "Display Name (@handle)" when a display name is known, else "@handle".
+    pub fn label(&self) -> String {
+        match self.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
+            Some(name) => format!("{name} (@{})", self.handle),
+            None => format!("@{}", self.handle),
+        }
+    }
 }
 
 impl Profile {

@@ -26,7 +26,7 @@ use crate::atproto::Atproto;
 use crate::config::Config;
 use crate::player::{Player, State as PlayState};
 use crate::radio::RadioBrowser;
-use state::{App, Overlay, View};
+use state::{App, HomeTab, Overlay, View};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
@@ -38,6 +38,7 @@ enum Msg {
     SearchResults { query: String, items: Vec<StationInfo> },
     Comments(Vec<crate::appview::CommentView>),
     Notifications { items: Vec<crate::appview::NotificationView>, unread: u32 },
+    SignedIn(crate::atproto::Profile),
     Toast(String),
 }
 
@@ -54,6 +55,7 @@ pub async fn run(config: Config) -> Result<()> {
     let profile = atproto.profile();
     let logged_in = profile.is_some();
     let handle = profile.as_ref().map(|p| p.handle.clone());
+    let display_name = profile.as_ref().and_then(|p| p.display_name.clone());
 
     let player = Arc::new(Player::new()?);
     #[cfg(target_os = "linux")]
@@ -65,6 +67,14 @@ pub async fn run(config: Config) -> Result<()> {
     // Load persisted settings (volume + DSP) and push them to the engine.
     let mut settings = crate::settings::Settings::load(&config.session_path);
     let mut app = App::new(logged_in, handle);
+    app.display_name = display_name;
+    app.did = profile.as_ref().map(|p| p.did.clone());
+    app.method = profile.as_ref().map(|p| p.method.clone());
+    app.pds = profile.as_ref().and_then(|p| p.pds.clone());
+    // Credentials for in-TUI sign-in (press `s`).
+    if let (Some(id), Some(pw)) = (config.identifier.clone(), config.app_password.clone()) {
+        app.env_creds = Some((id, pw));
+    }
     app.dsp = settings.audio();
     player.set_volume(settings.volume);
     player.apply_dsp(&app.dsp);
@@ -151,6 +161,14 @@ fn apply_msg(msg: Msg, app: &mut App) {
             app.notifications = items;
             app.unread = unread;
         }
+        Msg::SignedIn(p) => {
+            app.logged_in = true;
+            app.handle = Some(p.handle);
+            app.display_name = p.display_name;
+            app.did = Some(p.did);
+            app.method = Some(p.method);
+            app.pds = p.pds;
+        }
         Msg::Toast(t) => app.toast.set(t),
     }
 }
@@ -196,7 +214,24 @@ fn handle_event(
             app.search_selected = 0;
         }
         KeyCode::Char('h') => app.view = View::Home,
+        // Number keys jump straight to a home tab.
+        KeyCode::Char('1') => {
+            app.view = View::Home;
+            app.home_tab = HomeTab::Trending;
+            app.selected = 0;
+        }
+        KeyCode::Char('2') => {
+            app.view = View::Home;
+            app.home_tab = HomeTab::Popular;
+            app.selected = 0;
+        }
+        KeyCode::Char('3') => {
+            app.view = View::Home;
+            app.home_tab = HomeTab::Favorites;
+            app.selected = 0;
+        }
         KeyCode::Char('e') => app.view = View::Dsp,
+        KeyCode::Char('p') => app.view = View::Profile,
         KeyCode::Char('?') => app.view = View::Help,
         KeyCode::Char('n') => {
             app.view = View::Notifications;
@@ -250,6 +285,7 @@ fn handle_event(
             }
         }
         KeyCode::Char('f') => favorite_selected(app, atproto, tx),
+        KeyCode::Char('s') => toggle_signin(app, appview, atproto, tx),
         KeyCode::Up | KeyCode::Char('k') => move_up(app),
         KeyCode::Down | KeyCode::Char('j') => move_down(app),
         KeyCode::Left => {
@@ -343,6 +379,67 @@ fn start_playing(
             }
         });
     }
+}
+
+/// Sign in (app password from env) or sign out, depending on current state.
+fn toggle_signin(
+    app: &mut App,
+    appview: &AppView,
+    atproto: &Arc<Atproto>,
+    tx: &mpsc::UnboundedSender<Msg>,
+) {
+    if app.logged_in {
+        atproto.logout();
+        app.logged_in = false;
+        app.handle = None;
+        app.display_name = None;
+        app.did = None;
+        app.method = None;
+        app.pds = None;
+        app.favorites.clear();
+        app.notifications.clear();
+        app.unread = 0;
+        if app.view == View::Profile {
+            app.view = View::Home;
+        }
+        app.toast.set("Signed out.");
+        return;
+    }
+
+    let Some((id, pw)) = app.env_creds.clone() else {
+        app.toast
+            .set("Set ATPROTO_IDENTIFIER + ATPROTO_APP_PASSWORD, or run `atradio login --oauth`.");
+        return;
+    };
+
+    app.toast.set("Signing in…");
+    let at = atproto.clone();
+    let av = appview.clone();
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        match at.login_password(&id, &pw).await {
+            Ok(profile) => {
+                let handle = profile.handle.clone();
+                let _ = tx.send(Msg::Toast(format!("✓ Signed in as {}", profile.label())));
+                let _ = tx.send(Msg::SignedIn(profile));
+                // Load the now-available personalized lists.
+                if let Ok(out) = av.favorites(&handle, 100).await {
+                    let _ = tx.send(Msg::Favorites(
+                        out.items.into_iter().map(|v| v.station).collect(),
+                    ));
+                }
+                if let Ok(out) = av.notifications(&handle, 50).await {
+                    let _ = tx.send(Msg::Notifications {
+                        items: out.items,
+                        unread: out.unread_count,
+                    });
+                }
+            }
+            Err(e) => {
+                let _ = tx.send(Msg::Toast(format!("sign-in failed: {e}")));
+            }
+        }
+    });
 }
 
 fn favorite_selected(app: &mut App, atproto: &Arc<Atproto>, tx: &mpsc::UnboundedSender<Msg>) {
