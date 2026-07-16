@@ -1,0 +1,15 @@
+{
+  "features": {
+    "comments": "comentários",
+    "reactions": "reações",
+    "favorites": "favoritos",
+    "stations": "suas estações",
+    "status": "status de escuta",
+    "audio": "configurações de áudio"
+  },
+  "featuresFallback": "novos recursos",
+  "and": "e",
+  "message": "<strong>Novas permissões necessárias.</strong> A sua sessão não concede acesso a {{features}}. Saia e entre novamente para continuar.",
+  "signingOut": "Saindo…",
+  "reauth": "Sair e entrar novamente"
+}

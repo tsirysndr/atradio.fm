@@ -1,0 +1,15 @@
+{
+  "features": {
+    "comments": "comments",
+    "reactions": "reactions",
+    "favorites": "favorites",
+    "stations": "your stations",
+    "status": "listening status",
+    "audio": "audio settings"
+  },
+  "featuresFallback": "new features",
+  "and": "and",
+  "message": "<strong>New permissions required.</strong> Your session doesn't grant access to {{features}}. Please log out and sign in again to continue.",
+  "signingOut": "Signing out…",
+  "reauth": "Log out & sign in"
+}
