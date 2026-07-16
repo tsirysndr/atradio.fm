@@ -18,9 +18,14 @@ const isHlsUrl = (url: string) => /\.m3u8(\?|$)/i.test(url);
  */
 export function proxiedStreamUrl(url: string): string {
   const isHttp = /^http:\/\//i.test(url);
+  const isPlaylist = /\.(pls|m3u)(\?|$)/i.test(url);
   const pageHttps =
     typeof window !== "undefined" && window.location.protocol === "https:";
-  if (!isHttp || !pageHttps) return url;
+  // Route through the proxy when either an `http://` stream would be blocked as
+  // mixed content on an https page, or the URL is a `.pls`/`.m3u` playlist the
+  // proxy must unwrap into a real stream (the decoder can't play a playlist
+  // file). HLS `.m3u8` is never proxied — callers branch on `isHls` first.
+  if (!((isHttp && pageHttps) || isPlaylist)) return url;
   return `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`;
 }
 
@@ -49,8 +54,12 @@ function firstUrlFromPlaylist(body: string): string | null {
  * can actually play.
  *
  * - radio-browser `url_resolved` values are usually already direct streams.
- * - TuneIn stations point at a proxied Tune.ashx that returns a playlist body.
- * - Some direct URLs are `.pls` / `.m3u` playlists that must be unwrapped.
+ * - TuneIn stations point at a proxied Tune.ashx that returns a playlist body,
+ *   which we unwrap here (the response is a small, finite text list).
+ * - Plain `.pls` / `.m3u` playlists are unwrapped server-side by the stream
+ *   proxy instead, so we must NOT fetch them here: `/api/stream` now returns the
+ *   live audio for a playlist URL, and `res.text()` on an endless stream would
+ *   hang. `proxiedStreamUrl` routes those through the proxy for us.
  *
  * Network failures fall back to the original URL — the <audio> element gets a
  * chance and surfaces its own error if that fails too.
@@ -61,16 +70,13 @@ export async function resolveStream(
 ): Promise<ResolvedStream> {
   const url = station.streamUrl;
 
+  // Only TuneIn's Tune.ashx is unwrapped client-side (finite OPML/text body).
   const looksLikePlaylist =
-    station.source === "tunein" ||
-    /\.pls(\?|$)/i.test(url) ||
-    /\.m3u(\?|$)/i.test(url) ||
-    /Tune\.ashx/i.test(url);
+    station.source === "tunein" || /Tune\.ashx/i.test(url);
 
   if (looksLikePlaylist && !isHlsUrl(url)) {
     try {
-      // Fetch the playlist over the proxy too — an http playlist body can't be
-      // read directly from an https page.
+      // Same-origin TuneIn proxy body — safe to read in full.
       const res = await fetch(proxiedStreamUrl(url), { signal });
       if (res.ok) {
         const body = await res.text();

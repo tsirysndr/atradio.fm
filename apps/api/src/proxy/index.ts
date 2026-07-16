@@ -65,8 +65,8 @@ const STREAM_HEADERS = [
  * metadata interleaving still works when the decoder asks for it.
  */
 proxyRouter.get("/stream", async (req: Request, res: Response) => {
-  const target = String(req.query.url ?? "");
-  if (!/^https?:\/\//i.test(target)) {
+  const rawTarget = String(req.query.url ?? "");
+  if (!/^https?:\/\//i.test(rawTarget)) {
     res
       .status(400)
       .json({ error: "InvalidRequest", message: "url must be http(s)" });
@@ -76,6 +76,14 @@ proxyRouter.get("/stream", async (req: Request, res: Response) => {
   const controller = new AbortController();
   // Drop the upstream connection as soon as the client goes away.
   res.on("close", () => controller.abort());
+
+  // Unwrap `.pls`/`.m3u` playlists to the real stream URL. Without this the
+  // proxy would pipe the playlist *text* to the decoder, which can't play it —
+  // the station just fails silently. (HLS `.m3u8` is handled client-side and
+  // must NOT be unwrapped: its segment URIs resolve against the manifest URL.)
+  const target = /\.(pls|m3u)(\?|$)/i.test(rawTarget)
+    ? await resolvePlaylist(rawTarget)
+    : rawTarget;
 
   try {
     const upstream = await fetch(target, {
