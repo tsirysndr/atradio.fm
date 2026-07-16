@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
 import { IconSearch, IconX, IconMoodSmile } from "@tabler/icons-react";
 import {
@@ -17,6 +18,7 @@ interface MediaPickerProps {
 
 /** Klipy-powered GIF / sticker / clip / meme picker. */
 export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
+  const { t } = useTranslation("station");
   const [type, setType] = useState<KlipyMediaType>("gifs");
   const [query, setQuery] = useState("");
   const debounced = useDebouncedValue(query, 350);
@@ -58,7 +60,7 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close media picker"
+          aria-label={t("closeMediaPicker")}
           className="flex h-7 w-7 items-center justify-center rounded-full text-foreground/50 hover:bg-white/5 hover:text-foreground"
         >
           <IconX size={16} />
@@ -72,7 +74,7 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={`Search ${type}…`}
+          placeholder={t("searchType", { type })}
           className="h-9 w-full bg-transparent text-sm text-foreground placeholder:text-foreground/30 focus:outline-none"
         />
       </div>
@@ -82,12 +84,15 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
         {!KLIPY_ENABLED ? (
           <div className="col-span-3 flex flex-col items-center gap-1 py-8 text-center text-xs text-foreground/50">
             <IconMoodSmile size={22} className="text-foreground/30" />
-            Set <code className="text-synth-cyan">VITE_KLIPY_API_KEY</code> to
-            enable GIFs.
+            <Trans
+              t={t}
+              i18nKey="klipyDisabled"
+              components={{ code: <code className="text-synth-cyan" /> }}
+            />
           </div>
         ) : results.length === 0 ? (
           <div className="col-span-3 py-8 text-center text-xs text-foreground/40">
-            {isFetching ? "Loading…" : "No results"}
+            {isFetching ? t("loading", { ns: "common" }) : t("noResults")}
           </div>
         ) : (
           results.map((m) => (

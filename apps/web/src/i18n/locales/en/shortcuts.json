@@ -1,0 +1,13 @@
+{
+  "title": "Keyboard shortcuts",
+  "openSearch": "Open search",
+  "playPause": "Play / pause",
+  "muteUnmute": "Mute / unmute",
+  "favorite": "Favorite current station",
+  "addStation": "Add your own station",
+  "audioSettings": "Equalizer & audio settings",
+  "fullscreen": "Fullscreen player",
+  "volume": "Volume up / down",
+  "showHelp": "Show this help",
+  "close": "Close dialogs / blur search"
+}

@@ -1,0 +1,23 @@
+{
+  "back": "Voltar",
+  "loadingStations": "Carregando estações…",
+  "stationCount_one": "{{display}} estação",
+  "stationCount_other": "{{display}} estações",
+  "errorTitle": "Não foi possível carregar as estações",
+  "errorDescription": "Algo deu errado ao acessar o diretório de estações. Tente novamente em instantes.",
+  "emptyTitle": "Nenhuma estação de {{label}} encontrada",
+  "emptyDescription": "Tente outra categoria ou busque uma estação pelo nome.",
+  "endReached": "Você chegou ao fim de {{label}}.",
+  "browseByCategory": "Explorar por categoria",
+  "recentlyPlayed": "Tocadas recentemente na atradio.fm",
+  "someone": "alguém",
+  "playStation": "Tocar {{name}}",
+  "playedBy": "Tocada por {{name}}",
+  "timeAgo": {
+    "justNow": "agora mesmo",
+    "minutes": "há {{count}} min",
+    "hours": "há {{count}} h",
+    "days": "há {{count}} d",
+    "weeks": "há {{count}} sem"
+  }
+}

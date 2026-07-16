@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useAtom } from "jotai";
+import { useTranslation } from "react-i18next";
 import { Modal, useOverlayState } from "@heroui/react";
 import {
   ChannelMode,
@@ -156,6 +157,7 @@ function Toggle({
 // ── the modal ───────────────────────────────────────────────────────────────
 
 export function AudioSettingsModal() {
+  const { t } = useTranslation("settings");
   const [isOpen, setOpen] = useAtom(audioSettingsOpenAtom);
   const state = useOverlayState({ isOpen, onOpenChange: setOpen });
 
@@ -207,19 +209,19 @@ export function AudioSettingsModal() {
             <ModalCloseButton onClose={() => setOpen(false)} />
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
-                Audio settings
+                {t("title")}
               </Modal.Heading>
             </Modal.Header>
             <Modal.Body className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto py-4">
               <Section
-                title="Equalizer"
+                title={t("equalizer.title")}
                 action={
                   <div className="flex items-center gap-2 text-xs text-foreground/60">
-                    {eqEnabled ? "On" : "Off"}
+                    {eqEnabled ? t("on") : t("off")}
                     <Toggle
                       checked={eqEnabled}
                       onChange={onEqEnabled}
-                      label="Enable equalizer"
+                      label={t("equalizer.enable")}
                     />
                   </div>
                 }
@@ -239,7 +241,7 @@ export function AudioSettingsModal() {
                         max={24}
                         step={1}
                         value={eqGains[i]}
-                        aria-label={`${hz} Hz band gain`}
+                        aria-label={t("equalizer.bandGain", { hz })}
                         onChange={(e) => onEqBand(i, Number(e.target.value))}
                         className="eq-slider accent-synth-pink"
                       />
@@ -252,8 +254,8 @@ export function AudioSettingsModal() {
               </Section>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Section title="Tone">
-                  <Field label="Bass" value={`${bass} dB`}>
+                <Section title={t("tone.title")}>
+                  <Field label={t("tone.bass")} value={`${bass} dB`}>
                     <Range
                       min={-24}
                       max={24}
@@ -264,7 +266,7 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Treble" value={`${treble} dB`}>
+                  <Field label={t("tone.treble")} value={`${treble} dB`}>
                     <Range
                       min={-24}
                       max={24}
@@ -277,14 +279,14 @@ export function AudioSettingsModal() {
                   </Field>
                 </Section>
 
-                <Section title="Crossfeed (headphones)">
-                  <Field label="Mode">
+                <Section title={t("crossfeed.title")}>
+                  <Field label={t("crossfeed.mode")}>
                     <SelectBox<CrossfeedMode>
                       value={cfMode}
                       options={[
-                        [CrossfeedMode.Off, "Off"],
-                        [CrossfeedMode.Meier, "Meier"],
-                        [CrossfeedMode.Custom, "Custom"],
+                        [CrossfeedMode.Off, t("crossfeed.modeOff")],
+                        [CrossfeedMode.Meier, t("crossfeed.modeMeier")],
+                        [CrossfeedMode.Custom, t("crossfeed.modeCustom")],
                       ]}
                       onChange={(v) => {
                         setCfMode(v);
@@ -292,7 +294,10 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Direct gain" value={`${cfDirect.toFixed(1)} dB`}>
+                  <Field
+                    label={t("crossfeed.directGain")}
+                    value={`${cfDirect.toFixed(1)} dB`}
+                  >
                     <Range
                       min={-6}
                       max={0}
@@ -306,8 +311,8 @@ export function AudioSettingsModal() {
                   </Field>
                 </Section>
 
-                <Section title="Perceptual bass (PBE)">
-                  <Field label="Strength" value={`${pbe}%`}>
+                <Section title={t("pbe.title")}>
+                  <Field label={t("pbe.strength")} value={`${pbe}%`}>
                     <Range
                       min={0}
                       max={100}
@@ -318,7 +323,7 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Pre-cut" value={`-${pbePrecut} dB`}>
+                  <Field label={t("pbe.precut")} value={`-${pbePrecut} dB`}>
                     <Range
                       min={0}
                       max={24}
@@ -331,8 +336,8 @@ export function AudioSettingsModal() {
                   </Field>
                 </Section>
 
-                <Section title="Haas surround">
-                  <Field label="Delay (0 = off)" value={`${surDelay} ms`}>
+                <Section title={t("surround.title")}>
+                  <Field label={t("surround.delay")} value={`${surDelay} ms`}>
                     <Range
                       min={0}
                       max={30}
@@ -343,7 +348,7 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Balance" value={`${surBalance}%`}>
+                  <Field label={t("surround.balance")} value={`${surBalance}%`}>
                     <Range
                       min={0}
                       max={100}
@@ -356,8 +361,11 @@ export function AudioSettingsModal() {
                   </Field>
                 </Section>
 
-                <Section title="Compressor">
-                  <Field label="Threshold (0 = off)" value={`${compThresh} dB`}>
+                <Section title={t("compressor.title")}>
+                  <Field
+                    label={t("compressor.threshold")}
+                    value={`${compThresh} dB`}
+                  >
                     <Range
                       min={-30}
                       max={0}
@@ -368,7 +376,7 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Ratio">
+                  <Field label={t("compressor.ratio")}>
                     <SelectBox<number>
                       value={compRatio}
                       options={[
@@ -385,18 +393,18 @@ export function AudioSettingsModal() {
                   </Field>
                 </Section>
 
-                <Section title="Stereo">
-                  <Field label="Channels">
+                <Section title={t("stereo.title")}>
+                  <Field label={t("stereo.channels")}>
                     <SelectBox<ChannelMode>
                       value={channel}
                       options={[
-                        [ChannelMode.Stereo, "Stereo"],
-                        [ChannelMode.Mono, "Mono"],
-                        [ChannelMode.Custom, "Custom"],
-                        [ChannelMode.MonoLeft, "Mono left"],
-                        [ChannelMode.MonoRight, "Mono right"],
-                        [ChannelMode.Karaoke, "Karaoke"],
-                        [ChannelMode.Swap, "Swap L/R"],
+                        [ChannelMode.Stereo, t("stereo.channelStereo")],
+                        [ChannelMode.Mono, t("stereo.channelMono")],
+                        [ChannelMode.Custom, t("stereo.channelCustom")],
+                        [ChannelMode.MonoLeft, t("stereo.channelMonoLeft")],
+                        [ChannelMode.MonoRight, t("stereo.channelMonoRight")],
+                        [ChannelMode.Karaoke, t("stereo.channelKaraoke")],
+                        [ChannelMode.Swap, t("stereo.channelSwap")],
                       ]}
                       onChange={(v) => {
                         setChannel(v);
@@ -404,7 +412,7 @@ export function AudioSettingsModal() {
                       }}
                     />
                   </Field>
-                  <Field label="Stereo width" value={`${width}%`}>
+                  <Field label={t("stereo.width")} value={`${width}%`}>
                     <Range
                       min={0}
                       max={255}
@@ -419,9 +427,7 @@ export function AudioSettingsModal() {
               </div>
 
               <p className="px-1 text-[0.7rem] leading-relaxed text-foreground/40">
-                Processing runs in the Rockbox wasm engine, which decodes most
-                stations. HLS streams use the browser decoder and skip the DSP
-                chain.
+                {t("processingNote")}
               </p>
             </Modal.Body>
           </Modal.Dialog>

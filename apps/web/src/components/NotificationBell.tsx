@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { Trans, useTranslation } from "react-i18next";
 import {
   IconBell,
   IconAt,
@@ -20,9 +21,9 @@ export function NotificationRow({
   n: NotificationView;
   onOpenStation: (n: NotificationView) => void;
 }) {
-  const name = n.author.displayName || n.author.handle || "someone";
-  const verb =
-    n.reason === "mention" ? "mentioned you" : "commented on your station";
+  const { t } = useTranslation("notifications");
+  const name = n.author.displayName || n.author.handle || t("someone");
+  const reasonKey = n.reason === "mention" ? "row.mention" : "row.comment";
   const Icon = n.reason === "mention" ? IconAt : IconMessage2;
 
   return (
@@ -45,7 +46,14 @@ export function NotificationRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="text-sm text-foreground/85">
-          <span className="font-semibold text-foreground">{name}</span> {verb}
+          <Trans
+            t={t}
+            i18nKey={reasonKey}
+            values={{ name }}
+            components={{
+              actor: <span className="font-semibold text-foreground" />,
+            }}
+          />
           {n.station ? (
             <span className="text-foreground/50"> · {n.station.name}</span>
           ) : null}
@@ -64,6 +72,7 @@ export function NotificationRow({
 }
 
 export function NotificationBell() {
+  const { t } = useTranslation("notifications");
   const isLoggedIn = useAtomValue(isLoggedInAtom);
   const did = useAtomValue(didAtom);
   const [open, setOpen] = useAtom(notificationsOpenAtom);
@@ -122,7 +131,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={handleClick}
-        aria-label="Notifications"
+        aria-label={t("title")}
         className="relative flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground"
       >
         <IconBell size={19} />
@@ -141,7 +150,7 @@ export function NotificationBell() {
           {/* Click-away backdrop. */}
           <button
             type="button"
-            aria-label="Close notifications"
+            aria-label={t("close")}
             onClick={() => setOpen(false)}
             className="fixed inset-0 z-40 cursor-default"
           />
@@ -150,21 +159,20 @@ export function NotificationBell() {
             <div className="flex items-center justify-between border-b border-white/10 px-3 py-2.5">
               <span className="flex items-center gap-1.5 font-display text-sm font-semibold">
                 <IconBell size={16} className="text-synth-pink" />
-                Notifications
+                {t("title")}
               </span>
               <Link
                 to="/profile"
                 onClick={() => setOpen(false)}
                 className="text-xs text-synth-cyan/80 hover:text-synth-cyan"
               >
-                Profile
+                {t("profile")}
               </Link>
             </div>
             <div className="overflow-y-auto">
               {items.length === 0 ? (
                 <p className="px-6 py-10 text-center text-sm text-foreground/40">
-                  Nothing yet. Mentions and comments on your stations show up
-                  here.
+                  {t("empty")}
                 </p>
               ) : (
                 items.map((n) => (

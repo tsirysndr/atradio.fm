@@ -1,0 +1,51 @@
+{
+  "title": "Audio settings",
+  "processingNote": "Processing runs in the Rockbox wasm engine, which decodes most stations. HLS streams use the browser decoder and skip the DSP chain.",
+  "on": "On",
+  "off": "Off",
+  "equalizer": {
+    "title": "Equalizer",
+    "enable": "Enable equalizer",
+    "bandGain": "{{hz}} Hz band gain"
+  },
+  "tone": {
+    "title": "Tone",
+    "bass": "Bass",
+    "treble": "Treble"
+  },
+  "crossfeed": {
+    "title": "Crossfeed (headphones)",
+    "mode": "Mode",
+    "directGain": "Direct gain",
+    "modeOff": "Off",
+    "modeMeier": "Meier",
+    "modeCustom": "Custom"
+  },
+  "pbe": {
+    "title": "Perceptual bass (PBE)",
+    "strength": "Strength",
+    "precut": "Pre-cut"
+  },
+  "surround": {
+    "title": "Haas surround",
+    "delay": "Delay (0 = off)",
+    "balance": "Balance"
+  },
+  "compressor": {
+    "title": "Compressor",
+    "threshold": "Threshold (0 = off)",
+    "ratio": "Ratio"
+  },
+  "stereo": {
+    "title": "Stereo",
+    "channels": "Channels",
+    "width": "Stereo width",
+    "channelStereo": "Stereo",
+    "channelMono": "Mono",
+    "channelCustom": "Custom",
+    "channelMonoLeft": "Mono left",
+    "channelMonoRight": "Mono right",
+    "channelKaraoke": "Karaoke",
+    "channelSwap": "Swap L/R"
+  }
+}

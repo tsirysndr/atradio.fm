@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Modal, useOverlayState } from "@heroui/react";
 import {
@@ -18,13 +19,13 @@ import { InlineLoader } from "./Skeletons";
 
 const MAX_RESULTS = 12;
 
-const SOURCE_LABEL: Record<Station["source"], string> = {
-  "radio-browser": "radio-browser",
-  tunein: "TuneIn",
-  custom: "yours",
-};
-
 export function SearchPalette() {
+  const { t } = useTranslation("search");
+  const sourceLabel: Record<Station["source"], string> = {
+    "radio-browser": "radio-browser",
+    tunein: "TuneIn",
+    custom: t("source.custom"),
+  };
   const [isOpen, setOpen] = useAtom(searchPaletteOpenAtom);
   const seed = useAtomValue(searchPaletteQueryAtom);
   const state = useOverlayState({ isOpen, onOpenChange: setOpen });
@@ -110,7 +111,7 @@ export function SearchPalette() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Search stations, genres, cities…"
+                placeholder={t("placeholder")}
                 className="w-full bg-transparent text-base text-foreground placeholder:text-foreground/30 focus:outline-none"
                 autoComplete="off"
                 spellCheck={false}
@@ -120,7 +121,7 @@ export function SearchPalette() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close search"
+                aria-label={t("closeAria")}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground/60 hover:bg-white/5 hover:text-foreground sm:hidden"
               >
                 <IconX size={18} />
@@ -134,11 +135,11 @@ export function SearchPalette() {
             >
               {!hasQuery ? (
                 <p className="px-3 py-8 text-center text-sm text-foreground/40">
-                  Type to search thousands of internet radio stations.
+                  {t("emptyHint")}
                 </p>
               ) : results.length === 0 && !isFetching ? (
                 <p className="px-3 py-8 text-center text-sm text-foreground/40">
-                  No stations found for “{debounced}”.
+                  {t("noResults", { query: debounced })}
                 </p>
               ) : (
                 results.map((s, i) => (
@@ -158,7 +159,7 @@ export function SearchPalette() {
                         {s.name}
                       </p>
                       <p className="truncate text-xs text-foreground/50">
-                        {[s.genre, s.country, SOURCE_LABEL[s.source]]
+                        {[s.genre, s.country, sourceLabel[s.source]]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
@@ -183,19 +184,19 @@ export function SearchPalette() {
                 <kbd className="rounded border border-white/15 bg-white/5 px-1">
                   ↓
                 </kbd>
-                navigate
+                {t("hints.navigate")}
               </span>
               <span className="flex items-center gap-1">
                 <kbd className="flex items-center rounded border border-white/15 bg-white/5 px-1">
                   <IconCornerDownLeft size={11} />
                 </kbd>
-                play
+                {t("hints.play")}
               </span>
               <span className="flex items-center gap-1">
                 <kbd className="rounded border border-white/15 bg-white/5 px-1">
                   esc
                 </kbd>
-                close
+                {t("hints.close")}
               </span>
             </div>
           </Modal.Dialog>

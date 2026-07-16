@@ -1,0 +1,51 @@
+{
+  "title": "Configurações de áudio",
+  "processingNote": "O processamento é executado no mecanismo Rockbox wasm, que decodifica a maioria das estações. Os fluxos HLS usam o decodificador do navegador e ignoram a cadeia de DSP.",
+  "on": "Ativado",
+  "off": "Desativado",
+  "equalizer": {
+    "title": "Equalizador",
+    "enable": "Ativar equalizador",
+    "bandGain": "Ganho da banda de {{hz}} Hz"
+  },
+  "tone": {
+    "title": "Tom",
+    "bass": "Graves",
+    "treble": "Agudos"
+  },
+  "crossfeed": {
+    "title": "Crossfeed (fones de ouvido)",
+    "mode": "Modo",
+    "directGain": "Ganho direto",
+    "modeOff": "Desativado",
+    "modeMeier": "Meier",
+    "modeCustom": "Personalizado"
+  },
+  "pbe": {
+    "title": "Graves perceptuais (PBE)",
+    "strength": "Intensidade",
+    "precut": "Pré-corte"
+  },
+  "surround": {
+    "title": "Surround Haas",
+    "delay": "Atraso (0 = desativado)",
+    "balance": "Balanço"
+  },
+  "compressor": {
+    "title": "Compressor",
+    "threshold": "Limiar (0 = desativado)",
+    "ratio": "Proporção"
+  },
+  "stereo": {
+    "title": "Estéreo",
+    "channels": "Canais",
+    "width": "Largura estéreo",
+    "channelStereo": "Estéreo",
+    "channelMono": "Mono",
+    "channelCustom": "Personalizado",
+    "channelMonoLeft": "Mono esquerdo",
+    "channelMonoRight": "Mono direito",
+    "channelKaraoke": "Karaokê",
+    "channelSwap": "Inverter E/D"
+  }
+}

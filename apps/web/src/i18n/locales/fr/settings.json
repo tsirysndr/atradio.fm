@@ -1,0 +1,51 @@
+{
+  "title": "Paramètres audio",
+  "processingNote": "Le traitement s'exécute dans le moteur Rockbox wasm, qui décode la plupart des stations. Les flux HLS utilisent le décodeur du navigateur et contournent la chaîne DSP.",
+  "on": "Activé",
+  "off": "Désactivé",
+  "equalizer": {
+    "title": "Égaliseur",
+    "enable": "Activer l'égaliseur",
+    "bandGain": "Gain de la bande {{hz}} Hz"
+  },
+  "tone": {
+    "title": "Tonalité",
+    "bass": "Graves",
+    "treble": "Aigus"
+  },
+  "crossfeed": {
+    "title": "Crossfeed (casque)",
+    "mode": "Mode",
+    "directGain": "Gain direct",
+    "modeOff": "Désactivé",
+    "modeMeier": "Meier",
+    "modeCustom": "Personnalisé"
+  },
+  "pbe": {
+    "title": "Basses perceptuelles (PBE)",
+    "strength": "Intensité",
+    "precut": "Pré-atténuation"
+  },
+  "surround": {
+    "title": "Surround Haas",
+    "delay": "Délai (0 = désactivé)",
+    "balance": "Balance"
+  },
+  "compressor": {
+    "title": "Compresseur",
+    "threshold": "Seuil (0 = désactivé)",
+    "ratio": "Ratio"
+  },
+  "stereo": {
+    "title": "Stéréo",
+    "channels": "Canaux",
+    "width": "Largeur stéréo",
+    "channelStereo": "Stéréo",
+    "channelMono": "Mono",
+    "channelCustom": "Personnalisé",
+    "channelMonoLeft": "Mono gauche",
+    "channelMonoRight": "Mono droite",
+    "channelKaraoke": "Karaoké",
+    "channelSwap": "Inverser G/D"
+  }
+}

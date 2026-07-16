@@ -1,0 +1,16 @@
+{
+  "title": "Comments",
+  "placeholder": "Add a comment… use @ to mention",
+  "post": "Post",
+  "delete": "Delete",
+  "addGif": "Add a GIF",
+  "removeGif": "Remove GIF",
+  "someone": "someone",
+  "editComment": "Edit comment",
+  "deleteComment": "Delete comment",
+  "signInToComment": "Sign in to comment",
+  "empty": "No comments yet — say something!",
+  "deleteConfirmTitle": "Delete comment?",
+  "deleteConfirmBody": "This permanently deletes this one comment. It can't be undone.",
+  "gifBadge": "[GIF]"
+}

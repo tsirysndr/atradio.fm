@@ -1,5 +1,6 @@
 import { Outlet } from "@tanstack/react-router";
 import { useAtomValue, useSetAtom } from "jotai";
+import { useTranslation } from "react-i18next";
 import { IconKeyboard } from "@tabler/icons-react";
 import { currentStationAtom } from "@/atoms/player";
 import { Navbar } from "./Navbar";
@@ -20,6 +21,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { shortcutsOpenAtom } from "@/atoms/ui";
 
 export function Layout() {
+  const { t } = useTranslation("common");
   useKeyboardShortcuts();
   const openShortcuts = useSetAtom(shortcutsOpenAtom);
   const station = useAtomValue(currentStationAtom);
@@ -37,8 +39,8 @@ export function Layout() {
 
       <button
         type="button"
-        aria-label="Show keyboard shortcuts"
-        title="Keyboard shortcuts (?)"
+        aria-label={t("shortcutsButton")}
+        title={t("shortcutsButtonTitle")}
         onClick={() => openShortcuts(true)}
         className={`fixed right-4 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-synth-panel/80 text-foreground/60 backdrop-blur transition-all hover:border-synth-cyan/60 hover:text-synth-cyan sm:right-6 ${
           station ? "bottom-28 sm:bottom-28" : "bottom-6 sm:bottom-6"

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Button, Slider } from "@heroui/react";
 import {
@@ -53,13 +54,6 @@ import { AudioBars } from "./AudioBars";
 import { StationReactions } from "./StationReactions";
 import { CommentsPanel } from "./CommentsPanel";
 
-const STATUS_TEXT: Record<string, string> = {
-  idle: "",
-  loading: "Buffering…",
-  playing: "On air",
-  error: "Stream unavailable",
-};
-
 /** "MP3 · 44.1 kHz · 128 kbps" — from whatever fields are known. */
 function formatStreamInfo(info: StreamInfo | null): string {
   if (!info) return "";
@@ -81,6 +75,7 @@ function formatStreamInfo(info: StreamInfo | null): string {
 type Engine = "rockbox" | "native";
 
 export function Player() {
+  const { t } = useTranslation("player");
   const station = useAtomValue(currentStationAtom);
   const [isPlaying, setIsPlaying] = useAtom(isPlayingAtom);
   const [status, setStatus] = useAtom(playbackStatusAtom);
@@ -356,6 +351,13 @@ export function Player() {
 
   const isFavorite = station ? favoriteIds.has(station.id) : false;
 
+  const statusText: Record<string, string> = {
+    idle: "",
+    loading: t("status.buffering"),
+    playing: t("status.onAir"),
+    error: t("status.unavailable"),
+  };
+
   // Engine-reported stream info, falling back to the station directory's
   // codec/bitrate (radio-browser) while buffering or on the native path.
   const infoText = formatStreamInfo(
@@ -440,11 +442,11 @@ export function Player() {
       : [];
     ms.metadata = new MediaMetadata({
       title: nowPlaying || station.name,
-      artist: nowPlaying ? station.name : station.genre || "Live radio",
+      artist: nowPlaying ? station.name : station.genre || t("liveRadio"),
       album: station.name,
       artwork,
     });
-  }, [station, nowPlaying]);
+  }, [station, nowPlaying, t]);
 
   // Mirror play/pause state so OS controls show the right button.
   useEffect(() => {
@@ -482,7 +484,7 @@ export function Player() {
           keeping the single scrollbar on the screen's right edge. */}
       <button
         type="button"
-        aria-label="Close fullscreen player"
+        aria-label={t("aria.closeFullscreen")}
         onClick={() => setExpanded(false)}
         className="fixed inset-0 h-full w-full cursor-default bg-synth-bg/90 backdrop-blur-2xl"
       />
@@ -500,20 +502,20 @@ export function Player() {
             size="sm"
             variant="tertiary"
             className="rounded-full"
-            aria-label="Minimize player"
+            aria-label={t("aria.minimize")}
             onPress={() => setExpanded(false)}
           >
             <IconChevronDown size={20} className="text-foreground/70" />
           </Button>
           <span className="text-[0.7rem] font-medium uppercase tracking-wider text-foreground/40">
-            Now playing
+            {t("nowPlaying")}
           </span>
           {station.homepage ? (
             <a
               href={station.homepage}
               target="_blank"
               rel="noreferrer"
-              aria-label="Open station page"
+              aria-label={t("aria.openStationPage")}
               className="flex h-8 w-8 items-center justify-center rounded-full bg-white/5 text-foreground/60 transition-colors hover:text-synth-cyan"
             >
               <IconExternalLink size={16} />
@@ -541,7 +543,7 @@ export function Player() {
               {status === "error" ? (
                 <span className="flex items-center gap-1 text-danger">
                   <IconAlertTriangle size={15} />
-                  {STATUS_TEXT.error}
+                  {statusText.error}
                 </span>
               ) : nowPlaying ? (
                 <span className="flex min-w-0 items-center gap-1.5 text-synth-magenta">
@@ -550,7 +552,7 @@ export function Player() {
                 </span>
               ) : (
                 <span className="text-synth-cyan/80">
-                  {STATUS_TEXT[status] || station.genre || ""}
+                  {statusText[status] || station.genre || ""}
                 </span>
               )}
             </div>
@@ -564,7 +566,7 @@ export function Player() {
               {listeners ? (
                 <span className="flex items-center gap-1 text-synth-purple">
                   <IconHeadphones size={13} />
-                  {listeners} {listeners === 1 ? "listener" : "listeners"}
+                  {t("listeners", { count: listeners })}
                 </span>
               ) : null}
             </div>
@@ -579,7 +581,7 @@ export function Player() {
               size="sm"
               variant="tertiary"
               className="rounded-full"
-              aria-label="Toggle favorite"
+              aria-label={t("aria.toggleFavorite")}
               onPress={() => ensureAuth(() => toggleFavorite(station))}
             >
               {isFavorite ? (
@@ -594,7 +596,7 @@ export function Player() {
               size="lg"
               variant="primary"
               className="h-16 w-16 rounded-full !bg-white/10 !text-foreground hover:!bg-white/15"
-              aria-label={isPlaying ? "Pause" : "Play"}
+              aria-label={isPlaying ? t("aria.pause") : t("aria.play")}
               onPress={() => setIsPlaying((p) => !p)}
             >
               {isPlaying ? (
@@ -609,7 +611,7 @@ export function Player() {
               size="sm"
               variant="tertiary"
               className="rounded-full"
-              aria-label="Equalizer & audio settings"
+              aria-label={t("aria.audioSettings")}
               onPress={() => openAudioSettings(true)}
             >
               <IconAdjustmentsHorizontal
@@ -630,7 +632,7 @@ export function Player() {
               size="sm"
               variant="ghost"
               className="rounded-full"
-              aria-label={muted ? "Unmute" : "Mute"}
+              aria-label={muted ? t("aria.unmute") : t("aria.mute")}
               onPress={() => setMuted((m) => !m)}
             >
               {muted || volume === 0 ? (
@@ -640,7 +642,7 @@ export function Player() {
               )}
             </Button>
             <Slider
-              aria-label="Volume"
+              aria-label={t("aria.volume")}
               minValue={0}
               maxValue={1}
               step={0.01}
@@ -671,7 +673,7 @@ export function Player() {
             <div className="mt-7 border-t border-white/10 pt-5">
               <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground/80">
                 <IconMessageCircle size={16} className="text-synth-pink" />
-                Live comments
+                {t("liveComments")}
               </h3>
               <CommentsPanel station={station} />
             </div>
@@ -718,13 +720,13 @@ export function Player() {
               type="button"
               disabled={!station}
               onClick={() => station && setExpanded(true)}
-              aria-label="Open fullscreen player"
+              aria-label={t("aria.openFullscreen")}
               className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left transition-opacity enabled:hover:opacity-80 enabled:cursor-pointer"
             >
               {station && <StationLogo station={station} size={44} />}
               <div className="min-w-0">
                 <p className="truncate font-display text-sm font-semibold text-foreground">
-                  {station?.name ?? "Nothing playing"}
+                  {station?.name ?? t("nothingPlaying")}
                 </p>
                 <div className="flex items-center gap-2">
                   {status === "playing" && (
@@ -733,7 +735,7 @@ export function Player() {
                   {status === "error" ? (
                     <span className="flex items-center gap-1 text-xs text-danger">
                       <IconAlertTriangle size={13} />
-                      {STATUS_TEXT.error}
+                      {statusText.error}
                     </span>
                   ) : nowPlaying ? (
                     <span className="flex min-w-0 items-center gap-1 text-xs text-synth-magenta">
@@ -742,7 +744,7 @@ export function Player() {
                     </span>
                   ) : (
                     <span className="truncate text-xs text-synth-cyan/80">
-                      {STATUS_TEXT[status] || station?.genre || ""}
+                      {statusText[status] || station?.genre || ""}
                     </span>
                   )}
                   {infoText && status !== "error" && (
@@ -753,7 +755,7 @@ export function Player() {
                   {listeners ? (
                     <span
                       className="flex shrink-0 items-center gap-1 text-xs text-synth-purple"
-                      title={`${listeners} unique ${listeners === 1 ? "listener" : "listeners"}`}
+                      title={t("uniqueListeners", { count: listeners })}
                     >
                       <IconHeadphones size={13} />
                       {listeners}
@@ -770,7 +772,7 @@ export function Player() {
                 size="lg"
                 variant="primary"
                 className="rounded-full !bg-white/10 !text-foreground hover:!bg-white/15"
-                aria-label={isPlaying ? "Pause" : "Play"}
+                aria-label={isPlaying ? t("aria.pause") : t("aria.play")}
                 isDisabled={!station}
                 onPress={() => setIsPlaying((p) => !p)}
               >
@@ -785,7 +787,7 @@ export function Player() {
                 size="sm"
                 variant="tertiary"
                 className="rounded-full"
-                aria-label="Stop"
+                aria-label={t("aria.stop")}
                 isDisabled={!station}
                 onPress={handleStop}
               >
@@ -804,7 +806,7 @@ export function Player() {
                   size="sm"
                   variant="tertiary"
                   className="rounded-full"
-                  aria-label="Toggle favorite"
+                  aria-label={t("aria.toggleFavorite")}
                   onPress={() => ensureAuth(() => toggleFavorite(station))}
                 >
                   {isFavorite ? (
@@ -821,7 +823,7 @@ export function Player() {
                   size="sm"
                   variant="tertiary"
                   className="rounded-full"
-                  aria-label="Comments"
+                  aria-label={t("aria.comments")}
                   onPress={() => openComments(station)}
                 >
                   <IconMessageCircle size={16} className="text-foreground/70" />
@@ -833,7 +835,7 @@ export function Player() {
                 size="sm"
                 variant="tertiary"
                 className="rounded-full"
-                aria-label="Equalizer & audio settings"
+                aria-label={t("aria.audioSettings")}
                 onPress={() => openAudioSettings(true)}
               >
                 <IconAdjustmentsHorizontal
@@ -852,7 +854,7 @@ export function Player() {
                   size="sm"
                   variant="ghost"
                   className="rounded-full"
-                  aria-label={muted ? "Unmute" : "Mute"}
+                  aria-label={muted ? t("aria.unmute") : t("aria.mute")}
                   onPress={() => setMuted((m) => !m)}
                 >
                   {muted || volume === 0 ? (
@@ -862,7 +864,7 @@ export function Player() {
                   )}
                 </Button>
                 <Slider
-                  aria-label="Volume"
+                  aria-label={t("aria.volume")}
                   minValue={0}
                   maxValue={1}
                   step={0.01}
@@ -886,7 +888,7 @@ export function Player() {
                 size="sm"
                 variant="tertiary"
                 className="hidden rounded-full sm:inline-flex"
-                aria-label="Open fullscreen player"
+                aria-label={t("aria.openFullscreen")}
                 isDisabled={!station}
                 onPress={() => setExpanded(true)}
               >

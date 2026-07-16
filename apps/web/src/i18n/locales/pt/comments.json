@@ -1,0 +1,16 @@
+{
+  "title": "Comentários",
+  "placeholder": "Adicione um comentário… use @ para mencionar",
+  "post": "Publicar",
+  "delete": "Excluir",
+  "addGif": "Adicionar um GIF",
+  "removeGif": "Remover GIF",
+  "someone": "alguém",
+  "editComment": "Editar comentário",
+  "deleteComment": "Excluir comentário",
+  "signInToComment": "Entre para comentar",
+  "empty": "Nenhum comentário ainda — diga alguma coisa!",
+  "deleteConfirmTitle": "Excluir comentário?",
+  "deleteConfirmBody": "Isso exclui permanentemente este comentário. Não é possível desfazer.",
+  "gifBadge": "[GIF]"
+}

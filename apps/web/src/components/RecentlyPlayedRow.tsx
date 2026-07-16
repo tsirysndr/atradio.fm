@@ -1,4 +1,6 @@
 import { useAtomValue, useSetAtom } from "jotai";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
@@ -13,26 +15,27 @@ import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
 
 /** Compact "3m ago" style relative time. */
-function timeAgo(iso: string): string {
+function timeAgo(iso: string, t: TFunction<"browse">): string {
   const secs = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  if (secs < 60) return "just now";
+  if (secs < 60) return t("timeAgo.justNow");
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return t("timeAgo.minutes", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return t("timeAgo.hours", { count: hrs });
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
+  if (days < 7) return t("timeAgo.days", { count: days });
+  return t("timeAgo.weeks", { count: Math.floor(days / 7) });
 }
 
 function PlayCard({ item }: { item: PlayView }) {
+  const { t } = useTranslation("browse");
   const play = useSetAtom(playStationAtom);
   const current = useAtomValue(currentStationAtom);
   const station = infoToStation(item.station);
   const isCurrent = current?.id === station.id;
   const actorId = item.actor?.handle ?? item.actor?.did;
   const actorName =
-    item.actor?.displayName || item.actor?.handle || "someone";
+    item.actor?.displayName || item.actor?.handle || t("someone");
 
   return (
     <div className="flex w-[220px] shrink-0 flex-col gap-3 rounded-xl border border-white/10 bg-synth-surface/70 p-4 backdrop-blur">
@@ -40,7 +43,7 @@ function PlayCard({ item }: { item: PlayView }) {
         type="button"
         onClick={() => play(station)}
         className="group flex items-start gap-3 text-left"
-        aria-label={`Play ${station.name}`}
+        aria-label={t("playStation", { name: station.name })}
       >
         <div className="relative shrink-0">
           <StationLogo station={station} size={48} />
@@ -72,7 +75,7 @@ function PlayCard({ item }: { item: PlayView }) {
             to="/profile/$actor"
             params={{ actor: actorId }}
             className="flex min-w-0 items-center gap-1.5 text-xs text-foreground/60 hover:text-synth-cyan"
-            title={`Played by ${actorName}`}
+            title={t("playedBy", { name: actorName })}
           >
             {item.actor?.avatar ? (
               <img
@@ -92,7 +95,7 @@ function PlayCard({ item }: { item: PlayView }) {
           </span>
         )}
         <span className="ml-auto shrink-0 text-[0.7rem] text-foreground/40">
-          {timeAgo(item.playedAt)}
+          {timeAgo(item.playedAt, t)}
         </span>
       </div>
     </div>
@@ -104,6 +107,7 @@ function PlayCard({ item }: { item: PlayView }) {
  * station + the listener who played it + when. Hidden until data is available.
  */
 export function RecentlyPlayedRow() {
+  const { t } = useTranslation("browse");
   const { data } = useQuery({
     queryKey: ["global-recently-played"],
     queryFn: () => appview.getGlobalRecentlyPlayed({ limit: 20 }),
@@ -117,7 +121,7 @@ export function RecentlyPlayedRow() {
     <section className="flex w-full min-w-0 flex-col gap-3">
       <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
         <IconHistory size={18} className="text-synth-magenta" />
-        Recently played on atradio.fm
+        {t("recentlyPlayed")}
       </h2>
       <div className="-mx-1 flex w-full min-w-0 max-w-full gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item, i) => (

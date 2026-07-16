@@ -6,6 +6,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { useAtomValue } from "jotai";
 import { consola } from "consola";
 import { IconMoodSmile } from "@tabler/icons-react";
@@ -54,6 +55,7 @@ export function StationReactions({
   variant = "mini",
   className,
 }: StationReactionsProps) {
+  const { t } = useTranslation("reactions");
   const client = useAtomValue(clientAtom);
   const did = useAtomValue(didAtom);
   const ensureAuth = useRequireAuth();
@@ -163,7 +165,7 @@ export function StationReactions({
                     onMouseEnter={() => setHovered(i)}
                     onFocus={() => setHovered(i)}
                     onClick={() => react(emoji)}
-                    aria-label={`React ${emoji}`}
+                    aria-label={t("reactEmoji", { emoji })}
                     style={{
                       transform: `translateY(-${lift}px) scale(${scale})`,
                       transition: "transform 200ms cubic-bezier(0.22, 1, 0.36, 1)",
@@ -190,7 +192,7 @@ export function StationReactions({
         ref={triggerRef}
         type="button"
         onClick={() => (open ? setOpen(false) : openNow())}
-        aria-label="React with an emoji"
+        aria-label={t("reactWithEmoji")}
         aria-expanded={open}
         className={`flex ${triggerSize} items-center justify-center rounded-full transition-colors ${
           open

@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useAtom } from "jotai";
 import { Modal, useOverlayState } from "@heroui/react";
 import { IconMessage2 } from "@tabler/icons-react";
@@ -9,6 +10,7 @@ import { ModalCloseButton } from "./ModalCloseButton";
 
 /** Comments for any station, opened from station cards + the miniplayer. */
 export function CommentsModal() {
+  const { t } = useTranslation("comments");
   const [station, setStation] = useAtom(commentsStationAtom);
   const state = useOverlayState({
     isOpen: station !== null,
@@ -32,7 +34,7 @@ export function CommentsModal() {
                   <div className="min-w-0">
                     <Modal.Heading className="flex items-center gap-1.5 truncate font-display text-base">
                       <IconMessage2 size={16} className="text-synth-pink" />
-                      Comments
+                      {t("title")}
                     </Modal.Heading>
                     <p className="truncate text-xs text-foreground/50">
                       {station.name}

@@ -1,0 +1,16 @@
+{
+  "title": "Commentaires",
+  "placeholder": "Ajouter un commentaire… tapez @ pour mentionner",
+  "post": "Publier",
+  "delete": "Supprimer",
+  "addGif": "Ajouter un GIF",
+  "removeGif": "Retirer le GIF",
+  "someone": "quelqu'un",
+  "editComment": "Modifier le commentaire",
+  "deleteComment": "Supprimer le commentaire",
+  "signInToComment": "Connectez-vous pour commenter",
+  "empty": "Aucun commentaire pour l'instant — lancez-vous !",
+  "deleteConfirmTitle": "Supprimer le commentaire ?",
+  "deleteConfirmBody": "Cela supprime définitivement ce commentaire. Cette action est irréversible.",
+  "gifBadge": "[GIF]"
+}

@@ -1,11 +1,13 @@
+import { useTranslation } from "react-i18next";
 import { Link } from "@tanstack/react-router";
 import { CATEGORIES, categorySlug } from "@/lib/categories";
 
 export function CategoryGrid() {
+  const { t } = useTranslation("browse");
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-xs font-medium uppercase tracking-wider text-foreground/40">
-        Browse by category
+        {t("browseByCategory")}
       </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
         {CATEGORIES.map(({ label, term, icon: Icon, color }) => (
