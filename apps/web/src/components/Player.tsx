@@ -407,7 +407,7 @@ export function Player() {
                 isIconOnly
                 size="lg"
                 variant="primary"
-                className="rounded-full shadow-neon"
+                className="rounded-full !bg-white/10 !text-foreground hover:!bg-white/15"
                 aria-label={isPlaying ? "Pause" : "Play"}
                 isDisabled={!station}
                 onPress={() => setIsPlaying((p) => !p)}

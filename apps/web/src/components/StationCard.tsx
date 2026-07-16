@@ -122,7 +122,7 @@ export function StationCard({ station, onRemove }: StationCardProps) {
         <Button
           size="sm"
           variant="primary"
-          className="flex-1 gap-1.5 rounded-full"
+          className="flex-1 gap-1.5 rounded-full !bg-white/10 !text-foreground hover:!bg-white/15"
           onPress={handlePlay}
         >
           {isActive ? (
