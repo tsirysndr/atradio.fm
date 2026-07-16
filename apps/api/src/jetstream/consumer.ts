@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import { consola } from "consola";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import {
   NSID,
   actorStatusRecordSchema,
@@ -9,7 +9,7 @@ import {
 } from "@atradio/lexicons";
 import { env } from "../env";
 import { db, schema } from "../db";
-import { getProfile } from "../lib/profile";
+import { getProfile, getProfiles } from "../lib/profile";
 
 const WANTED: string[] = [NSID.favorite, NSID.station, NSID.actorStatus];
 const CURSOR_ID = "global";
@@ -37,30 +37,90 @@ function atUri(did: string, collection: string, rkey: string): string {
   return `at://${did}/${collection}/${rkey}`;
 }
 
+/** How long a cached profile is trusted before we refresh it from bsky. */
+const PROFILE_TTL_MS = 24 * 60 * 60 * 1000;
+
 async function ensureUser(did: string): Promise<void> {
   if (enrichedDids.has(did)) return;
-  enrichedDids.add(did);
+
+  // The users table is our profile cache. If we already hold a good handle that
+  // was refreshed within the TTL, trust it instead of hitting bsky again — that
+  // avoids the rate-limited-null lookups that were clobbering cached handles.
+  const [cached] = await db
+    .select({ handle: schema.users.handle, updatedAt: schema.users.updatedAt })
+    .from(schema.users)
+    .where(eq(schema.users.did, did))
+    .limit(1);
+  if (cached?.handle && Date.now() - cached.updatedAt.getTime() < PROFILE_TTL_MS) {
+    enrichedDids.add(did);
+    return;
+  }
+
   const profile = await getProfile(did);
+
+  // A failed lookup (bsky rate-limit, transient error) must NOT overwrite an
+  // already-good handle with null — that's what silently blanked every actor to
+  // "someone". Just make sure a bare row exists so the join resolves, and leave
+  // the DID un-enriched so the next event retries the profile fetch.
+  if (!profile) {
+    await db
+      .insert(schema.users)
+      .values({ did, updatedAt: new Date() })
+      .onConflictDoNothing({ target: schema.users.did });
+    return;
+  }
+
+  enrichedDids.add(did);
+  const set = {
+    handle: profile.handle,
+    displayName: profile.displayName ?? null,
+    avatarUrl: profile.avatar ?? null,
+    description: profile.description ?? null,
+    updatedAt: new Date(),
+  };
   await db
     .insert(schema.users)
-    .values({
-      did,
-      handle: profile?.handle ?? null,
-      displayName: profile?.displayName ?? null,
-      avatarUrl: profile?.avatar ?? null,
-      description: profile?.description ?? null,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: schema.users.did,
-      set: {
-        handle: profile?.handle ?? null,
-        displayName: profile?.displayName ?? null,
-        avatarUrl: profile?.avatar ?? null,
-        description: profile?.description ?? null,
-        updatedAt: new Date(),
-      },
-    });
+    .values({ did, ...set })
+    .onConflictDoUpdate({ target: schema.users.did, set });
+}
+
+/**
+ * One-shot repair for rows whose handle was previously blanked to null. Re-
+ * resolves them in batches via the AppView and refills the cache. Genuinely
+ * unresolvable DIDs (deactivated accounts) stay null and simply retry next run.
+ */
+async function backfillMissingHandles(): Promise<void> {
+  const rows = await db
+    .select({ did: schema.users.did })
+    .from(schema.users)
+    .where(isNull(schema.users.handle))
+    .limit(1000);
+  if (rows.length === 0) return;
+  consola.info(`[jetstream] backfilling ${rows.length} missing handle(s)`);
+
+  let healed = 0;
+  for (let i = 0; i < rows.length; i += 25) {
+    const batch = rows.slice(i, i + 25).map((r) => r.did);
+    const profiles = await getProfiles(batch);
+    for (const p of profiles) {
+      if (!p.handle) continue;
+      await db
+        .update(schema.users)
+        .set({
+          handle: p.handle,
+          displayName: p.displayName ?? null,
+          avatarUrl: p.avatar ?? null,
+          description: p.description ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.did, p.did));
+      enrichedDids.add(p.did);
+      healed++;
+    }
+    // Be gentle with the public AppView between batches.
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  consola.info(`[jetstream] backfill healed ${healed}/${rows.length} handle(s)`);
 }
 
 type Commit = NonNullable<JetstreamEvent["commit"]>;
@@ -248,6 +308,12 @@ async function persistCursor(): Promise<void> {
 /** Start consuming all Jetstream hosts simultaneously. */
 export async function startJetstream(): Promise<() => void> {
   await loadCursor();
+
+  // Heal any handles a previous run blanked to null (fire-and-forget).
+  void backfillMissingHandles().catch((err) =>
+    consola.error("[jetstream] handle backfill failed", err),
+  );
+
   const controller = new AbortController();
   for (const host of env.JETSTREAM_HOSTS) connect(host, controller.signal);
 
