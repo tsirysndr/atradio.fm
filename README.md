@@ -1,5 +1,7 @@
 # atradio.fm
 
+[![discord](https://img.shields.io/discord/1527379646583144560?label=discord&logo=discord&color=5865F2)](https://discord.gg/WA9hq9Tmkz)
+
 A **social internet radio platform built on the AT Protocol**. Search stations
 from [radio-browser.info](https://www.radio-browser.info/) and TuneIn, stream
 them in the browser, and save favorites + your own stations to **your own PDS**
