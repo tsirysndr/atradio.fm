@@ -9,7 +9,7 @@ import {
   IconTrash,
   IconPencil,
 } from "@tabler/icons-react";
-import { Spinner } from "@heroui/react";
+import { Button, Modal, Spinner, useOverlayState } from "@heroui/react";
 import { consola } from "consola";
 import type { CommentView, LiveEvent } from "@atradio/lexicons";
 import type { Station } from "@/lib/types";
@@ -165,6 +165,14 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
   const [deleted, setDeleted] = useState<Set<string>>(new Set());
   // The comment currently being edited inline (by uri).
   const [editingUri, setEditingUri] = useState<string | null>(null);
+  // The single comment queued for delete confirmation (null = dialog closed).
+  const [confirmTarget, setConfirmTarget] = useState<CommentView | null>(null);
+  const confirmState = useOverlayState({
+    isOpen: confirmTarget !== null,
+    onOpenChange: (open) => {
+      if (!open) setConfirmTarget(null);
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["comments", station.id],
@@ -188,19 +196,24 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
       return [c, ...rest];
     });
 
-  const handleDelete = async (comment: CommentView) => {
-    if (!client || !did) return;
-    setDeleted((prev) => new Set(prev).add(comment.uri));
-    setLocal((prev) => prev.filter((x) => x.uri !== comment.uri));
-    if (editingUri === comment.uri) setEditingUri(null);
+  /** Delete exactly one comment (by its own at-uri) after confirmation. */
+  const performDelete = async (comment: CommentView) => {
+    setConfirmTarget(null);
+    const uri = comment.uri;
+    // Guard: never proceed without a concrete uri to scope the delete to.
+    if (!client || !did || !uri) return;
+    setDeleted((prev) => new Set(prev).add(uri));
+    setLocal((prev) => prev.filter((x) => x.uri !== uri));
+    if (editingUri === uri) setEditingUri(null);
     try {
-      await deleteComment(client, did, comment.uri);
+      await deleteComment(client, did, uri);
+      consola.info("[comments] deleted", uri);
     } catch (err) {
       consola.error("[comments] delete failed", err);
       // Roll back so it reappears rather than silently vanishing.
       setDeleted((prev) => {
         const next = new Set(prev);
-        next.delete(comment.uri);
+        next.delete(uri);
         return next;
       });
     }
@@ -277,13 +290,66 @@ export function CommentsPanel({ station, className }: CommentsPanelProps) {
                 comment={c}
                 canModify={mine}
                 onEdit={(cc) => setEditingUri(cc.uri)}
-                onDelete={handleDelete}
+                onDelete={(cc) => setConfirmTarget(cc)}
                 editor={editor}
               />
             );
           })
         )}
       </ul>
+
+      {/* Delete confirmation — scoped to the one selected comment. */}
+      <Modal state={confirmState}>
+        <Modal.Backdrop variant="blur" style={{ zIndex: 210 }}>
+          <Modal.Container placement="center" size="sm">
+            <Modal.Dialog className="mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface">
+              <Modal.Header className="border-b border-white/10 pb-3">
+                <Modal.Heading className="flex items-center gap-1.5 font-display text-base">
+                  <IconTrash size={16} className="text-danger" />
+                  Delete comment?
+                </Modal.Heading>
+              </Modal.Header>
+              <Modal.Body className="flex flex-col gap-3 py-4">
+                <p className="text-sm text-foreground/70">
+                  This permanently deletes this one comment. It can't be undone.
+                </p>
+                {confirmTarget && (confirmTarget.text || confirmTarget.gif) && (
+                  <div className="rounded-xl border border-white/10 bg-synth-panel/60 px-3 py-2">
+                    {confirmTarget.text && (
+                      <p className="line-clamp-3 text-xs text-foreground/60">
+                        {confirmTarget.text}
+                      </p>
+                    )}
+                    {confirmTarget.gif?.url && (
+                      <p className="mt-0.5 text-xs italic text-foreground/40">
+                        [GIF]
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    className="rounded-full !bg-white/5"
+                    onPress={() => setConfirmTarget(null)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className="rounded-full !bg-danger !text-white hover:!bg-danger/90"
+                    onPress={() => confirmTarget && void performDelete(confirmTarget)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </Modal.Body>
+            </Modal.Dialog>
+          </Modal.Container>
+        </Modal.Backdrop>
+      </Modal>
     </div>
   );
 }
