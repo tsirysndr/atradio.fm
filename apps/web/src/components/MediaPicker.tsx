@@ -36,7 +36,7 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
   const results = data ?? [];
 
   return (
-    <div className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-2 max-sm:h-full max-sm:min-h-0">
       {/* Tabs */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1">
@@ -78,7 +78,7 @@ export function MediaPicker({ onSelect, onClose }: MediaPickerProps) {
       </div>
 
       {/* Grid */}
-      <div className="grid h-[min(58vh,24rem)] grid-cols-3 content-start gap-1.5 overflow-y-auto">
+      <div className="grid h-[min(58vh,24rem)] grid-cols-3 content-start gap-1.5 overflow-y-auto max-sm:h-auto max-sm:flex-1">
         {!KLIPY_ENABLED ? (
           <div className="col-span-3 flex flex-col items-center gap-1 py-8 text-center text-xs text-foreground/50">
             <IconMoodSmile size={22} className="text-foreground/30" />

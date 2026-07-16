@@ -199,8 +199,8 @@ export function AudioSettingsModal() {
   return (
     <Modal state={state}>
       <Modal.Backdrop variant="blur">
-        <Modal.Container placement="center" size="lg">
-          <Modal.Dialog className="mx-4 w-[calc(100vw-2rem)] max-w-2xl border border-white/10 bg-synth-surface">
+        <Modal.Container placement="center" size="lg" scroll="inside">
+          <Modal.Dialog className="mx-4 max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl border border-white/10 bg-synth-surface max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
                 Audio settings

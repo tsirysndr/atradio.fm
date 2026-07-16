@@ -2,6 +2,7 @@ import { useAtom } from "jotai";
 import { Modal, useOverlayState } from "@heroui/react";
 import { IconMessage2 } from "@tabler/icons-react";
 import { commentsStationAtom } from "@/atoms/ui";
+import { MOBILE_FULLSCREEN_BODY, MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { StationLogo } from "./StationLogo";
 import { CommentsPanel } from "./CommentsPanel";
 
@@ -19,7 +20,9 @@ export function CommentsModal() {
     <Modal state={state}>
       <Modal.Backdrop variant="blur">
         <Modal.Container placement="center" size="md">
-          <Modal.Dialog className="mx-4 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg flex-col border border-white/10 bg-synth-surface">
+          <Modal.Dialog
+            className={`mx-4 flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-lg flex-col border border-white/10 bg-synth-surface ${MOBILE_FULLSCREEN_DIALOG}`}
+          >
             {station && (
               <>
                 <Modal.Header className="flex items-center gap-3 border-b border-white/10 pb-3">
@@ -34,7 +37,7 @@ export function CommentsModal() {
                     </p>
                   </div>
                 </Modal.Header>
-                <Modal.Body className="overflow-y-auto py-4">
+                <Modal.Body className={`overflow-y-auto py-4 ${MOBILE_FULLSCREEN_BODY}`}>
                   <CommentsPanel station={station} />
                 </Modal.Body>
               </>

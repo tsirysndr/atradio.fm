@@ -4,6 +4,7 @@ import { Modal, Button, useOverlayState } from "@heroui/react";
 import { IconAt, IconBrandBluesky } from "@tabler/icons-react";
 import { consola } from "consola";
 import { loginModalOpenAtom } from "@/atoms/ui";
+import { MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { startLogin, startSignup } from "@/lib/atproto/session";
 
 export function LoginModal() {
@@ -58,7 +59,9 @@ export function LoginModal() {
           prompt triggered from there isn't hidden behind them. */}
       <Modal.Backdrop variant="blur" style={{ zIndex: 200 }}>
         <Modal.Container placement="center" size="sm">
-          <Modal.Dialog className="mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface">
+          <Modal.Dialog
+            className={`mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface max-sm:justify-center ${MOBILE_FULLSCREEN_DIALOG}`}
+          >
             <Modal.Header className="border-b border-white/10 pb-3">
               <Modal.Heading className="font-display text-lg">
                 Log in with Atmosphere account

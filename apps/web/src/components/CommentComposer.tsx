@@ -18,6 +18,7 @@ import {
 } from "@/lib/atproto/richtext";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { isVideoUrl, type MediaResult } from "@/lib/api/klipy";
+import { MOBILE_FULLSCREEN_DIALOG } from "@/lib/modal";
 import { MediaPicker } from "./MediaPicker";
 
 /** Adapt a stored GIF embed back into the picker's MediaResult shape. */
@@ -360,7 +361,9 @@ export function CommentComposer({
             opened from the player's comments. */}
         <Modal.Backdrop variant="blur" style={{ zIndex: 200 }}>
           <Modal.Container placement="center" size="sm">
-            <Modal.Dialog className="mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface p-3">
+            <Modal.Dialog
+              className={`mx-4 w-[calc(100vw-2rem)] max-w-sm border border-white/10 bg-synth-surface p-3 ${MOBILE_FULLSCREEN_DIALOG}`}
+            >
               <MediaPicker
                 onSelect={(m) => {
                   setGif(m);

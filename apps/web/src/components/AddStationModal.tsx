@@ -110,7 +110,7 @@ export function AddStationModal() {
     <Modal state={state}>
       <Modal.Backdrop variant="blur">
         <Modal.Container placement="center" size="md" scroll="inside">
-          <Modal.Dialog className="mx-4 max-h-[88vh] w-[calc(100vw-2rem)] max-w-lg border border-white/10 bg-synth-surface">
+          <Modal.Dialog className="mx-4 max-h-[88vh] w-[calc(100vw-2rem)] max-w-lg border border-white/10 bg-synth-surface max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
           <Modal.Header className="flex items-center gap-2 border-b border-white/10 pb-3">
             <IconBroadcast size={20} className="text-synth-cyan" />
             <Modal.Heading className="font-display text-lg">

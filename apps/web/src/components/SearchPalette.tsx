@@ -93,7 +93,7 @@ export function SearchPalette() {
     <Modal state={state}>
       <Modal.Backdrop variant="blur">
         <Modal.Container placement="top" size="lg">
-          <Modal.Dialog className="mx-4 mt-[8vh] w-[calc(100vw-2rem)] max-w-xl overflow-hidden border border-white/10 bg-overlay !p-0 shadow-2xl">
+          <Modal.Dialog className="mx-4 mt-[8vh] w-[calc(100vw-2rem)] max-w-xl overflow-hidden border border-white/10 bg-overlay !p-0 shadow-2xl max-sm:!m-0 max-sm:!h-[100dvh] max-sm:!max-h-[100dvh] max-sm:!w-screen max-sm:!max-w-none max-sm:!rounded-none">
             {/* Search field */}
             <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3.5">
               <IconSearch
