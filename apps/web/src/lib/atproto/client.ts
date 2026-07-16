@@ -10,6 +10,20 @@ import { actorResolver } from "./resolver";
  */
 export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus} repo:${NSID.comment} repo:${NSID.reaction}`;
 
+/** Individual scope tokens we request (derived from OAUTH_SCOPE). */
+export const REQUIRED_SCOPES = OAUTH_SCOPE.split(/\s+/).filter(Boolean);
+
+/**
+ * Scope tokens the current session is missing relative to what the app now
+ * requires. A session minted before we added a collection (e.g. comments,
+ * reactions) won't carry its `repo:` scope, so the user must re-authenticate to
+ * grant it. Returns [] when the granted scope covers everything.
+ */
+export function missingScopes(grantedScope: string | null | undefined): string[] {
+  const granted = new Set((grantedScope ?? "").split(/\s+/).filter(Boolean));
+  return REQUIRED_SCOPES.filter((scope) => !granted.has(scope));
+}
+
 /** Production origin (client-metadata + redirect must live here). */
 const PROD_ORIGIN = "https://atradio.fm";
 

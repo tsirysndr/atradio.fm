@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from "jotai";
 import { IconKeyboard } from "@tabler/icons-react";
 import { currentStationAtom } from "@/atoms/player";
 import { Navbar } from "./Navbar";
+import { PermissionBanner } from "./PermissionBanner";
 import { Player } from "./Player";
 import { PlayerReactionRain } from "./PlayerReactionRain";
 import { AddStationModal } from "./AddStationModal";
@@ -24,6 +25,7 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <PermissionBanner />
       <Navbar />
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-36 pt-8 sm:px-6">
         <Outlet />
