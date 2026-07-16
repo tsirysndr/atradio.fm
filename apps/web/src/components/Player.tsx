@@ -41,6 +41,7 @@ import { ensureRockboxReady, getRockboxPlayer } from "@/lib/audio/rockbox";
 import { resolveStream, proxiedStreamUrl } from "@/lib/audio/resolve";
 import { watchIcyMetadata } from "@/lib/audio/icyMetadata";
 import { SILENT_AUDIO_DATA_URI } from "@/lib/audio/silence";
+import { proxiedImageUrl } from "@/lib/images";
 import { registerRadioBrowserClick } from "@/lib/api/radioBrowser";
 import { StationLogo } from "./StationLogo";
 import { AudioBars } from "./AudioBars";
@@ -410,9 +411,11 @@ export function Player() {
       ms.metadata = null;
       return;
     }
-    const artwork = station.favicon
+    // Proxy http favicons so they aren't blocked as mixed content on https.
+    const art = proxiedImageUrl(station.favicon);
+    const artwork = art
       ? [96, 128, 192, 256, 384, 512].map((s) => ({
-          src: station.favicon as string,
+          src: art,
           sizes: `${s}x${s}`,
         }))
       : [];

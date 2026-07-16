@@ -61,6 +61,68 @@ const STREAM_HEADERS = [
   "icy-url",
 ];
 
+/* ------------------------------ Image proxy ----------------------------- */
+
+/** Cache proxied artwork for a day — station logos rarely change. */
+const IMAGE_TTL = 86400;
+
+/**
+ * GET /api/image?url=<http(s) image>
+ *
+ * Reverse-proxy a station logo so the https app can show `http://` favicons
+ * (station artwork, Media Session images) without the browser blocking them as
+ * mixed content. Only actual image responses are relayed.
+ */
+proxyRouter.get("/image", async (req: Request, res: Response) => {
+  const target = String(req.query.url ?? "");
+  if (!/^https?:\/\//i.test(target)) {
+    res
+      .status(400)
+      .json({ error: "InvalidRequest", message: "url must be http(s)" });
+    return;
+  }
+
+  const controller = new AbortController();
+  res.on("close", () => controller.abort());
+
+  try {
+    const upstream = await fetch(target, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": "atradio.fm/1.0", Accept: "image/*" },
+    });
+    const type = upstream.headers.get("content-type") ?? "";
+    // Never relay non-image content through the image proxy.
+    if (!upstream.ok || !type.startsWith("image/")) {
+      res.status(upstream.ok ? 415 : 502).end();
+      return;
+    }
+
+    res.status(200);
+    res.setHeader("Content-Type", type);
+    res.setHeader("Cache-Control", `public, max-age=${IMAGE_TTL}`);
+    const len = upstream.headers.get("content-length");
+    if (len) res.setHeader("Content-Length", len);
+
+    if (!upstream.body) {
+      res.end();
+      return;
+    }
+    const stream = Readable.fromWeb(
+      upstream.body as Parameters<typeof Readable.fromWeb>[0],
+    );
+    stream.on("error", () => {
+      if (!res.destroyed) res.destroy();
+    });
+    stream.pipe(res);
+  } catch (err) {
+    if (controller.signal.aborted) return;
+    consola.error("[proxy] image error", err);
+    if (!res.headersSent) res.status(502).end();
+    else res.destroy();
+  }
+});
+
 /**
  * GET /api/stream?url=<http(s) stream>
  *

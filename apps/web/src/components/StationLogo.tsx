@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { IconRadio } from "@tabler/icons-react";
 import type { Station } from "@/lib/types";
+import { proxiedImageUrl } from "@/lib/images";
 
 interface StationLogoProps {
   station: Station;
@@ -24,7 +25,7 @@ export function StationLogo({
     >
       {showImage ? (
         <img
-          src={station.favicon}
+          src={proxiedImageUrl(station.favicon)}
           alt=""
           loading="lazy"
           onError={() => setErrored(true)}
