@@ -89,9 +89,10 @@ export function Player() {
   const currentUrlRef = useRef<string | null>(null);
   /** URL we already fell back to native for (avoid fallback loops). */
   const fallbackUrlRef = useRef<string | null>(null);
-  /** True once the engine delivered ICY metadata for this station — the
-   *  proxy-based watcher then stops overwriting it. */
-  const engineMetaRef = useRef(false);
+  /** Last track title the engine reported, so its once-per-second progress
+   *  events only publish a real change instead of re-writing a stale title
+   *  (which would otherwise fight and win over the live ICY poll below). */
+  const lastEngineTitleRef = useRef<string | null>(null);
 
   // Latest values for use inside async flows / engine event handlers.
   const stateRef = useRef({ volume, muted, audioSettings });
@@ -120,8 +121,12 @@ export function Player() {
     const onMeta = (md: TrackMetadata | null) => {
       if (engineRef.current !== "rockbox" || !md) return;
       const text = [md.artist, md.title].filter(Boolean).join(" – ");
-      if (text) {
-        engineMetaRef.current = true;
+      // Only publish when the engine's OWN title actually changes. Progress
+      // events fire every second carrying the same (often stale, connect-time)
+      // StreamTitle for live radio; re-writing it each tick would clobber the
+      // fresher server-side ICY poll and freeze "now playing" on song one.
+      if (text && text !== lastEngineTitleRef.current) {
+        lastEngineTitleRef.current = text;
         setNowPlaying(text);
       }
       const info: StreamInfo = {
@@ -176,7 +181,7 @@ export function Player() {
     setStatus("loading");
     setNowPlaying(null);
     setStreamInfo(null);
-    engineMetaRef.current = false;
+    lastEngineTitleRef.current = null;
 
     // Tear down whatever the previous station was using.
     if (hlsRef.current) {
@@ -241,12 +246,14 @@ export function Player() {
         }
 
         // Direct (Icecast/SHOUTcast/file) stream → Rockbox engine.
-        // Best-effort ICY "now playing" via the proxy, for streams whose
-        // metadata the engine can't read over CORS.
+        // Server-side ICY "now playing" poll — authoritative for live track
+        // titles (the engine often only reads the connect-time title). Apply
+        // any non-empty title it returns; a transient empty result keeps the
+        // current one rather than blanking it.
         void watchIcyMetadata(
           url,
           (title) => {
-            if (!engineMetaRef.current) setNowPlaying(title);
+            if (title) setNowPlaying(title);
           },
           controller.signal,
         );
