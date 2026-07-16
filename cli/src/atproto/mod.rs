@@ -23,7 +23,18 @@ use crate::appview::StationInfo;
 use crate::fm_atradio::actor::status::Status as ActorStatus;
 use crate::fm_atradio::comment::Comment;
 use crate::fm_atradio::favorite::Favorite;
+use crate::fm_atradio::station::Station as StationRecord;
 use crate::fm_atradio::StationInfo as GenStation;
+
+/// User input for creating a custom station.
+#[derive(Clone, Debug, Default)]
+pub struct StationDraft {
+    pub name: String,
+    pub stream_url: String,
+    pub genre: Option<String>,
+    pub homepage: Option<String>,
+    pub logo: Option<String>,
+}
 
 pub use profile::Profile;
 
@@ -98,8 +109,11 @@ impl Atproto {
         };
 
         let did = auth.did.to_string();
+        // createSession gives us a reliable handle; only the display name needs
+        // the public profile lookup.
+        let (_, display_name) = fetch_profile(&did).await.unwrap_or((None, None));
         let profile = Profile {
-            display_name: fetch_display_name(&did).await,
+            display_name,
             did,
             handle: auth.handle.to_string(),
             pds: auth.pds.as_ref().map(|u| u.to_string()),
@@ -127,7 +141,24 @@ impl Atproto {
         let store = FileAuthStore::new(self.session_path.to_string_lossy().to_string());
         let oauth = OAuthClient::new(store, client_data, reqwest::Client::new());
         let hint = SessionHint::from_optional_input(input);
-        let scopes = Scopes::builder().atproto().build().map_err(to_anyhow)?;
+        // Request write access to every fm.atradio.* collection the CLI touches,
+        // matching the web app's OAuth scope.
+        let scopes = Scopes::builder()
+            .atproto()
+            .repo_collection("fm.atradio.station")
+            .map_err(to_anyhow)?
+            .repo_collection("fm.atradio.favorite")
+            .map_err(to_anyhow)?
+            .repo_collection("fm.atradio.comment")
+            .map_err(to_anyhow)?
+            .repo_collection("fm.atradio.reaction")
+            .map_err(to_anyhow)?
+            .repo_collection("fm.atradio.actor.status")
+            .map_err(to_anyhow)?
+            .repo_collection("fm.atradio.audio.settings")
+            .map_err(to_anyhow)?
+            .build()
+            .map_err(to_anyhow)?;
 
         let session = match oauth
             .resume_or_login_with_local_server(
@@ -155,15 +186,18 @@ impl Atproto {
         };
 
         let agent: Agent<_> = Agent::from(session);
-        let (did, handle) = agent
+        // NOTE: `info().1` is the OAuth *session id*, not the handle — resolve
+        // the real handle (and display name) from the DID via the public API.
+        let (did, _session_id) = agent
             .info()
             .await
             .ok_or_else(|| anyhow!("OAuth session missing identity"))?;
         let did = did.to_string();
+        let (handle, display_name) = fetch_profile(&did).await.unwrap_or((None, None));
         let profile = Profile {
-            display_name: fetch_display_name(&did).await,
+            display_name,
+            handle: handle.unwrap_or_else(|| did.clone()),
             did,
-            handle: handle.map(|h| h.to_string()).unwrap_or_default(),
             pds: None,
             method: "oauth".into(),
         };
@@ -219,6 +253,29 @@ impl Atproto {
         Ok(out.uri.to_string())
     }
 
+    /// Create a custom station record on the user's PDS. Returns its URI.
+    pub async fn create_station(&self, draft: &StationDraft) -> Result<String> {
+        let record = StationRecord::new()
+            .name(draft.name.clone())
+            .stream_url(
+                parse_uri(&draft.stream_url)
+                    .unwrap_or_else(|| UriValue::Any(draft.stream_url.clone().into())),
+            )
+            .maybe_genre(draft.genre.clone().map(Into::into))
+            .maybe_homepage(draft.homepage.as_deref().and_then(parse_uri))
+            .maybe_logo(draft.logo.as_deref().and_then(parse_uri))
+            .created_at(Datetime::now())
+            .build();
+        let out = self
+            .agent()
+            .await?
+            .create_record(record, None)
+            .await
+            .map_err(to_anyhow)
+            .context("create station")?;
+        Ok(out.uri.to_string())
+    }
+
     /// Update the actor's play-status singleton (so you appear in the
     /// recently-played / listener-count feeds).
     pub async fn set_play_status(&self, station: &StationInfo) -> Result<()> {
@@ -264,13 +321,15 @@ fn to_anyhow<E: std::fmt::Display>(e: E) -> anyhow::Error {
     anyhow!("{e}")
 }
 
-/// Best-effort lookup of an actor's display name from the public Bluesky
-/// AppView (the same source atradio's own AppView uses). Returns None on any
-/// failure so login never blocks on it.
-async fn fetch_display_name(actor: &str) -> Option<String> {
+/// Best-effort lookup of an actor's handle + display name from the public
+/// Bluesky AppView (the same source atradio's own AppView uses). Returns None on
+/// any failure so login never blocks on it. `actor` may be a DID or a handle.
+async fn fetch_profile(actor: &str) -> Option<(Option<String>, Option<String>)> {
     #[derive(serde::Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct ProfileOut {
+        #[serde(default)]
+        handle: Option<String>,
         #[serde(default)]
         display_name: Option<String>,
     }
@@ -278,5 +337,6 @@ async fn fetch_display_name(actor: &str) -> Option<String> {
         "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={actor}"
     );
     let out: ProfileOut = reqwest::get(&url).await.ok()?.json().await.ok()?;
-    out.display_name.filter(|d| !d.trim().is_empty())
+    let clean = |s: Option<String>| s.filter(|v| !v.trim().is_empty());
+    Some((clean(out.handle), clean(out.display_name)))
 }

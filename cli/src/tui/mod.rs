@@ -26,7 +26,7 @@ use crate::atproto::Atproto;
 use crate::config::Config;
 use crate::player::{Player, State as PlayState};
 use crate::radio::RadioBrowser;
-use state::{App, HomeTab, Overlay, View};
+use state::{AddStationForm, App, HomeTab, Overlay, View};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
@@ -35,12 +35,11 @@ enum Msg {
     Trending(Vec<StationInfo>),
     Popular(Vec<StationInfo>),
     Favorites(Vec<StationInfo>),
+    Stations(Vec<StationInfo>),
     SearchResults { query: String, items: Vec<StationInfo> },
     Comments(Vec<crate::appview::CommentView>),
     Notifications { items: Vec<crate::appview::NotificationView>, unread: u32 },
     SignedIn(crate::atproto::Profile),
-    /// The OAuth flow finished (success or failure); clear the busy state.
-    OAuthDone,
     Toast(String),
 }
 
@@ -91,6 +90,7 @@ pub async fn run(config: Config) -> Result<()> {
     spawn_load_popular(&appview, &tx);
     if let Some(actor) = atproto.actor() {
         spawn_load_favorites(&appview, &tx, actor.clone());
+        spawn_load_stations(&appview, &tx, actor.clone());
         spawn_load_notifications(&appview, &tx, actor);
     }
 
@@ -130,6 +130,34 @@ pub async fn run(config: Config) -> Result<()> {
                 }
             }
         }
+
+        // OAuth opens a browser and runs a loopback server that prints to the
+        // terminal, so we must SUSPEND the TUI (leave the alt-screen + raw mode)
+        // while it runs, then restore. Done inline here so nothing else draws.
+        if let Some(input) = app.pending_oauth.take() {
+            app.overlay = Overlay::None;
+            if let Err(e) = restore_terminal(&mut term) {
+                break Err(e);
+            }
+            println!("\nOpening your browser to sign in — complete it there…\n");
+            let result = atproto.login_oauth(Some(&input)).await;
+            term = match setup_terminal() {
+                Ok(t) => t,
+                Err(e) => break Err(e),
+            };
+            match result {
+                Ok(profile) => {
+                    app.toast.set(format!("✓ Signed in as {}", profile.label()));
+                    apply_msg(Msg::SignedIn(profile), &mut app);
+                    if let Some(actor) = atproto.actor() {
+                        spawn_load_favorites(&appview, &tx, actor.clone());
+                        spawn_load_stations(&appview, &tx, actor.clone());
+                        spawn_load_notifications(&appview, &tx, actor);
+                    }
+                }
+                Err(e) => app.toast.set(format!("sign-in failed: {e}")),
+            }
+        }
     };
 
     // Persist volume + DSP on exit.
@@ -148,6 +176,7 @@ fn apply_msg(msg: Msg, app: &mut App) {
         }
         Msg::Popular(items) => app.popular = items,
         Msg::Favorites(items) => app.favorites = items,
+        Msg::Stations(items) => app.stations = items,
         Msg::SearchResults { query, items } => {
             // Ignore stale responses.
             if query == app.search_query || app.search_query.is_empty() {
@@ -171,12 +200,6 @@ fn apply_msg(msg: Msg, app: &mut App) {
             app.method = Some(p.method);
             app.pds = p.pds;
             app.overlay = Overlay::None;
-        }
-        Msg::OAuthDone => {
-            app.oauth_busy = false;
-            if app.overlay == Overlay::SignIn {
-                app.overlay = Overlay::None;
-            }
         }
         Msg::Toast(t) => app.toast.set(t),
     }
@@ -206,7 +229,8 @@ fn handle_event(
     match app.overlay {
         Overlay::Search => return handle_search_keys(key.code, app, player, atproto, tx),
         Overlay::Compose => return handle_compose_keys(key.code, app, atproto, tx),
-        Overlay::SignIn => return handle_signin_keys(key.code, app, appview, atproto, tx),
+        Overlay::SignIn => return handle_signin_keys(key.code, app),
+        Overlay::AddStation => return handle_add_station_keys(key, app, appview, atproto, tx),
         Overlay::None => {}
     }
 
@@ -238,6 +262,11 @@ fn handle_event(
         KeyCode::Char('3') => {
             app.view = View::Home;
             app.home_tab = HomeTab::Favorites;
+            app.selected = 0;
+        }
+        KeyCode::Char('4') => {
+            app.view = View::Home;
+            app.home_tab = HomeTab::Yours;
             app.selected = 0;
         }
         KeyCode::Char('e') => app.view = View::Dsp,
@@ -295,6 +324,14 @@ fn handle_event(
             }
         }
         KeyCode::Char('f') => favorite_selected(app, atproto, tx),
+        KeyCode::Char('A') => {
+            if app.logged_in {
+                app.add_form = AddStationForm::default();
+                app.overlay = Overlay::AddStation;
+            } else {
+                app.toast.set("Sign in first (press s) to add a station.");
+            }
+        }
         KeyCode::Char('s') => toggle_signin(app, atproto),
         KeyCode::Up | KeyCode::Char('k') => move_up(app),
         KeyCode::Down | KeyCode::Char('j') => move_down(app),
@@ -420,21 +457,85 @@ fn toggle_signin(app: &mut App, atproto: &Arc<Atproto>) {
     app.overlay = Overlay::SignIn;
 }
 
-/// Keys for the OAuth sign-in modal.
-fn handle_signin_keys(
-    code: KeyCode,
+/// Keys for the add-station form.
+fn handle_add_station_keys(
+    key: crossterm::event::KeyEvent,
     app: &mut App,
     appview: &AppView,
     atproto: &Arc<Atproto>,
     tx: &mpsc::UnboundedSender<Msg>,
 ) {
-    if app.oauth_busy {
-        // Ignore edits while the browser flow is running; Esc still dismisses.
-        if code == KeyCode::Esc {
+    use crossterm::event::KeyCode;
+    let n = AddStationForm::FIELD_COUNT;
+    match key.code {
+        KeyCode::Esc => {
             app.overlay = Overlay::None;
         }
-        return;
+        KeyCode::Tab | KeyCode::Down => {
+            app.add_form.focus = (app.add_form.focus + 1) % n;
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            app.add_form.focus = (app.add_form.focus + n - 1) % n;
+        }
+        KeyCode::Enter => {
+            if !app.add_form.is_valid() {
+                app.toast.set("Name and stream URL are required.");
+                return;
+            }
+            let draft = crate::atproto::StationDraft {
+                name: app.add_form.name.trim().to_string(),
+                stream_url: app.add_form.stream_url.trim().to_string(),
+                genre: nonempty(&app.add_form.genre),
+                homepage: nonempty(&app.add_form.homepage),
+                logo: nonempty(&app.add_form.logo),
+            };
+            app.overlay = Overlay::None;
+            app.toast.set("Adding station…");
+            let at = atproto.clone();
+            let av = appview.clone();
+            let actor = atproto.actor();
+            let tx = tx.clone();
+            tokio::spawn(async move {
+                match at.create_station(&draft).await {
+                    Ok(_) => {
+                        let _ = tx.send(Msg::Toast(format!("✓ Added {}", draft.name)));
+                        // The AppView indexes off the firehose; give it a beat,
+                        // then refresh the Yours tab.
+                        if let Some(actor) = actor {
+                            tokio::time::sleep(Duration::from_millis(1500)).await;
+                            if let Ok(out) = av.stations(&actor, 100).await {
+                                let _ = tx.send(Msg::Stations(
+                                    out.items.into_iter().map(|v| v.station).collect(),
+                                ));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Msg::Toast(format!("add station failed: {e}")));
+                    }
+                }
+            });
+        }
+        KeyCode::Backspace => {
+            let f = app.add_form.focus;
+            app.add_form.field_mut(f).pop();
+        }
+        KeyCode::Char(c) => {
+            let f = app.add_form.focus;
+            app.add_form.field_mut(f).push(c);
+        }
+        _ => {}
     }
+}
+
+fn nonempty(s: &str) -> Option<String> {
+    let t = s.trim();
+    (!t.is_empty()).then(|| t.to_string())
+}
+
+/// Keys for the OAuth sign-in modal. Enter defers the actual OAuth run to the
+/// main loop (which suspends the TUI first) via `app.pending_oauth`.
+fn handle_signin_keys(code: KeyCode, app: &mut App) {
     match code {
         KeyCode::Esc => {
             app.overlay = Overlay::None;
@@ -445,35 +546,7 @@ fn handle_signin_keys(
                 app.toast.set("Enter a handle, DID, or PDS URL.");
                 return;
             }
-            app.oauth_busy = true;
-            app.toast.set("Opening browser to sign in…");
-            let at = atproto.clone();
-            let av = appview.clone();
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                match at.login_oauth(Some(&input)).await {
-                    Ok(profile) => {
-                        let handle = profile.handle.clone();
-                        let _ = tx.send(Msg::Toast(format!("✓ Signed in as {}", profile.label())));
-                        let _ = tx.send(Msg::SignedIn(profile));
-                        if let Ok(out) = av.favorites(&handle, 100).await {
-                            let _ = tx.send(Msg::Favorites(
-                                out.items.into_iter().map(|v| v.station).collect(),
-                            ));
-                        }
-                        if let Ok(out) = av.notifications(&handle, 50).await {
-                            let _ = tx.send(Msg::Notifications {
-                                items: out.items,
-                                unread: out.unread_count,
-                            });
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Msg::Toast(format!("sign-in failed: {e}")));
-                    }
-                }
-                let _ = tx.send(Msg::OAuthDone);
-            });
+            app.pending_oauth = Some(input);
         }
         KeyCode::Backspace => {
             app.signin_input.pop();
@@ -632,6 +705,16 @@ fn spawn_load_favorites(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, acto
     tokio::spawn(async move {
         if let Ok(out) = av.favorites(&actor, 100).await {
             let _ = tx.send(Msg::Favorites(out.items.into_iter().map(|v| v.station).collect()));
+        }
+    });
+}
+
+fn spawn_load_stations(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, actor: String) {
+    let av = appview.clone();
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        if let Ok(out) = av.stations(&actor, 100).await {
+            let _ = tx.send(Msg::Stations(out.items.into_iter().map(|v| v.station).collect()));
         }
     });
 }

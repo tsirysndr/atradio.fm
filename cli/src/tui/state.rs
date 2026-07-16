@@ -33,6 +33,53 @@ pub enum Overlay {
     Compose,
     /// OAuth sign-in prompt (enter a handle / DID / PDS URL).
     SignIn,
+    /// Add-a-custom-station form.
+    AddStation,
+}
+
+/// The add-station form: an ordered set of text fields.
+#[derive(Clone, Default)]
+pub struct AddStationForm {
+    pub name: String,
+    pub stream_url: String,
+    pub genre: String,
+    pub homepage: String,
+    pub logo: String,
+    /// Index of the focused field (0..FIELD_COUNT).
+    pub focus: usize,
+}
+
+impl AddStationForm {
+    pub const FIELD_COUNT: usize = 5;
+
+    pub fn labels() -> [&'static str; Self::FIELD_COUNT] {
+        ["Name*", "Stream URL*", "Genre", "Homepage", "Logo URL"]
+    }
+
+    pub fn field(&self, i: usize) -> &str {
+        match i {
+            0 => &self.name,
+            1 => &self.stream_url,
+            2 => &self.genre,
+            3 => &self.homepage,
+            _ => &self.logo,
+        }
+    }
+
+    pub fn field_mut(&mut self, i: usize) -> &mut String {
+        match i {
+            0 => &mut self.name,
+            1 => &mut self.stream_url,
+            2 => &mut self.genre,
+            3 => &mut self.homepage,
+            _ => &mut self.logo,
+        }
+    }
+
+    /// True when the required fields (name + stream URL) are filled.
+    pub fn is_valid(&self) -> bool {
+        !self.name.trim().is_empty() && !self.stream_url.trim().is_empty()
+    }
 }
 
 /// Home has several horizontally-laid lists; this tracks focus.
@@ -41,31 +88,41 @@ pub enum HomeTab {
     Trending,
     Popular,
     Favorites,
+    /// The connected user's own stations.
+    Yours,
 }
 
 impl HomeTab {
-    pub fn all() -> [HomeTab; 3] {
-        [HomeTab::Trending, HomeTab::Popular, HomeTab::Favorites]
+    pub fn all() -> [HomeTab; 4] {
+        [
+            HomeTab::Trending,
+            HomeTab::Popular,
+            HomeTab::Favorites,
+            HomeTab::Yours,
+        ]
     }
     pub fn label(self) -> &'static str {
         match self {
             HomeTab::Trending => "Trending",
             HomeTab::Popular => "Popular",
             HomeTab::Favorites => "Favorites",
+            HomeTab::Yours => "Yours",
         }
     }
     pub fn next(self) -> HomeTab {
         match self {
             HomeTab::Trending => HomeTab::Popular,
             HomeTab::Popular => HomeTab::Favorites,
-            HomeTab::Favorites => HomeTab::Trending,
+            HomeTab::Favorites => HomeTab::Yours,
+            HomeTab::Yours => HomeTab::Trending,
         }
     }
     pub fn prev(self) -> HomeTab {
         match self {
-            HomeTab::Trending => HomeTab::Favorites,
+            HomeTab::Trending => HomeTab::Yours,
             HomeTab::Popular => HomeTab::Trending,
             HomeTab::Favorites => HomeTab::Popular,
+            HomeTab::Yours => HomeTab::Favorites,
         }
     }
 }
@@ -103,6 +160,8 @@ pub struct App {
     pub trending: Vec<StationInfo>,
     pub popular: Vec<StationInfo>,
     pub favorites: Vec<StationInfo>,
+    /// The connected user's own stations.
+    pub stations: Vec<StationInfo>,
     pub selected: usize,
 
     // ---- search overlay ----
@@ -118,8 +177,12 @@ pub struct App {
     // ---- sign-in overlay ----
     /// Handle / DID / PDS URL typed into the OAuth sign-in prompt.
     pub signin_input: String,
-    /// True while an OAuth flow is in progress (browser opened).
-    pub oauth_busy: bool,
+    /// Set by the modal to request the run loop start OAuth (with this input);
+    /// the loop suspends the TUI, runs it inline, then restores.
+    pub pending_oauth: Option<String>,
+
+    // ---- add-station overlay ----
+    pub add_form: AddStationForm,
 
     // ---- comments / notifications ----
     pub comments: Vec<CommentView>,
@@ -162,6 +225,7 @@ impl App {
             trending: Vec::new(),
             popular: Vec::new(),
             favorites: Vec::new(),
+            stations: Vec::new(),
             selected: 0,
             search_query: String::new(),
             search_results: Vec::new(),
@@ -169,7 +233,8 @@ impl App {
             search_dirty: false,
             compose_text: String::new(),
             signin_input: String::new(),
-            oauth_busy: false,
+            pending_oauth: None,
+            add_form: AddStationForm::default(),
             comments: Vec::new(),
             comments_selected: 0,
             notifications: Vec::new(),
@@ -197,6 +262,7 @@ impl App {
             HomeTab::Trending => &self.trending,
             HomeTab::Popular => &self.popular,
             HomeTab::Favorites => &self.favorites,
+            HomeTab::Yours => &self.stations,
         }
     }
 

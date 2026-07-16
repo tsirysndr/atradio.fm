@@ -8,7 +8,7 @@ use ratatui::widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph};
 use ratatui::Frame;
 
 use super::dsp_rows;
-use super::state::{App, HomeTab, Overlay, View};
+use super::state::{AddStationForm, App, HomeTab, Overlay, View};
 use crate::appview::StationInfo;
 use crate::player::NowPlaying;
 use crate::theme;
@@ -43,6 +43,7 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         Overlay::Search => draw_search(f, f.area(), app),
         Overlay::Compose => draw_compose(f, f.area(), app),
         Overlay::SignIn => draw_signin(f, f.area(), app),
+        Overlay::AddStation => draw_add_station(f, f.area(), app),
         Overlay::None => {}
     }
 }
@@ -133,10 +134,10 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
 
     if list.is_empty() {
         let msg = match app.home_tab {
-            HomeTab::Favorites if !app.logged_in => {
-                "Sign in to see your favorites (run `atradio login`)."
-            }
+            HomeTab::Favorites if !app.logged_in => "Press s to sign in and see your favorites.",
             HomeTab::Favorites => "No favorites yet. Press f on a station to favorite it.",
+            HomeTab::Yours if !app.logged_in => "Press s to sign in and see your stations.",
+            HomeTab::Yours => "No stations yet. Press A to add one.",
             _ => "Loading…",
         };
         f.render_widget(
@@ -393,13 +394,14 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let keys = [
         ("↑/↓ j/k", "move selection"),
         ("←/→ Tab", "switch home tab"),
-        ("1 / 2 / 3", "jump to Trending / Popular / Favorites"),
+        ("1 / 2 / 3 / 4", "jump to Trending / Popular / Favorites / Yours"),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
         ("m", "mute"),
         ("/", "fuzzy station search"),
         ("f", "favorite the selected/current station"),
+        ("A", "add a custom station (when signed in)"),
         ("c", "comments for the current station"),
         ("a", "add a comment"),
         ("n", "notifications"),
@@ -493,7 +495,7 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
         );
         return;
     }
-    let hint = "  1/2/3=tabs  /=search  e=eq  c=comments  n=notifs  p=profile  f=fav  s=sign in/out  Space=play/pause  ?=help  q=quit";
+    let hint = "  1-4=tabs  /=search  A=add  e=eq  c=comments  n=notifs  p=profile  f=fav  s=sign in/out  Space=play/pause  ?=help  q=quit";
     f.render_widget(
         Paragraph::new(Span::styled(hint, Style::default().fg(theme::MUTED)))
             .style(Style::default().bg(theme::BG)),
@@ -620,28 +622,70 @@ fn draw_signin(f: &mut Frame, area: Rect, app: &App) {
         Paragraph::new(Line::from(vec![
             Span::styled("@ ", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
             Span::styled(&app.signin_input, Style::default().fg(theme::FG)),
-            Span::styled(
-                if app.oauth_busy { "" } else { "█" },
-                Style::default().fg(theme::TEAL),
-            ),
+            Span::styled("█", Style::default().fg(theme::TEAL)),
         ])),
         rows[1],
     );
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "Enter opens your browser to finish signing in · Esc to cancel",
+            Style::default().fg(theme::MUTED),
+        )))
+        .wrap(ratatui::widgets::Wrap { trim: true }),
+        rows[3],
+    );
+}
 
-    let status = if app.oauth_busy {
-        Line::from(Span::styled(
-            "Opening your browser… finish signing in there, then return here.",
-            Style::default().fg(theme::CYAN),
-        ))
-    } else {
-        Line::from(Span::styled(
-            "Enter to open the browser · Esc to cancel",
+fn draw_add_station(f: &mut Frame, area: Rect, app: &App) {
+    let popup = centered(area, 66, 62);
+    f.render_widget(Clear, popup);
+    let block = panel("Add a station", true);
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let labels = AddStationForm::labels();
+    // Two lines per field (label + input) + a footer line.
+    let mut constraints: Vec<Constraint> =
+        (0..labels.len()).flat_map(|_| [Constraint::Length(1), Constraint::Length(1)]).collect();
+    constraints.push(Constraint::Length(1)); // spacer
+    constraints.push(Constraint::Min(1)); // hint
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    for (i, label) in labels.iter().enumerate() {
+        let focused = i == app.add_form.focus;
+        let label_area = rows[i * 2];
+        let input_area = rows[i * 2 + 1];
+
+        f.render_widget(
+            Paragraph::new(Span::styled(
+                *label,
+                Style::default().fg(if focused { theme::TEAL } else { theme::MUTED }),
+            )),
+            label_area,
+        );
+
+        let value = app.add_form.field(i);
+        let mut spans = vec![
+            Span::styled(if focused { "› " } else { "  " }, Style::default().fg(theme::CYAN)),
+            Span::styled(value.to_string(), Style::default().fg(theme::FG)),
+        ];
+        if focused {
+            spans.push(Span::styled("█", Style::default().fg(theme::TEAL)));
+        }
+        f.render_widget(Paragraph::new(Line::from(spans)), input_area);
+    }
+
+    let hint = rows[rows.len() - 1];
+    f.render_widget(
+        Paragraph::new(Span::styled(
+            "Tab/↑↓ move · Enter create · Esc cancel   (* required)",
             Style::default().fg(theme::MUTED),
         ))
-    };
-    f.render_widget(
-        Paragraph::new(status).wrap(ratatui::widgets::Wrap { trim: true }),
-        rows[3],
+        .wrap(ratatui::widgets::Wrap { trim: true }),
+        hint,
     );
 }
 
