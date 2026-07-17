@@ -14,6 +14,7 @@ import { ShortcutsHelp } from "./ShortcutsHelp";
 import { SearchPalette } from "./SearchPalette";
 import { LoginModal } from "./LoginModal";
 import { AudioSettingsModal } from "./AudioSettingsModal";
+import { CliInstallModal } from "./CliInstallModal";
 import { AudioSettingsSync } from "./AudioSettingsSync";
 import { UserDataSync } from "./UserDataSync";
 import { PlayStatusSync } from "./PlayStatusSync";
@@ -57,6 +58,7 @@ export function Layout() {
       <SearchPalette />
       <LoginModal />
       <AudioSettingsModal />
+      <CliInstallModal />
       <AudioSettingsSync />
       <UserDataSync />
       <PlayStatusSync />

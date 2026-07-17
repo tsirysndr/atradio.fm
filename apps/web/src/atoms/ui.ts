@@ -22,6 +22,9 @@ export const loginModalOpenAtom = atom(false);
 /** Controls the advanced audio settings (EQ / DSP) modal. */
 export const audioSettingsOpenAtom = atom(false);
 
+/** Controls the "Install the CLI" modal opened from the topbar. */
+export const cliInstallOpenAtom = atom(false);
+
 /** Controls the fullscreen ("now playing") player view. */
 export const playerFullscreenAtom = atom(false);
 

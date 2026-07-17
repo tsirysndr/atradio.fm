@@ -4,5 +4,7 @@
   "onBluesky": "atradio.fm on Bluesky",
   "onDiscord": "atradio.fm on Discord",
   "onTangled": "atradio.fm on Tangled",
+  "cli": "CLI",
+  "getCli": "Get the CLI",
   "changeLanguage": "Change language"
 }

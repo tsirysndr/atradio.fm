@@ -1,0 +1,15 @@
+{
+  "title": "atradio.fm no seu terminal",
+  "intro": "Um player de rádio TUI nativo no AT Protocol. Instale pela linha de comando e execute.",
+  "macosLinux": "macOS / Linux",
+  "linux": "Linux",
+  "homebrew": "Homebrew",
+  "nix": "Nix",
+  "cargo": "A partir do código (Cargo)",
+  "debian": "Debian / Ubuntu (apt)",
+  "fedora": "Fedora / RHEL (dnf)",
+  "run": "Depois execute",
+  "copy": "Copiar comando",
+  "copied": "Copiado!",
+  "allReleases": "Ver todos os downloads e versões →"
+}
