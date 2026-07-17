@@ -18,6 +18,8 @@ mod player;
 mod radio;
 mod remote;
 mod settings;
+#[cfg(target_os = "linux")]
+mod systemd;
 mod theme;
 mod tui;
 

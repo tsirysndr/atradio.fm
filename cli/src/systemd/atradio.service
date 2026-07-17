@@ -1,0 +1,15 @@
+[Unit]
+Description=atradio.fm Connect device (headless radio player on the AT Protocol)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# `--no-tui` runs headless as an atradio Connect device: stay online and let the
+# web app or other clients drive playback. The path is rewritten to the actual
+# binary location at install time.
+ExecStart=/usr/local/bin/atradio --no-tui
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
