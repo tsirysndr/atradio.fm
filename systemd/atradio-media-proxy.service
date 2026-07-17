@@ -1,0 +1,26 @@
+[Unit]
+Description=atradio.fm media proxy (Gleam/BEAM: stream, tunein, image, icy)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/github/atradio.fm/apps/media-proxy
+# Mirrors the api/jetstream units: run from source via the toolchain on PATH.
+# For a production release instead: `gleam export erlang-shipment` then point
+# ExecStart at build/erlang-shipment/entrypoint.sh run
+ExecStart=/bin/bash -ic 'exec gleam run'
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=atradio-media-proxy
+
+Environment=HOME=/root
+Environment=USER=root
+# HTTP listen port (defaults to 7081 when unset).
+Environment=PORT=7081
+
+[Install]
+WantedBy=multi-user.target
