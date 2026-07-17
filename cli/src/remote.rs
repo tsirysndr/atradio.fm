@@ -22,7 +22,10 @@ use crate::atproto::Atproto;
 
 /// The lexicon method the service-auth token is bound to (matches the hub).
 const CONNECT_LXM: &str = "fm.atradio.connect";
-const DEFAULT_SERVICE_DID: &str = "did:web:api.atradio.fm";
+/// The token audience — a DID *service reference* (bare DID + `#fragment`); a
+/// bare DID is rejected by atproto's OAuth scope parser. Must match the
+/// AppView's `CONNECT_SERVICE_AUD` and the `?aud=` in `atradio_scopes()`.
+const DEFAULT_SERVICE_AUD: &str = "did:web:api.atradio.fm#atradio_appview";
 
 /// Minimal station description exchanged over the wire.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -145,10 +148,10 @@ async fn run(
 ) {
     let mut backoff = 1000u64;
     loop {
-        let service_did = discover_service_did(&cfg.base_url).await;
+        let service_aud = discover_service_aud(&cfg.base_url).await;
         match connect_once(
             &cfg,
-            &service_did,
+            &service_aud,
             &mut state,
             &cmd_tx,
             &evt_tx,
@@ -169,7 +172,7 @@ async fn run(
 /// (this device is shutting down), `Ok(false)`/`Err` to reconnect.
 async fn connect_once(
     cfg: &RemoteConfig,
-    service_did: &str,
+    service_aud: &str,
     state: &mut watch::Receiver<WireState>,
     cmd_tx: &mpsc::UnboundedSender<RemoteCmd>,
     evt_tx: &mpsc::UnboundedSender<RemoteEvent>,
@@ -177,7 +180,7 @@ async fn connect_once(
 ) -> Result<bool> {
     let token = cfg
         .atproto
-        .mint_service_auth(service_did, CONNECT_LXM)
+        .mint_service_auth(service_aud, CONNECT_LXM)
         .await?;
     let (ws, _resp) = tokio_tungstenite::connect_async(ws_url(&cfg.base_url)).await?;
     let (mut sink, mut stream) = ws.split();
@@ -302,20 +305,20 @@ fn json_to_cmd(v: &Value) -> Option<RemoteCmd> {
     }
 }
 
-async fn discover_service_did(base: &str) -> String {
+async fn discover_service_aud(base: &str) -> String {
     #[derive(Deserialize)]
     struct Health {
-        #[serde(rename = "connectDid")]
-        connect_did: Option<String>,
+        #[serde(rename = "connectAud")]
+        connect_aud: Option<String>,
     }
     match reqwest::get(format!("{}/health", base.trim_end_matches('/'))).await {
         Ok(r) => match r.json::<Health>().await {
             Ok(h) => h
-                .connect_did
-                .unwrap_or_else(|| DEFAULT_SERVICE_DID.to_string()),
-            Err(_) => DEFAULT_SERVICE_DID.to_string(),
+                .connect_aud
+                .unwrap_or_else(|| DEFAULT_SERVICE_AUD.to_string()),
+            Err(_) => DEFAULT_SERVICE_AUD.to_string(),
         },
-        Err(_) => DEFAULT_SERVICE_DID.to_string(),
+        Err(_) => DEFAULT_SERVICE_AUD.to_string(),
     }
 }
 

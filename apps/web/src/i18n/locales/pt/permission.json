@@ -5,7 +5,8 @@
     "favorites": "favoritos",
     "stations": "suas estações",
     "status": "status de escuta",
-    "audio": "configurações de áudio"
+    "audio": "configurações de áudio",
+    "connect": "controle remoto (Connect)"
   },
   "featuresFallback": "novos recursos",
   "and": "e",

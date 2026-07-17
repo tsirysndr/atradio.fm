@@ -5,9 +5,9 @@ import { IconAlertTriangle, IconRefresh } from "@tabler/icons-react";
 import { NSID } from "@atradio/lexicons";
 import { sessionAtom } from "@/atoms/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { missingScopes } from "@/lib/atproto/client";
+import { CONNECT_RPC_SCOPE, missingScopes } from "@/lib/atproto/client";
 
-/** i18n key (under `features.*`) for a `repo:<nsid>` scope the session is missing. */
+/** i18n key (under `features.*`) for a scope the session is missing. */
 const SCOPE_FEATURE: Record<string, string> = {
   [`repo:${NSID.comment}`]: "comments",
   [`repo:${NSID.reaction}`]: "reactions",
@@ -15,6 +15,7 @@ const SCOPE_FEATURE: Record<string, string> = {
   [`repo:${NSID.station}`]: "stations",
   [`repo:${NSID.actorStatus}`]: "status",
   [`repo:${NSID.audioSettings}`]: "audio",
+  [CONNECT_RPC_SCOPE]: "connect",
 };
 
 /**

@@ -2,14 +2,13 @@ import { consola } from "consola";
 import { APPVIEW_URL } from "@/lib/appview";
 import {
   CONNECT_LXM,
+  CONNECT_SERVICE_AUD,
   type Command,
   type DeviceInfo,
   type PlaybackState,
   type Platform,
   type ServerMsg,
 } from "./protocol";
-
-const DEFAULT_SERVICE_DID = "did:web:api.atradio.fm";
 
 export interface ConnectHandlers {
   onStatus?: (status: "connecting" | "online" | "offline") => void;
@@ -38,21 +37,11 @@ export class ConnectClient {
   private closed = false;
   private backoff = 1000;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private serviceDid = DEFAULT_SERVICE_DID;
 
   constructor(private readonly opts: ConnectOptions) {}
 
   async start(): Promise<void> {
     this.closed = false;
-    // Discover the AppView's Connect DID (the token audience); fall back to the
-    // production default if /health is unreachable.
-    try {
-      const res = await fetch(`${APPVIEW_URL}/health`);
-      const data = (await res.json()) as { connectDid?: string };
-      if (data.connectDid) this.serviceDid = data.connectDid;
-    } catch {
-      /* keep default */
-    }
     this.connect();
   }
 
@@ -72,7 +61,7 @@ export class ConnectClient {
 
     ws.onopen = async () => {
       try {
-        const token = await this.opts.mintToken(this.serviceDid, CONNECT_LXM);
+        const token = await this.opts.mintToken(CONNECT_SERVICE_AUD, CONNECT_LXM);
         if (this.ws !== ws || ws.readyState !== WebSocket.OPEN) return;
         ws.send(
           JSON.stringify({

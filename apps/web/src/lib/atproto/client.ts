@@ -1,18 +1,25 @@
 import { configureOAuth } from "@atcute/oauth-browser-client";
 import { NSID } from "@atradio/lexicons";
+import { CONNECT_LXM, CONNECT_SERVICE_AUD } from "@/lib/connect/protocol";
 import { actorResolver } from "./resolver";
 
+/** The full `rpc:` scope token that lets the session mint the Connect token. */
+export const CONNECT_RPC_SCOPE = `rpc:${CONNECT_LXM}?aud=${CONNECT_SERVICE_AUD}`;
+
 /**
- * Request the minimum needed: `atproto` (base) plus granular `repo:` write
- * permissions for exactly our `fm.atradio.*` collections. Record reads are
- * public in AT Proto, so `repo:<nsid>` effectively grants read+write for our own
- * data without asking for broad access to the whole repo.
+ * Request the minimum needed: `atproto` (base), granular `repo:` write
+ * permissions for exactly our `fm.atradio.*` collections, and an `rpc:` scope so
+ * the session can mint the atproto service-auth token that authenticates the
+ * atradio Connect WebSocket (`com.atproto.server.getServiceAuth`). Record reads
+ * are public in AT Proto, so `repo:<nsid>` effectively grants read+write for our
+ * own data without asking for broad access to the whole repo.
  *
  * IMPORTANT: keep this in sync with the `scope` field in
  * `public/client-metadata.json` — the authorization server rejects any scope
- * requested here that isn't also declared there (`invalid_scope`).
+ * requested here that isn't also declared there (`invalid_scope`). The `rpc:`
+ * audience MUST be a `did#serviceId` reference (bare DID is rejected).
  */
-export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus} repo:${NSID.comment} repo:${NSID.reaction}`;
+export const OAUTH_SCOPE = `atproto repo:${NSID.favorite} repo:${NSID.station} repo:${NSID.audioSettings} repo:${NSID.actorStatus} repo:${NSID.comment} repo:${NSID.reaction} ${CONNECT_RPC_SCOPE}`;
 
 /** Individual scope tokens we request (derived from OAUTH_SCOPE). */
 export const REQUIRED_SCOPES = OAUTH_SCOPE.split(/\s+/).filter(Boolean);

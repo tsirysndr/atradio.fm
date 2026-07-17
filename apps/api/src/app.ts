@@ -17,6 +17,7 @@ export function createApp(): Express {
       ok: true,
       service: "atradio-api",
       connectDid: env.CONNECT_SERVICE_DID,
+      connectAud: env.CONNECT_SERVICE_AUD,
     });
   });
 

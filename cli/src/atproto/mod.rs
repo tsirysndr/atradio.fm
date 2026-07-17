@@ -400,6 +400,7 @@ impl Atproto {
 /// Rockbox EQ bands (32 Hz…16 kHz) differ from the web build's (60 Hz…20 kHz),
 /// so DSP is persisted locally (settings.toml) and never synced to the PDS.
 fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>> {
+    use jacquard::oauth::scopes::Scope;
     jacquard::oauth::scopes::Scopes::builder()
         .atproto()
         .repo_collection("fm.atradio.station")
@@ -412,6 +413,14 @@ fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>
         .map_err(to_anyhow)?
         .repo_collection("fm.atradio.actor.status")
         .map_err(to_anyhow)?
+        // Allow minting the service-auth token that authenticates the atradio
+        // Connect WebSocket (com.atproto.server.getServiceAuth). The audience is
+        // a DID *service reference* (bare DID is rejected by the scope parser)
+        // and must match the AppView's CONNECT_SERVICE_AUD.
+        .scope(
+            Scope::rpc_aud("fm.atradio.connect", "did:web:api.atradio.fm#atradio_appview")
+                .map_err(to_anyhow)?,
+        )
         .build()
         .map_err(to_anyhow)
 }

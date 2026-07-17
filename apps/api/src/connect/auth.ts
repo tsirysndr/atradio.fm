@@ -27,7 +27,7 @@ async function getSigningKey(
 export async function verifyConnectToken(token: string): Promise<string> {
   const payload = await verifyJwt(
     token,
-    env.CONNECT_SERVICE_DID,
+    env.CONNECT_SERVICE_AUD,
     CONNECT_LXM,
     getSigningKey,
   );
