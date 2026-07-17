@@ -31,7 +31,7 @@ jobs:
       
       - uses: cachix/cachix-action@v17
         with:
-          name: tsirysndr
+          name: atradio
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       # Build the root default package (built from the ./cli source).
