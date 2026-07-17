@@ -1,6 +1,6 @@
 [package]
 name = "atradio"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "atradio.fm in your terminal — a TUI radio player on the AT Protocol"
 # NOTE: rockbox-playback is GPL-2.0-or-later; linking it makes this binary GPL.
