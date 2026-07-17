@@ -193,12 +193,4 @@ body {
     -webkit-background-clip: text;
     color: transparent;
   }
-
-  /* Vertical EQ band sliders (advanced audio settings modal). */
-  .eq-slider {
-    writing-mode: vertical-lr;
-    direction: rtl;
-    width: 8px;
-    height: 7rem;
-  }
 }

@@ -1,5 +1,6 @@
 import { useAtomValue, useSetAtom } from "jotai";
 import { useTranslation } from "react-i18next";
+import { Slider } from "@heroui/react";
 import {
   IconBroadcast,
   IconPlayerPlayFilled,
@@ -87,18 +88,25 @@ export function ConnectBanner() {
 
         <div className="hidden items-center gap-2 md:flex">
           <IconVolume size={16} className="text-foreground/50" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={state.volume}
-            onChange={(e) =>
-              send({ action: "setVolume", value: Number(e.target.value) })
-            }
-            className="h-1 w-24 cursor-pointer accent-synth-cyan"
+          <Slider
             aria-label={t("remoteVolume")}
-          />
+            minValue={0}
+            maxValue={1}
+            step={0.01}
+            value={[state.volume]}
+            onChange={(v) =>
+              send({
+                action: "setVolume",
+                value: Array.isArray(v) ? v[0] : v,
+              })
+            }
+            className="w-24"
+          >
+            <Slider.Track className="h-1.5 rounded-full bg-white/10">
+              <Slider.Fill className="rounded-full bg-gradient-to-r from-synth-pink to-synth-cyan" />
+              <Slider.Thumb className="h-3.5 w-3.5 bg-synth-cyan shadow-neon-cyan" />
+            </Slider.Track>
+          </Slider>
         </div>
 
         <button

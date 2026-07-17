@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useAtom } from "jotai";
 import { useTranslation } from "react-i18next";
-import { Modal, useOverlayState } from "@heroui/react";
+import { Modal, Slider, useOverlayState } from "@heroui/react";
 import {
   ChannelMode,
   CrossfeedMode,
@@ -88,17 +88,47 @@ function Range(props: {
   step?: number;
   value: number;
   onChange: (v: number) => void;
+  "aria-label"?: string;
 }) {
   return (
-    <input
-      type="range"
-      min={props.min}
-      max={props.max}
+    <Slider
+      aria-label={props["aria-label"]}
+      minValue={props.min}
+      maxValue={props.max}
       step={props.step ?? 1}
-      value={props.value}
-      onChange={(e) => props.onChange(Number(e.target.value))}
-      className="accent-synth-pink"
-    />
+      value={[props.value]}
+      onChange={(v) => props.onChange(Array.isArray(v) ? v[0] : v)}
+    >
+      <Slider.Track className="h-1.5 rounded-full bg-white/10">
+        <Slider.Fill className="rounded-full bg-gradient-to-r from-synth-pink to-synth-cyan" />
+        <Slider.Thumb className="h-3.5 w-3.5 bg-synth-cyan shadow-neon-cyan" />
+      </Slider.Track>
+    </Slider>
+  );
+}
+
+/** One vertical EQ band fader (HeroUI Slider, gain in dB). */
+function EqBandSlider(props: {
+  value: number;
+  onChange: (v: number) => void;
+  "aria-label": string;
+}) {
+  return (
+    <Slider
+      orientation="vertical"
+      aria-label={props["aria-label"]}
+      minValue={-24}
+      maxValue={24}
+      step={1}
+      value={[props.value]}
+      onChange={(v) => props.onChange(Array.isArray(v) ? v[0] : v)}
+      className="flex h-28 justify-center"
+    >
+      <Slider.Track className="h-full w-1.5 rounded-full bg-white/10">
+        <Slider.Fill className="rounded-full bg-gradient-to-t from-synth-pink to-synth-cyan" />
+        <Slider.Thumb className="h-3.5 w-3.5 bg-synth-cyan shadow-neon-cyan" />
+      </Slider.Track>
+    </Slider>
   );
 }
 
@@ -235,15 +265,10 @@ export function AudioSettingsModal() {
                       <span className="font-mono text-[0.65rem] text-foreground/80">
                         {eqGains[i] > 0 ? `+${eqGains[i]}` : eqGains[i]}
                       </span>
-                      <input
-                        type="range"
-                        min={-24}
-                        max={24}
-                        step={1}
+                      <EqBandSlider
                         value={eqGains[i]}
                         aria-label={t("equalizer.bandGain", { hz })}
-                        onChange={(e) => onEqBand(i, Number(e.target.value))}
-                        className="eq-slider accent-synth-pink"
+                        onChange={(v) => onEqBand(i, v)}
                       />
                       <span className="font-mono text-[0.6rem] text-foreground/40">
                         {hz >= 1000 ? `${hz / 1000}k` : hz}
@@ -257,6 +282,7 @@ export function AudioSettingsModal() {
                 <Section title={t("tone.title")}>
                   <Field label={t("tone.bass")} value={`${bass} dB`}>
                     <Range
+                      aria-label={t("tone.bass")}
                       min={-24}
                       max={24}
                       value={bass}
@@ -268,6 +294,7 @@ export function AudioSettingsModal() {
                   </Field>
                   <Field label={t("tone.treble")} value={`${treble} dB`}>
                     <Range
+                      aria-label={t("tone.treble")}
                       min={-24}
                       max={24}
                       value={treble}
@@ -299,6 +326,7 @@ export function AudioSettingsModal() {
                     value={`${cfDirect.toFixed(1)} dB`}
                   >
                     <Range
+                      aria-label={t("crossfeed.directGain")}
                       min={-6}
                       max={0}
                       step={0.5}
@@ -314,6 +342,7 @@ export function AudioSettingsModal() {
                 <Section title={t("pbe.title")}>
                   <Field label={t("pbe.strength")} value={`${pbe}%`}>
                     <Range
+                      aria-label={t("pbe.strength")}
                       min={0}
                       max={100}
                       value={pbe}
@@ -325,6 +354,7 @@ export function AudioSettingsModal() {
                   </Field>
                   <Field label={t("pbe.precut")} value={`-${pbePrecut} dB`}>
                     <Range
+                      aria-label={t("pbe.precut")}
                       min={0}
                       max={24}
                       value={pbePrecut}
@@ -339,6 +369,7 @@ export function AudioSettingsModal() {
                 <Section title={t("surround.title")}>
                   <Field label={t("surround.delay")} value={`${surDelay} ms`}>
                     <Range
+                      aria-label={t("surround.delay")}
                       min={0}
                       max={30}
                       value={surDelay}
@@ -350,6 +381,7 @@ export function AudioSettingsModal() {
                   </Field>
                   <Field label={t("surround.balance")} value={`${surBalance}%`}>
                     <Range
+                      aria-label={t("surround.balance")}
                       min={0}
                       max={100}
                       value={surBalance}
@@ -367,6 +399,7 @@ export function AudioSettingsModal() {
                     value={`${compThresh} dB`}
                   >
                     <Range
+                      aria-label={t("compressor.threshold")}
                       min={-30}
                       max={0}
                       value={compThresh}
@@ -414,6 +447,7 @@ export function AudioSettingsModal() {
                   </Field>
                   <Field label={t("stereo.width")} value={`${width}%`}>
                     <Range
+                      aria-label={t("stereo.width")}
                       min={0}
                       max={255}
                       value={width}
