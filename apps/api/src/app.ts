@@ -2,10 +2,9 @@ import express, { type Express } from "express";
 import cors from "cors";
 import { env } from "./env";
 import { xrpcRouter } from "./xrpc";
-import { proxyRouter } from "./proxy";
 import { liveRouter } from "./live";
 
-/** Build the Express app (XRPC read API + media proxies). Open CORS for all. */
+/** Build the Express app (XRPC read API + Connect). Open CORS for all. */
 export function createApp(): Express {
   const app = express();
 
@@ -43,8 +42,8 @@ export function createApp(): Express {
   // Real-time per-station comment + reaction stream (SSE): /live/:stationId
   app.use("/live", liveRouter);
 
-  // Media proxies: /api/tunein/*, /api/icy
-  app.use("/api", proxyRouter);
+  // The media proxies (/api/stream, /api/tunein, /api/image, /api/icy) now live
+  // in the dedicated apps/media-proxy service.
 
   return app;
 }

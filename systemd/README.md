@@ -3,8 +3,8 @@
 Deployment units for the atradio.fm API. Two services split the combined
 `apps/api` entrypoint so they can be scaled/restarted independently:
 
-- **`atradio-api.service`** — the Express server (XRPC read API + TuneIn/ICY
-  media proxies), `bun run start:server`.
+- **`atradio-api.service`** — the Express server (XRPC read API + Connect hub),
+  `bun run start:server`. The media proxies moved to `atradio-media-proxy`.
 - **`atradio-jetstream.service`** — the Jetstream consumer that indexes
   `fm.atradio.*` records into Postgres, `bun run start:consumer`.
 

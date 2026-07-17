@@ -41,7 +41,10 @@ them in the browser, and save favorites + your own stations to **your own PDS**
   no auth server.
 - **apps/api** is a read-only **AppView**: a Jetstream consumer indexes those
   records into Postgres, and XRPC endpoints serve them (for public profiles and
-  discovery). It also hosts the production TuneIn + ICY media proxies.
+  discovery), plus the atradio Connect hub.
+- **apps/media-proxy** (Gleam/BEAM) is a stateless reverse-proxy for radio
+  streams, TuneIn, artwork, and ICY "now playing" — split out so the streaming
+  workload scales independently.
 
 ## Monorepo layout
 
@@ -49,12 +52,13 @@ them in the browser, and save favorites + your own stations to **your own PDS**
 atradio.fm/
 ├─ apps/
 │  ├─ web/            # Vite + React SPA (player, search, OAuth, gating, profiles)
-│  └─ api/            # Express + Drizzle + Postgres: Jetstream consumer, XRPC, proxies
+│  ├─ api/            # Express + Drizzle + Postgres: Jetstream consumer, XRPC, Connect
+│  └─ media-proxy/    # Gleam/BEAM: stream / tunein / image / icy reverse-proxy
 ├─ packages/
 │  └─ lexicons/       # fm.atradio.* lexicons (authored in Pkl → JSON) + TS/zod/mappers
 ├─ tools/
 │  └─ console/        # Babashka + Clojure + rebel REPL command hub
-├─ systemd/           # deployment units (api + jetstream)
+├─ systemd/           # deployment units (api + jetstream + media-proxy)
 ├─ console            # ./console → launches the command REPL
 └─ turbo.json / mise.toml / package.json (bun workspaces)
 ```
@@ -145,9 +149,8 @@ it in real time.
 - **XRPC** (open CORS, read-only): `fm.atradio.getFavorites`,
   `fm.atradio.getStations` (`?actor=<did|handle>&limit&cursor`), plus
   `getRecentStations` / `getPopularStations` for discovery.
-- **Media proxies:** `GET /api/tunein/*` (TuneIn CORS) and `GET /api/icy?url=…`
-  (ICY "now playing"). The web app points `VITE_TUNEIN_PROXY` / `VITE_ICY_PROXY`
-  at the deployed API in prod; in dev it uses Vite's built-in proxy.
+- **Media proxies** (stream / TuneIn / image / ICY) now live in the dedicated
+  **apps/media-proxy** service — point the web app at it with `VITE_MEDIA_PROXY`.
 
 ## Deployment
 
