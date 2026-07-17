@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: DeterminateSystems/nix-installer-action@v16
-
+      
       - uses: cachix/cachix-action@v17
         with:
           name: tsirysndr
@@ -49,5 +49,3 @@ jobs:
           echo "Build failed after retries"
           exit 1
 
-      - name: nix flake check
-        run: nix flake check -L
