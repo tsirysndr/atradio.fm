@@ -14,7 +14,10 @@ when signed in — favorite stations, add your own, and post comments to your PD
 Prebuilt release tarballs, `.deb`, and `.rpm` packages are attached to every
 [GitHub release](https://github.com/tsirysndr/atradio.fm/releases), named
 `atradio-<version>-<os>-<arch>.tar.gz` (`macos-amd64`, `macos-aarch64`,
-`linux-amd64`, `linux-aarch64`) — each contains the binary, README, and LICENSE.
+`linux-amd64`, `linux-aarch64`, `freebsd-amd64`, `freebsd-aarch64`,
+`netbsd-amd64`, `netbsd-aarch64`) — each contains the binary, README, and
+LICENSE. The BSD builds run in emulated VMs and are attached to the release
+shortly after it's published (aarch64 ones can take hours).
 
 ### macOS / Linux — Homebrew
 
@@ -70,7 +73,7 @@ sudo dnf install atradio
 
 ```bash
 # Optional: use the binary cache to skip building.
-cachix use tsirysndr
+cachix use atradio
 
 # One-off run:
 nix run github:tsirysndr/atradio.fm

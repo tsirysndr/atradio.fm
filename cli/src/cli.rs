@@ -140,8 +140,15 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
     };
 
     let player = std::sync::Arc::new(crate::player::Player::new()?);
+
+    // MPRIS (Linux): snapshots out over a watch channel, transport commands
+    // back over an mpsc — the engine handle itself is !Send.
     #[cfg(target_os = "linux")]
-    crate::mpris::spawn(player.clone());
+    let (mpris_np_tx, mut mpris_cmd_rx) = {
+        let (tx, rx) = tokio::sync::watch::channel(crate::player::NowPlaying::default());
+        (tx, crate::mpris::spawn(rx))
+    };
+
     player.play_url(&url);
     println!("Playing {url}\nPress Ctrl-C to stop.");
 
@@ -150,6 +157,22 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
     loop {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         let np = player.now_playing();
+
+        #[cfg(target_os = "linux")]
+        {
+            let _ = mpris_np_tx.send(np.clone());
+            while let Ok(cmd) = mpris_cmd_rx.try_recv() {
+                use crate::player::MprisCmd;
+                match cmd {
+                    MprisCmd::Play => player.play(),
+                    MprisCmd::Pause => player.pause(),
+                    MprisCmd::PlayPause => player.toggle(),
+                    MprisCmd::Stop => player.stop(),
+                    MprisCmd::SetVolume(v) => player.set_volume(v),
+                }
+            }
+        }
+
         if let Some(line) = np.line() {
             if line != last {
                 println!("♪ {line}");
