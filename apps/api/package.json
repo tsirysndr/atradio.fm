@@ -10,7 +10,10 @@
     "start:consumer": "tsx src/bin/consumer.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
+    "build": "bun build src/index.ts --outdir ./dist --target node --sourcemap=inline && bun build src/bin/server.ts --outdir ./dist/bin --target node --sourcemap=inline && bun build src/bin/consumer.ts --outdir ./dist/bin --target node --sourcemap=inline",
+    "prod": "node --enable-source-maps dist/index.js",
+    "prod:server": "node --enable-source-maps dist/bin/server.js",
+    "prod:consumer": "node --enable-source-maps dist/bin/consumer.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push"
