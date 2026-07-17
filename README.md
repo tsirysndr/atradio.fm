@@ -10,6 +10,20 @@ them in the browser, and save favorites + your own stations to **your own PDS**
 
 ![atradio.fm](./preview.png)
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Monorepo layout](#monorepo-layout)
+- [Stack](#stack)
+- [Getting started](#getting-started)
+- [Command console](#command-console)
+- [AT Protocol](#at-protocol)
+- [atradio Connect](#atradio-connect)
+- [Backend (apps/api)](#backend-appsapi)
+- [Deployment](#deployment)
+- [Keyboard shortcuts](#keyboard-shortcuts)
+- [Notes](#notes)
+
 ## Architecture
 
 ```
@@ -94,6 +108,32 @@ bb tasks            # the same commands as Babashka tasks
 - **Data:** your favorites/stations are records in your PDS (read on login,
   written with optimistic UI). Any user's profile is viewable at
   `/profile/:did` or `/profile/:handle`.
+
+## atradio Connect
+
+Like **Spotify Connect**: when you're signed in, every atradio client you have
+open — the web app, the [CLI/TUI](./cli), other terminals — shows up as a
+**device** on your account, and any of them can control the currently selected
+player. Pick a device and play/pause, volume, mute, and station changes route to
+it in real time.
+
+![atradio Connect](./connect.png)
+
+- **Device roster + presence.** Each signed-in client registers over a WebSocket
+  to the AppView's Connect hub (`fm.atradio.connect`, in `apps/api/src/connect`)
+  and appears in a live device list; a disconnect drops it from the roster.
+- **Remote control.** Any device can drive the target player — load a station,
+  play/pause, set volume, mute — while playback state (now-playing, volume,
+  playing/paused) streams back to every device.
+- **Authenticated per account.** Connections are keyed to your DID and
+  authenticated with an atproto **service-auth JWT**
+  (`com.atproto.server.getServiceAuth`), so only your own clients join — logged-out
+  clients don't participate.
+- **Drives your listening status.** Your `fm.atradio.actor.status` record is set
+  from Connect and cleared automatically once none of your devices are playing.
+- **Headless devices.** Run `atradio --no-tui` (or install it as a service) to
+  keep a terminal online purely as a controllable speaker — see the
+  [CLI README](./cli/README.md).
 
 ## Backend (apps/api)
 

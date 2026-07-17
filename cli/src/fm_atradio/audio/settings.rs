@@ -58,7 +58,7 @@ pub struct Settings<S: BosStr = DefaultStr> {
     ///Whether the 10-band parametric EQ is enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eq_enabled: Option<bool>,
-    ///Per-band EQ gain in dB, one entry per band (60 Hz - 20 kHz).
+    ///Per-band EQ gain in dB, one entry per band (32 Hz - 16 kHz).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eq_gains: Option<Vec<i64>>,
     ///Perceptual Bass Enhancement strength in percent.
@@ -937,7 +937,7 @@ fn lexicon_doc_fm_atradio_audio_settings() -> LexiconDoc<'static> {
                                 LexObjectProperty::Array(LexArray {
                                     description: Some(
                                         CowStr::new_static(
-                                            "Per-band EQ gain in dB, one entry per band (60 Hz - 20 kHz).",
+                                            "Per-band EQ gain in dB, one entry per band (32 Hz - 16 kHz).",
                                         ),
                                     ),
                                     items: LexArrayItem::Integer(LexInteger {

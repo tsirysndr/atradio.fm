@@ -3,11 +3,16 @@ import { atomWithStorage } from "jotai/utils";
 import { RockboxPlayer, ChannelMode, CrossfeedMode } from "rockbox-wasm";
 import {
   DEFAULT_AUDIO_SETTINGS as DEFAULTS,
+  EQ_BANDS_HZ,
   type AudioSettingsData,
 } from "@atradio/lexicons";
 
-/** The 10 Rockbox EQ band centre frequencies (60 Hz … 20 kHz). */
-export const EQ_CUTOFFS = RockboxPlayer.EQ_BAND_CUTOFFS;
+/** The 10 Rockbox EQ band centre frequencies (32 Hz … 16 kHz). Shared with the
+ *  CLI via `@atradio/lexicons` so `eqGains` is index-aligned across both and the
+ *  `fm.atradio.audio.settings` record syncs cleanly. `setEqBand` takes an
+ *  explicit cutoff, so the wasm engine retunes to these regardless of its own
+ *  default band table. */
+export const EQ_CUTOFFS: number[] = [...EQ_BANDS_HZ];
 
 // Every DSP setting persists to localStorage (atomWithStorage) so the audio
 // chain survives reloads — applyAudioSettings() pushes the whole snapshot to

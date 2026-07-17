@@ -112,6 +112,22 @@ pub async fn run(config: Config) -> Result<()> {
     player.set_volume(settings.volume);
     player.apply_dsp(&app.dsp);
 
+    // Remote-wins: if signed in, pull the synced audio settings and apply them
+    // over the local cache, so the EQ + DSP chain follows the account across the
+    // web app and other devices (bands now match, so gains are index-aligned).
+    if atproto.is_logged_in() {
+        match atproto.get_audio_settings().await {
+            Ok(Some(remote)) => {
+                app.dsp = remote;
+                settings.update_from(&app.dsp, player.volume());
+                settings.save(&config.session_path);
+                player.apply_dsp(&app.dsp);
+            }
+            Ok(None) => {}
+            Err(e) => app.toast.set(format!("audio sync: {e}")),
+        }
+    }
+
     // atradio Connect: register this process as a controllable device and open
     // the remote-control channel. Snapshots go out over a watch channel;
     // inbound commands + roster/presence events come back over mpsc.
@@ -267,9 +283,13 @@ pub async fn run(config: Config) -> Result<()> {
         }
     };
 
-    // Persist volume + DSP on exit.
+    // Persist volume + DSP on exit, then push the DSP chain up to the PDS so it
+    // syncs to the web app / other devices (best-effort — never blocks quitting).
     settings.update_from(&app.dsp, player.volume());
     settings.save(&config.session_path);
+    if atproto.is_logged_in() {
+        let _ = atproto.put_audio_settings(&app.dsp).await;
+    }
 
     restore_terminal(&mut term)?;
     res

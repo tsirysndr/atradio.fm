@@ -17,7 +17,7 @@ defs = new Mapping<String, Record> {
         }
         ["eqGains"] = new Array {
           type = "array"
-          description = "Per-band EQ gain in dB, one entry per band (60 Hz - 20 kHz)."
+          description = "Per-band EQ gain in dB, one entry per band (32 Hz - 16 kHz)."
           items = new IntegerType {
             type = "integer"
             minimum = -24

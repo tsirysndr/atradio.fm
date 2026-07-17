@@ -16,8 +16,8 @@ const SERVICE_TEMPLATE: &str = include_str!("atradio.service");
 
 /// `~/.config/systemd/user` (honours `XDG_CONFIG_HOME`).
 fn unit_dir() -> Result<PathBuf> {
-    let base = directories::BaseDirs::new()
-        .context("could not determine the user config directory")?;
+    let base =
+        directories::BaseDirs::new().context("could not determine the user config directory")?;
     Ok(base.config_dir().join("systemd").join("user"))
 }
 
@@ -37,7 +37,10 @@ fn systemctl(args: &[&str]) -> Result<()> {
 pub fn install() -> Result<()> {
     let path = unit_path()?;
     if path.exists() {
-        println!("Service already installed at {}. Nothing to do.", path.display());
+        println!(
+            "Service already installed at {}. Nothing to do.",
+            path.display()
+        );
         return Ok(());
     }
 
@@ -48,8 +51,7 @@ pub fn install() -> Result<()> {
     );
 
     std::fs::create_dir_all(unit_dir()?).context("could not create the systemd user directory")?;
-    std::fs::write(&path, unit)
-        .with_context(|| format!("could not write {}", path.display()))?;
+    std::fs::write(&path, unit).with_context(|| format!("could not write {}", path.display()))?;
 
     systemctl(&["daemon-reload"])?;
     systemctl(&["enable", SERVICE_NAME])?;
@@ -78,8 +80,7 @@ pub fn uninstall() -> Result<()> {
 
     systemctl(&["stop", SERVICE_NAME])?;
     systemctl(&["disable", SERVICE_NAME])?;
-    std::fs::remove_file(&path)
-        .with_context(|| format!("could not remove {}", path.display()))?;
+    std::fs::remove_file(&path).with_context(|| format!("could not remove {}", path.display()))?;
     systemctl(&["daemon-reload"])?;
 
     println!("✓ atradio service uninstalled.");
