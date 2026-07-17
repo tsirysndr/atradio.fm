@@ -75,6 +75,28 @@ pub enum Command {
 
     /// Show the currently signed-in account.
     Whoami,
+
+    /// Manage the systemd user service that runs atradio Connect headless.
+    ///
+    /// Linux only — installs `atradio --no-tui` under `systemctl --user` so the
+    /// device stays online across logout/reboot. Not available on macOS/*BSD.
+    #[cfg(target_os = "linux")]
+    Service {
+        #[command(subcommand)]
+        action: ServiceAction,
+    },
+}
+
+/// Subcommands for `atradio service` (Linux only).
+#[cfg(target_os = "linux")]
+#[derive(Subcommand)]
+pub enum ServiceAction {
+    /// Install the service and start it under `systemctl --user`.
+    Install,
+    /// Show the service status.
+    Status,
+    /// Stop, disable, and remove the service.
+    Uninstall,
 }
 
 pub async fn run(cli: Cli) -> Result<()> {
@@ -95,6 +117,12 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Login { identifier, oauth } => cmd_login(identifier, oauth, &config).await,
         Command::Logout => cmd_logout(&config),
         Command::Whoami => cmd_whoami(&config),
+        #[cfg(target_os = "linux")]
+        Command::Service { action } => match action {
+            ServiceAction::Install => crate::systemd::install(),
+            ServiceAction::Status => crate::systemd::status(),
+            ServiceAction::Uninstall => crate::systemd::uninstall(),
+        },
     }
 }
 

@@ -22,6 +22,7 @@ when signed in — favorite stations, add your own, and post comments to your PD
 - [Keybindings (TUI)](#keybindings-tui)
 - [Equalizer & DSP](#equalizer--dsp)
 - [atradio Connect (remote control)](#atradio-connect-remote-control)
+- [Run as a service (systemd, Linux only)](#run-as-a-service-systemd-linux-only)
 - [Platform notes](#platform-notes)
 - [Lexicon bindings](#lexicon-bindings)
 
@@ -138,6 +139,7 @@ atradio login                 # sign in with an app password (env), or:
 atradio login --oauth         # sign in via the browser (OAuth)
 atradio whoami                # show the signed-in account
 atradio logout
+atradio service install       # Linux: run the headless daemon as a systemd user service
 ```
 
 ## Signing in
@@ -232,6 +234,33 @@ set a custom one in `~/.config/atradio/settings.toml`:
 ```toml
 device_name = "Living Room"
 ```
+
+### Run as a service (`systemd`, Linux only)
+
+On Linux you can install the headless daemon as a **`systemctl --user` service**
+so it starts on login and restarts on failure — ideal for a Raspberry Pi or an
+always-on box. Sign in with an [app password](#signing-in) first so the daemon
+stays online unattended.
+
+```bash
+atradio service install     # write the unit, enable + start it under systemctl --user
+atradio service status      # show the running service (wraps `systemctl --user status`)
+atradio service uninstall   # stop, disable, and remove the unit
+```
+
+`install` drops a unit at `~/.config/systemd/user/atradio.service` whose
+`ExecStart` points at the current `atradio` binary running `--no-tui`, then runs
+`daemon-reload`, `enable`, and `start`. Follow its logs with:
+
+```bash
+journalctl --user -u atradio -f
+```
+
+> To keep the service running after you log out (e.g. on a headless Pi), enable
+> lingering once: `sudo loginctl enable-linger $USER`.
+
+The `service` subcommand is **Linux-only** — it is compiled out entirely on
+macOS, FreeBSD, NetBSD, and other platforms, where systemd isn't available.
 
 ## Platform notes
 
