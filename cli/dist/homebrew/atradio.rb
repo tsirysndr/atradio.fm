@@ -5,7 +5,7 @@
 class Atradio < Formula
   desc "A TUI radio player on the AT Protocol"
   homepage "https://github.com/tsirysndr/atradio.fm"
-  version "0.1.0"
+  version "0.2.0"
   license "GPL-2.0-or-later"
 
   on_macos do
