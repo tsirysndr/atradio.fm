@@ -48,9 +48,10 @@ smol_str = { version = "0.3", features = ["serde"] }
 toml = "0.8"
 
 # Linux-only: expose the player over MPRIS (D-Bus) for media-key / desktop
-# integration. No-op on macOS/Windows.
+# integration. No-op on macOS/Windows. Same version + tokio feature as fin's
+# proven fin-mpris crate.
 [target.'cfg(target_os = "linux")'.dependencies]
-mpris-server = "0.8"
+mpris-server = { version = "0.10", features = ["tokio"] }
 
 [features]
 default = ["fm_atradio"]

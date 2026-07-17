@@ -31,6 +31,9 @@ pub struct NowPlaying {
     pub sample_rate: u32,
     /// Decoded codec, e.g. "mp3", "aac".
     pub codec: String,
+    /// Current volume (0.0..=1.0) — carried so consumers of snapshots
+    /// (e.g. the MPRIS thread) never need the non-Send engine handle.
+    pub volume: f32,
 }
 
 impl NowPlaying {
@@ -57,6 +60,18 @@ pub enum State {
     Stopped,
     Playing,
     Paused,
+}
+
+/// Transport commands from desktop integration (MPRIS on Linux), routed back
+/// to the thread that owns the [`Player`] — the engine handle holds a cpal
+/// output stream and is `!Send`, so it can never cross to the D-Bus thread.
+#[derive(Clone, Copy, Debug)]
+pub enum MprisCmd {
+    PlayPause,
+    Play,
+    Pause,
+    Stop,
+    SetVolume(f32),
 }
 
 impl NowPlaying {
@@ -98,6 +113,10 @@ impl Player {
 
     pub fn play(&self) {
         self.rb.play();
+    }
+
+    pub fn pause(&self) {
+        self.rb.pause();
     }
 
     pub fn stop(&self) {
@@ -173,6 +192,7 @@ impl Player {
             bitrate,
             sample_rate,
             codec,
+            volume: self.rb.volume(),
         }
     }
 }

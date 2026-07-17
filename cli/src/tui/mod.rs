@@ -61,8 +61,22 @@ pub async fn run(config: Config) -> Result<()> {
     let display_name = profile.as_ref().and_then(|p| p.display_name.clone());
 
     let player = Arc::new(Player::new()?);
+
+    // MPRIS (Linux): the engine handle is !Send, so the D-Bus tasks talk to
+    // us over channels — now-playing snapshots out, transport commands back.
     #[cfg(target_os = "linux")]
-    crate::mpris::spawn(player.clone());
+    let (mpris_np_tx, mut mpris_cmd_rx) = {
+        let (tx, rx) = tokio::sync::watch::channel(crate::player::NowPlaying::default());
+        (tx, crate::mpris::spawn(rx))
+    };
+    // On other platforms the command channel is born closed: the select!
+    // branch below never fires.
+    #[cfg(not(target_os = "linux"))]
+    let mut mpris_cmd_rx = {
+        let (_tx, rx) = mpsc::unbounded_channel::<crate::player::MprisCmd>();
+        rx
+    };
+
     let appview = AppView::new(&config.appview_url);
     let browser = RadioBrowser::new();
     let atproto = Arc::new(atproto);
@@ -104,6 +118,8 @@ pub async fn run(config: Config) -> Result<()> {
     let res = loop {
         // Render.
         let np = player.now_playing();
+        #[cfg(target_os = "linux")]
+        let _ = mpris_np_tx.send(np.clone());
         app.volume = player.volume();
         app.muted = player.is_muted();
         if let Err(e) = term.draw(|f| ui::draw(f, &app, &np)) {
@@ -121,6 +137,18 @@ pub async fn run(config: Config) -> Result<()> {
             }
             Some(msg) = rx.recv() => {
                 apply_msg(msg, &mut app);
+            }
+            // Desktop-initiated transport commands (MPRIS). Applied here so
+            // the non-Send engine handle never leaves this thread.
+            Some(cmd) = mpris_cmd_rx.recv() => {
+                use crate::player::MprisCmd;
+                match cmd {
+                    MprisCmd::Play => player.play(),
+                    MprisCmd::Pause => player.pause(),
+                    MprisCmd::PlayPause => player.toggle(),
+                    MprisCmd::Stop => player.stop(),
+                    MprisCmd::SetVolume(v) => player.set_volume(v),
+                }
             }
             _ = ticker.tick() => {
                 app.toast.tick();
