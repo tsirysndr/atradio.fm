@@ -16,6 +16,12 @@ export interface ConnectHandlers {
   onDevices?: (devices: DeviceInfo[]) => void;
   onCommand?: (from: string, cmd: Command) => void;
   onPresence?: (anyPlaying: boolean, cleanup: boolean) => void;
+  /**
+   * The hub rejected our identity, or we repeatedly failed to mint a
+   * service-auth token — i.e. the OAuth session is stale/expired. The user must
+   * re-authenticate; retrying won't help. Fired at most once per client.
+   */
+  onAuthError?: () => void;
 }
 
 export interface ConnectOptions {
@@ -37,6 +43,13 @@ export class ConnectClient {
   private closed = false;
   private backoff = 1000;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Consecutive connect attempts that never reached `welcome`. */
+  private authFailures = 0;
+  /** Guards `onAuthError` so we prompt for re-login only once. */
+  private authErrorNotified = false;
+
+  /** How many failed handshakes before we treat it as a dead session. */
+  private static readonly AUTH_FAILURE_THRESHOLD = 2;
 
   constructor(private readonly opts: ConnectOptions) {}
 
@@ -77,6 +90,7 @@ export class ConnectClient {
         );
       } catch (err) {
         consola.warn("[connect] token mint failed", err);
+        this.noteAuthFailure();
         ws.close();
       }
     };
@@ -91,6 +105,8 @@ export class ConnectClient {
       switch (msg.t) {
         case "welcome":
           this.backoff = 1000;
+          this.authFailures = 0;
+          this.authErrorNotified = false;
           this.opts.handlers.onStatus?.("online");
           this.opts.handlers.onWelcome?.(msg.did, msg.deviceId);
           break;
@@ -105,6 +121,13 @@ export class ConnectClient {
           break;
         case "error":
           consola.warn("[connect] hub error", msg.code, msg.message);
+          // The hub verified our token and rejected it: the session is bad and
+          // reconnecting with the same one is futile. Stop and prompt re-login.
+          if (msg.code === "AuthFailed") {
+            this.notifyAuthError();
+            this.closed = true;
+            this.ws?.close();
+          }
           break;
       }
     };
@@ -118,6 +141,26 @@ export class ConnectClient {
     ws.onerror = () => {
       /* onclose does the reconnect */
     };
+  }
+
+  /**
+   * A handshake never reached `welcome` (token mint threw). After a couple of
+   * these in a row, surface a re-login prompt — but keep retrying with backoff
+   * in case it was a transient blip that self-heals.
+   */
+  private noteAuthFailure(): void {
+    this.authFailures += 1;
+    if (this.authFailures >= ConnectClient.AUTH_FAILURE_THRESHOLD) {
+      this.notifyAuthError();
+    }
+  }
+
+  /** Fire `onAuthError` at most once until the next successful `welcome`. */
+  private notifyAuthError(): void {
+    if (this.authErrorNotified) return;
+    this.authErrorNotified = true;
+    this.opts.handlers.onStatus?.("offline");
+    this.opts.handlers.onAuthError?.();
   }
 
   private scheduleReconnect(): void {

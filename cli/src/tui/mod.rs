@@ -716,6 +716,10 @@ fn apply_remote_event(evt: RemoteEvent, app: &mut App, atproto: &Arc<Atproto>) {
                 });
             }
         }
+        RemoteEvent::AuthExpired => {
+            app.connect_online = false;
+            app.toast.set("Session expired — press s to sign in again");
+        }
     }
 }
 

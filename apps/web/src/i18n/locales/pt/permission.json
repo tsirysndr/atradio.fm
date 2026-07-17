@@ -11,6 +11,7 @@
   "featuresFallback": "novos recursos",
   "and": "e",
   "message": "<strong>Novas permissões necessárias.</strong> A sua sessão não concede acesso a {{features}}. Saia e entre novamente para continuar.",
+  "expired": "<strong>Sessão expirada.</strong> A sua sessão não pode mais ser renovada, então o controle remoto e a sincronização pararam de funcionar. Saia e entre novamente.",
   "signingOut": "Saindo…",
   "reauth": "Sair e entrar novamente"
 }

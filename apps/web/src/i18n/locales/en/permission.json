@@ -11,6 +11,7 @@
   "featuresFallback": "new features",
   "and": "and",
   "message": "<strong>New permissions required.</strong> Your session doesn't grant access to {{features}}. Please log out and sign in again to continue.",
+  "expired": "<strong>Session expired.</strong> Your session can no longer be refreshed, so remote control and syncing have stopped working. Please log out and sign in again.",
   "signingOut": "Signing out…",
   "reauth": "Log out & sign in"
 }

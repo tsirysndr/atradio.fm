@@ -57,10 +57,15 @@ pub enum Command {
     },
 
     /// Sign in so you can favorite and comment.
+    ///
+    /// Defaults to an app-password login (set ATPROTO_APP_PASSWORD), which stays
+    /// signed in the longest — recommended for a long-running `daemon`. Pass
+    /// `--oauth` for the interactive browser flow instead.
     Login {
         /// Handle, DID, or PDS URL (optional; falls back to env / prompt).
         identifier: Option<String>,
-        /// Use the browser OAuth flow instead of an app password.
+        /// Use the browser OAuth flow instead of an app password. Convenient for
+        /// interactive use, but its session expires sooner than an app password.
         #[arg(long)]
         oauth: bool,
     },
@@ -213,6 +218,16 @@ async fn cmd_daemon(config: Config) -> Result<()> {
     if !atproto.is_logged_in() {
         anyhow::bail!("atradio Connect requires sign-in — run `atradio login` first");
     }
+    // Daemons run unattended for a long time. OAuth refresh tokens are short-
+    // lived, so nudge toward an app-password session, which stays signed in far
+    // longer (and refreshes silently). OAuth still works — it just may need the
+    // occasional re-login.
+    if atproto.is_oauth_session() {
+        println!(
+            "ℹ signed in via OAuth — for an unattended daemon, an app-password login \
+             (`atradio login <handle>` with ATPROTO_APP_PASSWORD) lasts much longer."
+        );
+    }
 
     let settings = crate::settings::Settings::load(&config.session_path);
     let player = Arc::new(crate::player::Player::new()?);
@@ -289,6 +304,12 @@ async fn cmd_daemon(config: Config) -> Result<()> {
                         let at = atproto.clone();
                         tokio::spawn(async move { let _ = at.delete_play_status().await; });
                     }
+                }
+                RemoteEvent::AuthExpired => {
+                    println!(
+                        "○ session expired — run `atradio login` to reconnect \
+                         (an app-password login lasts longer for a daemon)"
+                    );
                 }
                 _ => {}
             },

@@ -16,6 +16,13 @@ export const devicesAtom = atom<DeviceInfo[]>([]);
 /** WebSocket status to the Connect hub. */
 export const connectStatusAtom = atom<ConnectStatus>("offline");
 
+/**
+ * Set when the hub rejects our identity or token minting keeps failing — the
+ * OAuth session is stale/expired and the user must sign in again. Cleared when a
+ * fresh session rebuilds the Connect client.
+ */
+export const connectAuthErrorAtom = atom(false);
+
 /** This browser's device id, once the hub has acknowledged it. */
 export const selfDeviceIdAtom = atom<string | null>(null);
 

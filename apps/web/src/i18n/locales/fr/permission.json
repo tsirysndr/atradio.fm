@@ -11,6 +11,7 @@
   "featuresFallback": "de nouvelles fonctionnalités",
   "and": "et",
   "message": "<strong>Nouvelles autorisations requises.</strong> Votre session ne donne pas accès à {{features}}. Veuillez vous déconnecter puis vous reconnecter pour continuer.",
+  "expired": "<strong>Session expirée.</strong> Votre session ne peut plus être actualisée : le contrôle à distance et la synchronisation ne fonctionnent plus. Veuillez vous déconnecter puis vous reconnecter.",
   "signingOut": "Déconnexion…",
   "reauth": "Se déconnecter et se reconnecter"
 }

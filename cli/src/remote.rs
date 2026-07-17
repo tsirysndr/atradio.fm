@@ -86,6 +86,10 @@ pub enum RemoteEvent {
     Devices(Vec<Device>),
     /// Presence summary; `cleanup` asks us to delete our `actor.status` record.
     Presence { any_playing: bool, cleanup: bool },
+    /// We repeatedly couldn't mint a service-auth token — the OAuth session is
+    /// stale/expired and the user needs to sign in again. Emitted at most once
+    /// per stretch of failures (reset once we reconnect).
+    AuthExpired,
 }
 
 /// Cloneable handle to send commands to *other* devices.
@@ -146,22 +150,47 @@ async fn run(
     evt_tx: mpsc::UnboundedSender<RemoteEvent>,
     mut out_rx: mpsc::UnboundedReceiver<Outbound>,
 ) {
+    /// Consecutive token-mint failures before we surface "session expired".
+    const AUTH_FAILURE_THRESHOLD: u32 = 2;
+
     let mut backoff = 1000u64;
+    let mut mint_failures = 0u32;
+    let mut auth_notified = false;
     loop {
         let service_aud = discover_service_aud(&cfg.base_url).await;
-        match connect_once(
-            &cfg,
-            &service_aud,
-            &mut state,
-            &cmd_tx,
-            &evt_tx,
-            &mut out_rx,
-        )
-        .await
+
+        // Mint the service-auth token up front so we can tell an auth/session
+        // problem (retrying won't help until the user re-logs) apart from a
+        // transient WebSocket drop.
+        let token = match cfg
+            .atproto
+            .mint_service_auth(&service_aud, CONNECT_LXM)
+            .await
         {
+            Ok(t) => {
+                mint_failures = 0;
+                t
+            }
+            Err(_) => {
+                mint_failures += 1;
+                if mint_failures >= AUTH_FAILURE_THRESHOLD && !auth_notified {
+                    auth_notified = true;
+                    let _ = evt_tx.send(RemoteEvent::AuthExpired);
+                }
+                let _ = evt_tx.send(RemoteEvent::Status(false));
+                tokio::time::sleep(Duration::from_millis(backoff)).await;
+                backoff = (backoff * 2).min(15000);
+                continue;
+            }
+        };
+
+        match connect_once(&cfg, token, &mut state, &cmd_tx, &evt_tx, &mut out_rx).await {
             Ok(true) => return, // local shutdown (state/control dropped)
             Ok(false) | Err(_) => {}
         }
+        // We had a live connection (or a post-auth failure); a fresh mint above
+        // proves the session is fine, so allow a new prompt if it dies later.
+        auth_notified = false;
         let _ = evt_tx.send(RemoteEvent::Status(false));
         tokio::time::sleep(Duration::from_millis(backoff)).await;
         backoff = (backoff * 2).min(15000);
@@ -172,16 +201,12 @@ async fn run(
 /// (this device is shutting down), `Ok(false)`/`Err` to reconnect.
 async fn connect_once(
     cfg: &RemoteConfig,
-    service_aud: &str,
+    token: String,
     state: &mut watch::Receiver<WireState>,
     cmd_tx: &mpsc::UnboundedSender<RemoteCmd>,
     evt_tx: &mpsc::UnboundedSender<RemoteEvent>,
     out_rx: &mut mpsc::UnboundedReceiver<Outbound>,
 ) -> Result<bool> {
-    let token = cfg
-        .atproto
-        .mint_service_auth(service_aud, CONNECT_LXM)
-        .await?;
     let (ws, _resp) = tokio_tungstenite::connect_async(ws_url(&cfg.base_url)).await?;
     let (mut sink, mut stream) = ws.split();
 

@@ -11,6 +11,7 @@ import {
   volumeAtom,
 } from "@/atoms/player";
 import {
+  connectAuthErrorAtom,
   connectStatusAtom,
   devicesAtom,
   remoteTargetIdAtom,
@@ -44,6 +45,7 @@ export function ConnectProvider() {
   const setStatus = useSetAtom(connectStatusAtom);
   const setSelfId = useSetAtom(selfDeviceIdAtom);
   const setRemoteTarget = useSetAtom(remoteTargetIdAtom);
+  const setAuthError = useSetAtom(connectAuthErrorAtom);
 
   const setCurrentStation = useSetAtom(currentStationAtom);
   const setIsPlaying = useSetAtom(isPlayingAtom);
@@ -98,6 +100,10 @@ export function ConnectProvider() {
 
   // (Re)build the client whenever the identity/session changes.
   useEffect(() => {
+    // A fresh identity/session is our chance to clear a prior "session expired"
+    // prompt — the new client gets to prove itself.
+    setAuthError(false);
+
     if (!client || !did) {
       connRef.current?.stop();
       connRef.current = null;
@@ -110,12 +116,16 @@ export function ConnectProvider() {
 
     const handlers: ConnectHandlers = {
       onStatus: (s) => setStatus(s),
-      onWelcome: (_d, deviceId) => setSelfId(deviceId),
+      onWelcome: (_d, deviceId) => {
+        setSelfId(deviceId);
+        setAuthError(false);
+      },
       onDevices: (devices) => setDevices(devices),
       onCommand: (_from, cmd) => applyCommand(cmd),
       onPresence: (_anyPlaying, cleanup) => {
         if (cleanup) void deleteActorStatus(client, did);
       },
+      onAuthError: () => setAuthError(true),
     };
 
     const conn = new ConnectClient({

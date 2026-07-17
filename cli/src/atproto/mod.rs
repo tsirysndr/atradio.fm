@@ -78,6 +78,13 @@ impl Atproto {
         self.profile().is_some()
     }
 
+    /// True when the stored session was created via the browser OAuth flow (as
+    /// opposed to an app password). OAuth sessions carry shorter-lived refresh
+    /// tokens, so a long-running daemon may need periodic re-login.
+    pub fn is_oauth_session(&self) -> bool {
+        self.is_oauth()
+    }
+
     /// Log out: drop the cached session + profile.
     pub fn logout(&self) {
         Profile::clear(&self.session_path);

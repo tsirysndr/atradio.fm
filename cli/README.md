@@ -150,8 +150,12 @@ require a session.** Two ways to authenticate:
   export ATPROTO_IDENTIFIER="you.bsky.social"
   export ATPROTO_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx"
   ```
+  Its session stays signed in the longest and refreshes silently — **recommended
+  for a long-running [headless daemon](#headless-daemon---no-tui).**
 - **OAuth** — `atradio login --oauth you.bsky.social`, or press `s` in the TUI
-  to open the sign-in modal, which completes the flow in your browser.
+  to open the sign-in modal, which completes the flow in your browser. Convenient
+  for interactive use, but its session expires sooner than an app password, so an
+  always-on daemon may need the occasional re-login.
 
 The session + a small profile cache are stored under `~/.config/atradio/`
 (also `settings.toml` for volume + DSP).
@@ -212,6 +216,14 @@ atradio --no-tui              # stay online as a controllable device; Ctrl-C to 
 
 Runs with no TUI — just an online player you drive from the web app or another
 client (great for a Raspberry Pi or a always-on box wired to your speakers).
+
+> **Sign in with an app password for a daemon.** OAuth refresh tokens are
+> short-lived, so an OAuth-authenticated daemon eventually drops offline and
+> prints `session expired — run atradio login to reconnect` until you sign in
+> again. An [app-password](#authentication-optional) session stays signed in far
+> longer and refreshes on its own — set `ATPROTO_IDENTIFIER` +
+> `ATPROTO_APP_PASSWORD` and run `atradio login` (no `--oauth`). See
+> [Signing in](#signing-in).
 
 The device name shown to your other clients defaults to a hostname-based label;
 set a custom one in `~/.config/atradio/settings.toml`:
