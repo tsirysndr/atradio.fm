@@ -75,7 +75,9 @@ export function CliInstallModal() {
                 />
                 <CommandBlock
                   label={t("nix")}
-                  command="nix profile install github:tsirysndr/atradio.fm"
+                  command={
+                    "cachix use atradio # optional, speeds up the build\nnix profile install github:tsirysndr/atradio.fm"
+                  }
                 />
                 <CommandBlock
                   label={t("cargo")}
