@@ -139,6 +139,8 @@ atradio login                 # sign in with an app password (env), or:
 atradio login --oauth         # sign in via the browser (OAuth)
 atradio whoami                # show the signed-in account
 atradio logout
+atradio push                  # upload your local EQ/DSP settings to your PDS
+atradio pull                  # download your EQ/DSP settings from your PDS
 atradio service install       # Linux: run the headless daemon as a systemd user service
 ```
 
@@ -188,9 +190,26 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 
 Press `e` for the full Rockbox chain: a 10-band equalizer, bass/treble tone,
 crossfeed, perceptual bass, Haas surround, a compressor, and channel mode /
-stereo width. Changes apply live and persist to `settings.toml`. DSP stays
-**local** — the native EQ bands (32 Hz–16 kHz) differ from the web build's, so
-they are not synced to your PDS.
+stereo width. Changes apply live and persist to `settings.toml`.
+
+### Syncing settings (`push` / `pull`)
+
+When you're signed in, the whole DSP chain also **syncs to your PDS** as the
+`fm.atradio.audio.settings` singleton record — the CLI's EQ bands (32 Hz–16 kHz)
+now match the web build, so your EQ + DSP follow your account across the web app
+and other devices. The TUI syncs automatically: on startup a signed-in session
+**pulls** the record and applies it (remote wins), then **pushes** the current
+chain back when you quit.
+
+You can also sync on demand (both require [signing in](#signing-in)):
+
+```bash
+atradio push    # upload settings.toml → your fm.atradio.audio.settings record
+atradio pull    # download the record → overwrite the DSP chain in settings.toml
+```
+
+> `pull` replaces the local DSP chain with the synced record (it keeps your local
+> `volume`). If you have no record yet, `push` (or quitting the TUI) creates it.
 
 ## atradio Connect (remote control)
 
