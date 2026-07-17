@@ -9,6 +9,14 @@ use crate::config::Config;
 use crate::radio::RadioBrowser;
 use crate::theme;
 
+// The `service` subcommand is compiled in only where we know how to manage a
+// background service, and dispatches to the matching init-system backend:
+// systemd on Linux, rc.d on FreeBSD/NetBSD. Other platforms compile it out.
+#[cfg(target_os = "linux")]
+use crate::systemd as service_impl;
+#[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
+use crate::rcd as service_impl;
+
 #[derive(Parser)]
 #[command(
     name = "atradio",
@@ -76,22 +84,23 @@ pub enum Command {
     /// Show the currently signed-in account.
     Whoami,
 
-    /// Manage the systemd user service that runs atradio Connect headless.
+    /// Manage a background service that runs atradio Connect headless.
     ///
-    /// Linux only — installs `atradio --no-tui` under `systemctl --user` so the
-    /// device stays online across logout/reboot. Not available on macOS/*BSD.
-    #[cfg(target_os = "linux")]
+    /// Installs `atradio --no-tui` under the platform's init system — systemd
+    /// (`systemctl --user`) on Linux, rc.d on FreeBSD/NetBSD — so the device
+    /// stays online across logout/reboot. Not available on macOS or elsewhere.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
     Service {
         #[command(subcommand)]
         action: ServiceAction,
     },
 }
 
-/// Subcommands for `atradio service` (Linux only).
-#[cfg(target_os = "linux")]
+/// Subcommands for `atradio service` (Linux / FreeBSD / NetBSD).
+#[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
 #[derive(Subcommand)]
 pub enum ServiceAction {
-    /// Install the service and start it under `systemctl --user`.
+    /// Install the service and start it.
     Install,
     /// Show the service status.
     Status,
@@ -117,11 +126,11 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Login { identifier, oauth } => cmd_login(identifier, oauth, &config).await,
         Command::Logout => cmd_logout(&config),
         Command::Whoami => cmd_whoami(&config),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
         Command::Service { action } => match action {
-            ServiceAction::Install => crate::systemd::install(),
-            ServiceAction::Status => crate::systemd::status(),
-            ServiceAction::Uninstall => crate::systemd::uninstall(),
+            ServiceAction::Install => service_impl::install(),
+            ServiceAction::Status => service_impl::status(),
+            ServiceAction::Uninstall => service_impl::uninstall(),
         },
     }
 }

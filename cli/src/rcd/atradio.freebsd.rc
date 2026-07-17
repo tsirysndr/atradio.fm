@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# PROVIDE: atradio
+# REQUIRE: LOGIN NETWORKING
+# KEYWORD: shutdown
+#
+# atradio.fm Connect device — a headless radio player on the AT Protocol.
+#
+# Enable and configure in /etc/rc.conf (or /etc/rc.conf.d/atradio):
+#   atradio_enable="YES"
+#   atradio_user="youruser"   # user whose atradio session/config to use (default: root)
+#
+# `atradio service install` sets atradio_enable via sysrc(8) and starts it.
+
+. /etc/rc.subr
+
+name="atradio"
+rcvar="atradio_enable"
+
+load_rc_config $name
+
+: ${atradio_enable:="NO"}
+: ${atradio_user:="root"}
+
+pidfile="/var/run/${name}.pid"
+# %%ATRADIO_BIN%% is rewritten to the installed binary path at install time.
+atradio_bin="%%ATRADIO_BIN%%"
+
+# daemon(8) backgrounds the foreground `atradio --no-tui` process, writes the
+# pidfile, and supervises/restarts it (-r).
+command="/usr/sbin/daemon"
+command_args="-P ${pidfile} -r -f -u ${atradio_user} ${atradio_bin} --no-tui"
+
+run_rc_command "$1"

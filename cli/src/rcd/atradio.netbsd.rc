@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# PROVIDE: atradio
+# REQUIRE: DAEMON NETWORKING
+# KEYWORD: shutdown
+#
+# atradio.fm Connect device — a headless radio player on the AT Protocol.
+#
+# Enable and configure in /etc/rc.conf:
+#   atradio=YES
+#   atradio_user="youruser"   # user whose atradio session/config to use (default: root)
+#
+# `atradio service install` adds `atradio=YES` to /etc/rc.conf and starts it.
+# NetBSD ships no daemon(8), so the start hook backgrounds the process itself
+# and records its pid.
+
+. /etc/rc.subr
+
+name="atradio"
+rcvar=$name
+# %%ATRADIO_BIN%% is rewritten to the installed binary path at install time.
+command="%%ATRADIO_BIN%%"
+command_args="--no-tui"
+pidfile="/var/run/${name}.pid"
+
+: ${atradio_user:="root"}
+
+start_cmd="atradio_start"
+stop_cmd="atradio_stop"
+
+atradio_start()
+{
+	echo "Starting ${name}."
+	su -m "${atradio_user}" -c "${command} ${command_args}" >/dev/null 2>&1 &
+	echo $! > ${pidfile}
+}
+
+atradio_stop()
+{
+	if [ -f ${pidfile} ]; then
+		kill -- "$(cat ${pidfile})" 2>/dev/null
+		rm -f ${pidfile}
+		echo "Stopped ${name}."
+	else
+		echo "${name} is not running."
+	fi
+}
+
+load_rc_config $name
+run_rc_command "$1"
