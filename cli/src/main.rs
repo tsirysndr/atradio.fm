@@ -16,6 +16,8 @@ mod config;
 mod mpris;
 mod player;
 mod radio;
+#[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
+mod rcd;
 mod remote;
 mod settings;
 #[cfg(target_os = "linux")]

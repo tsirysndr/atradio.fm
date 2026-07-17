@@ -25,7 +25,15 @@
         atradio = import ./package.nix {
           inherit craneLib pkgs advisory-db;
           inherit (pkgs) lib;
-          src = craneLib.cleanCargoSource ./.;
+          # crane's default filter keeps only Rust/Cargo files; also keep the
+          # systemd unit + rc.d scripts the binary embeds via include_str!.
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter = path: type:
+              (craneLib.filterCargoSources path type)
+              || (pkgs.lib.hasSuffix ".service" path)
+              || (pkgs.lib.hasSuffix ".rc" path);
+          };
         };
       in
       {
