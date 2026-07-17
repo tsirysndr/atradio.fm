@@ -161,8 +161,14 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
         (tx, crate::mpris::spawn(rx))
     };
 
-    player.play_url(&url);
-    println!("Playing {url}\nPress Ctrl-C to stop.");
+    // Resolve playlists (TuneIn/.pls/.m3u) into a direct stream the engine can
+    // decode; source is unknown for a raw URL, so rely on the extension.
+    let resolved = crate::radio::resolve_stream(&url, "").await;
+    if resolved.is_hls {
+        anyhow::bail!("HLS streams (.m3u8) aren't playable from the CLI yet: {url}");
+    }
+    player.play_url(&resolved.url);
+    println!("Playing {}\nPress Ctrl-C to stop.", resolved.url);
 
     // Poll and print now-playing until interrupted.
     let mut last = String::new();
@@ -246,8 +252,6 @@ async fn cmd_daemon(config: Config) -> Result<()> {
                 RemoteCmd::SetVolume(v) => player.set_volume(v),
                 RemoteCmd::ToggleMute => player.toggle_mute(),
                 RemoteCmd::LoadStation(s) => {
-                    player.play_url(&s.url);
-                    println!("▶ {}", s.name);
                     let source = if s.id.starts_with("tunein:") {
                         "tunein"
                     } else if s.id.starts_with("custom:") {
@@ -255,6 +259,14 @@ async fn cmd_daemon(config: Config) -> Result<()> {
                     } else {
                         "radio-browser"
                     };
+                    // Unwrap playlists into a direct stream before playing.
+                    let resolved = crate::radio::resolve_stream(&s.url, source).await;
+                    if resolved.is_hls {
+                        println!("▶ {} — HLS not supported, skipping", s.name);
+                        continue;
+                    }
+                    player.play_url(&resolved.url);
+                    println!("▶ {}", s.name);
                     let station = StationInfo {
                         station_id: s.id.clone(),
                         name: s.name.clone(),

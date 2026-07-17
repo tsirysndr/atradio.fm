@@ -54,6 +54,11 @@ enum Msg {
     },
     SignedIn(crate::atproto::Profile),
     Toast(String),
+    /// A resolved, directly-playable stream URL for the station we're loading.
+    PlayResolved {
+        station_id: String,
+        url: String,
+    },
 }
 
 pub fn status_glyph(state: PlayState) -> &'static str {
@@ -186,7 +191,18 @@ pub async fn run(config: Config) -> Result<()> {
                 }
             }
             Some(msg) = rx.recv() => {
-                apply_msg(msg, &mut app);
+                match msg {
+                    // Play only if this is still the station we're loading (guards
+                    // against a slow resolve landing after the user switched away).
+                    Msg::PlayResolved { station_id, url } => {
+                        if app.current.as_ref().map(|s| s.station_id.as_str())
+                            == Some(station_id.as_str())
+                        {
+                            player.play_url(&url);
+                        }
+                    }
+                    other => apply_msg(other, &mut app),
+                }
             }
             // Desktop-initiated transport commands (MPRIS). Applied here so
             // the non-Send engine handle never leaves this thread.
@@ -303,6 +319,8 @@ fn apply_msg(msg: Msg, app: &mut App) {
             app.overlay = Overlay::None;
         }
         Msg::Toast(t) => app.toast.set(t),
+        // Handled in the run loop (needs the player); never reaches here.
+        Msg::PlayResolved { .. } => {}
     }
 }
 
@@ -328,9 +346,7 @@ fn handle_event(
     }
 
     match app.overlay {
-        Overlay::Search => {
-            return handle_search_keys(key.code, app, player, browser, atproto, appview, tx)
-        }
+        Overlay::Search => return handle_search_keys(key.code, app, browser, atproto, appview, tx),
         Overlay::Compose => return handle_compose_keys(key.code, app, atproto, tx),
         Overlay::SignIn => return handle_signin_keys(key.code, app),
         Overlay::AddStation => return handle_add_station_keys(key, app, appview, atproto, tx),
@@ -450,7 +466,7 @@ fn handle_event(
                 app.selected = 0;
             }
         }
-        KeyCode::Enter => play_selected(app, player, browser, atproto, appview, tx),
+        KeyCode::Enter => play_selected(app, browser, atproto, appview, tx),
         _ => {}
     }
 }
@@ -495,7 +511,6 @@ fn move_down(app: &mut App) {
 
 fn play_selected(
     app: &mut App,
-    player: &Arc<Player>,
     browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
     appview: &AppView,
@@ -516,21 +531,54 @@ fn play_selected(
             return;
         }
     }
-    start_playing(app, player, browser, atproto, appview, tx, station);
+    start_playing(app, browser, atproto, appview, tx, station);
+}
+
+/// Resolve a station's stream URL (unwrapping playlists) in the background and
+/// hand the direct URL back to the player thread. HLS streams the engine can't
+/// decode are reported via a toast instead.
+fn spawn_resolve_play(
+    tx: &mpsc::UnboundedSender<Msg>,
+    station_id: String,
+    url: String,
+    source: String,
+    name: String,
+) {
+    let tx = tx.clone();
+    tokio::spawn(async move {
+        let resolved = crate::radio::resolve_stream(&url, &source).await;
+        if resolved.is_hls {
+            let _ = tx.send(Msg::Toast(format!(
+                "{name}: HLS streams aren't playable in the terminal yet."
+            )));
+        } else {
+            let _ = tx.send(Msg::PlayResolved {
+                station_id,
+                url: resolved.url,
+            });
+        }
+    });
 }
 
 fn start_playing(
     app: &mut App,
-    player: &Arc<Player>,
     browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
     appview: &AppView,
     tx: &mpsc::UnboundedSender<Msg>,
     station: StationInfo,
 ) {
-    player.play_url(&station.stream_url);
     app.toast.set(format!("▶ {}", station.name));
     app.current = Some(station.clone());
+    // Resolve the real stream URL (unwrap TuneIn/.pls/.m3u playlists) off the
+    // player thread, then play it via Msg::PlayResolved.
+    spawn_resolve_play(
+        tx,
+        station.station_id.clone(),
+        station.stream_url.clone(),
+        station.source.clone(),
+        station.name.clone(),
+    );
 
     // Register the play with radio-browser (click count), best-effort.
     let b = browser.clone();
@@ -634,15 +682,7 @@ fn apply_remote_cmd(
         RemoteCmd::LoadStation(s) => {
             // Being told to play a station means this device becomes active.
             app.remote_target = None;
-            start_playing(
-                app,
-                player,
-                browser,
-                atproto,
-                appview,
-                tx,
-                lite_to_station(s),
-            );
+            start_playing(app, browser, atproto, appview, tx, lite_to_station(s));
         }
     }
 }
@@ -874,7 +914,6 @@ fn favorite_selected(app: &mut App, atproto: &Arc<Atproto>, tx: &mpsc::Unbounded
 fn handle_search_keys(
     code: KeyCode,
     app: &mut App,
-    player: &Arc<Player>,
     browser: &RadioBrowser,
     atproto: &Arc<Atproto>,
     appview: &AppView,
@@ -889,7 +928,7 @@ fn handle_search_keys(
             if let Some((_, s)) = ranked.get(app.search_selected) {
                 let station = (*s).clone();
                 app.overlay = Overlay::None;
-                start_playing(app, player, browser, atproto, appview, tx, station);
+                start_playing(app, browser, atproto, appview, tx, station);
             }
         }
         KeyCode::Up => {
