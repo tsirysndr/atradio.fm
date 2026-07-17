@@ -47,6 +47,7 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         Overlay::Compose => draw_compose(f, f.area(), app),
         Overlay::SignIn => draw_signin(f, f.area(), app),
         Overlay::AddStation => draw_add_station(f, f.area(), app),
+        Overlay::Devices => draw_devices(f, f.area(), app),
         Overlay::None => {}
     }
 }
@@ -597,6 +598,53 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
         ])
         .split(inner);
 
+    // atradio Connect: when controlling a remote device, the player bar shows
+    // that device's playback instead of local audio.
+    if let Some(dev) = app.remote_target_device() {
+        let st = &dev.state;
+        let glyph = if st.playing { "▶" } else { "⏸" };
+        let name = st
+            .station
+            .as_ref()
+            .map(|s| s.name.clone())
+            .unwrap_or_else(|| "—".into());
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("◉ ", Style::default().fg(theme::ORANGE)),
+                Span::styled(
+                    format!("Controlling {}  ", truncate(&dev.name, 24)),
+                    Style::default()
+                        .fg(theme::ORANGE)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(format!("{glyph} "), Style::default().fg(theme::GREEN)),
+                Span::styled(truncate(&name, 36), Style::default().fg(theme::FG)),
+            ])),
+            rows[0],
+        );
+        let title = st.title.clone().unwrap_or_else(|| "—".into());
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("♪ ", Style::default().fg(theme::CYAN)),
+                Span::styled(truncate(&title, 48), Style::default().fg(theme::CYAN)),
+            ])),
+            rows[1],
+        );
+        let vol = ((st.volume * 100.0).round() as i64).clamp(0, 100) as u16;
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("vol ", Style::default().fg(theme::MUTED)),
+                Span::styled(volume_bar(vol), Style::default().fg(theme::TEAL)),
+                Span::styled(
+                    format!(" {vol}%   ·  d: switch device"),
+                    Style::default().fg(theme::MUTED),
+                ),
+            ])),
+            rows[2],
+        );
+        return;
+    }
+
     match &app.current {
         Some(s) => {
             let state = crate::tui::status_glyph(np.state);
@@ -889,6 +937,118 @@ fn draw_add_station(f: &mut Frame, area: Rect, app: &App) {
         .wrap(ratatui::widgets::Wrap { trim: true }),
         hint,
     );
+}
+
+fn render_device_row(
+    f: &mut Frame,
+    area: Rect,
+    name: &str,
+    platform: &str,
+    sub: Option<String>,
+    active: bool,
+    selected: bool,
+) {
+    let dot = if active { "● " } else { "○ " };
+    let mut spans = vec![
+        Span::styled(
+            if selected { "› " } else { "  " },
+            Style::default().fg(theme::CYAN),
+        ),
+        Span::styled(
+            dot,
+            Style::default().fg(if active { theme::GREEN } else { theme::MUTED }),
+        ),
+        Span::styled(
+            truncate(name, 24),
+            Style::default()
+                .fg(if selected { theme::TEAL } else { theme::FG })
+                .add_modifier(if selected {
+                    Modifier::BOLD
+                } else {
+                    Modifier::empty()
+                }),
+        ),
+        Span::styled(format!("  ({platform})"), Style::default().fg(theme::MUTED)),
+    ];
+    if let Some(sub) = sub {
+        spans.push(Span::styled(
+            format!("  {}", truncate(&sub, 26)),
+            Style::default().fg(theme::INDIGO),
+        ));
+    }
+    f.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+
+fn draw_devices(f: &mut Frame, area: Rect, app: &App) {
+    let popup = centered(area, 62, 55);
+    f.render_widget(Clear, popup);
+    let title = if app.connect_online {
+        "atradio Connect · devices"
+    } else {
+        "atradio Connect · connecting…"
+    };
+    let block = panel(title, true);
+    let inner = block.inner(popup);
+    f.render_widget(block, popup);
+
+    let others = app.other_devices();
+    let total = 1 + others.len();
+
+    let mut constraints: Vec<Constraint> = (0..total).map(|_| Constraint::Length(1)).collect();
+    constraints.push(Constraint::Length(1)); // spacer
+    constraints.push(Constraint::Min(1)); // hint
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(inner);
+
+    // "This device" is the active player unless we're controlling a peer.
+    render_device_row(
+        f,
+        rows[0],
+        "This device",
+        "here",
+        None,
+        !app.remote_active(),
+        app.device_sel == 0,
+    );
+
+    for (i, dev) in others.iter().enumerate() {
+        let idx = i + 1;
+        let active = app.remote_target.as_deref() == Some(dev.id.as_str());
+        let sub = match &dev.state.station {
+            Some(s) => Some(format!(
+                "{} · {}",
+                if dev.state.playing {
+                    "playing"
+                } else {
+                    "paused"
+                },
+                s.name
+            )),
+            None => Some("idle".to_string()),
+        };
+        render_device_row(
+            f,
+            rows[idx],
+            &dev.name,
+            &dev.platform,
+            sub,
+            active,
+            app.device_sel == idx,
+        );
+    }
+
+    if let Some(hint) = rows.get(total + 1) {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "↑/↓ select · Enter play here / control · Esc close",
+                Style::default().fg(theme::MUTED),
+            )))
+            .wrap(ratatui::widgets::Wrap { trim: true }),
+            *hint,
+        );
+    }
 }
 
 // ---- helpers -------------------------------------------------------------

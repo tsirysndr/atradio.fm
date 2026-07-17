@@ -14,6 +14,11 @@ use crate::player::dsp::AudioSettings;
 pub struct Settings {
     pub volume: f32,
 
+    /// atradio Connect device name shown to other clients. Editable in
+    /// `settings.toml`; falls back to a hostname-based default when empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_name: Option<String>,
+
     pub eq_enabled: bool,
     pub eq_gains: Vec<f32>,
     pub bass: i32,
@@ -35,6 +40,7 @@ impl Default for Settings {
         let d = AudioSettings::default();
         Self {
             volume: 0.8,
+            device_name: None,
             eq_enabled: d.eq_enabled,
             eq_gains: d.eq_gains.to_vec(),
             bass: d.bass,

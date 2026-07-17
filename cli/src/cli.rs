@@ -23,6 +23,11 @@ or run `atradio login`.",
 pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
+
+    /// Run headless as an atradio Connect device (no TUI): stay online and let
+    /// the web app or other clients control playback. Waits until Ctrl-C.
+    #[arg(long, global = true)]
+    pub no_tui: bool,
 }
 
 #[derive(Subcommand)]
@@ -69,9 +74,16 @@ pub enum Command {
 
 pub async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env();
+    let no_tui = cli.no_tui;
 
     match cli.command.unwrap_or(Command::Tui) {
-        Command::Tui => crate::tui::run(config).await,
+        Command::Tui => {
+            if no_tui {
+                cmd_daemon(config).await
+            } else {
+                crate::tui::run(config).await
+            }
+        }
         Command::Search { query, limit } => cmd_search(query.join(" "), limit).await,
         Command::Play { target } => cmd_play(target.join(" "), config).await,
         Command::Trending { limit } => cmd_trending(limit, &config).await,
@@ -180,6 +192,109 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
             }
         }
     }
+}
+
+/// Headless atradio Connect device: no TUI, just an online controllable player.
+async fn cmd_daemon(config: Config) -> Result<()> {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use crate::appview::StationInfo;
+    use crate::player::State as PlayState;
+    use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
+
+    let atproto = Arc::new(Atproto::new(config.session_path.clone()));
+    if !atproto.is_logged_in() {
+        anyhow::bail!("atradio Connect requires sign-in — run `atradio login` first");
+    }
+
+    let settings = crate::settings::Settings::load(&config.session_path);
+    let player = Arc::new(crate::player::Player::new()?);
+    player.set_volume(settings.volume);
+    player.apply_dsp(&settings.audio());
+
+    let device_id = crate::remote::load_or_create_device_id(&config.session_path);
+    let device_name = settings
+        .device_name
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(crate::remote::default_device_name);
+    let (state_tx, state_rx) = tokio::sync::watch::channel(WireState::default());
+    let mut remote = crate::remote::spawn(
+        RemoteConfig {
+            base_url: config.appview_url.clone(),
+            device_id,
+            device_name: device_name.clone(),
+            atproto: atproto.clone(),
+        },
+        state_rx,
+    );
+
+    println!("atradio Connect device “{device_name}” is online.");
+    println!("Control it from the web app or another client. Press Ctrl-C to stop.");
+
+    let mut current: Option<StationLite> = None;
+    let mut ticker = tokio::time::interval(Duration::from_millis(500));
+    loop {
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => break,
+            Some(cmd) = remote.cmd_rx.recv() => match cmd {
+                RemoteCmd::Play => player.play(),
+                RemoteCmd::Pause => player.pause(),
+                RemoteCmd::PlayPause => player.toggle(),
+                RemoteCmd::Stop => { player.stop(); current = None; }
+                RemoteCmd::SetVolume(v) => player.set_volume(v),
+                RemoteCmd::ToggleMute => player.toggle_mute(),
+                RemoteCmd::LoadStation(s) => {
+                    player.play_url(&s.url);
+                    println!("▶ {}", s.name);
+                    let source = if s.id.starts_with("tunein:") {
+                        "tunein"
+                    } else if s.id.starts_with("custom:") {
+                        "custom"
+                    } else {
+                        "radio-browser"
+                    };
+                    let station = StationInfo {
+                        station_id: s.id.clone(),
+                        name: s.name.clone(),
+                        stream_url: s.url.clone(),
+                        source: source.to_string(),
+                        logo: s.favicon.clone(),
+                        ..Default::default()
+                    };
+                    current = Some(s);
+                    let at = atproto.clone();
+                    tokio::spawn(async move { let _ = at.set_play_status(&station).await; });
+                }
+            },
+            Some(evt) = remote.evt_rx.recv() => match evt {
+                RemoteEvent::Status(online) => {
+                    println!("{}", if online { "● connected" } else { "○ disconnected — retrying" });
+                }
+                RemoteEvent::Presence { cleanup, .. } => {
+                    if cleanup {
+                        let at = atproto.clone();
+                        tokio::spawn(async move { let _ = at.delete_play_status().await; });
+                    }
+                }
+                _ => {}
+            },
+            _ = ticker.tick() => {
+                let np = player.now_playing();
+                let _ = state_tx.send(WireState {
+                    playing: matches!(np.state, PlayState::Playing),
+                    station: current.clone(),
+                    title: np.line(),
+                    volume: player.volume(),
+                    muted: player.is_muted(),
+                });
+            }
+        }
+    }
+
+    println!("\nStopping atradio Connect device.");
+    Ok(())
 }
 
 async fn cmd_login(identifier: Option<String>, oauth: bool, config: &Config) -> Result<()> {

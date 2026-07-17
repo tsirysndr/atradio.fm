@@ -16,6 +16,7 @@ mod config;
 mod mpris;
 mod player;
 mod radio;
+mod remote;
 mod settings;
 mod theme;
 mod tui;

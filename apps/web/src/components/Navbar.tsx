@@ -19,6 +19,7 @@ import {
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "./NotificationBell";
+import { DevicePicker } from "./DevicePicker";
 import { IconTangled } from "./IconTangled";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 
@@ -117,6 +118,7 @@ export function Navbar() {
             <span className="sm:hidden">{t("add", { ns: "common" })}</span>
           </Button>
 
+          {isLoggedIn && <DevicePicker />}
           {isLoggedIn && <NotificationBell />}
 
           {isLoggedIn ? (

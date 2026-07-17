@@ -7,6 +7,8 @@ import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
 import { PermissionBanner } from "./PermissionBanner";
 import { Player } from "./Player";
+import { ConnectBanner } from "./ConnectBanner";
+import { ConnectProvider } from "./ConnectProvider";
 import { PlayerReactionRain } from "./PlayerReactionRain";
 import { AddStationModal } from "./AddStationModal";
 import { CommentsModal } from "./CommentsModal";
@@ -51,6 +53,7 @@ export function Layout() {
       </button>
 
       <Player />
+      <ConnectBanner />
       <PlayerReactionRain />
       <AddStationModal />
       <CommentsModal />
@@ -62,6 +65,7 @@ export function Layout() {
       <AudioSettingsSync />
       <UserDataSync />
       <PlayStatusSync />
+      <ConnectProvider />
     </div>
   );
 }

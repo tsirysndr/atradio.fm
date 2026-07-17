@@ -335,6 +335,62 @@ impl Atproto {
         let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
         self.put(rkey, record, "update play status").await
     }
+
+    /// Delete the actor's play-status singleton (rkey `self`). Used when no
+    /// player is online anymore, so the user stops appearing as "listening".
+    pub async fn delete_play_status(&self) -> Result<()> {
+        let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
+        if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .delete_record::<ActorStatus>(rkey)
+                .await
+                .map_err(to_anyhow)
+                .context("delete play status")?;
+        } else {
+            self.credential_agent()
+                .await?
+                .delete_record::<ActorStatus>(rkey)
+                .await
+                .map_err(to_anyhow)
+                .context("delete play status")?;
+        }
+        Ok(())
+    }
+
+    /// Mint an atproto **service-auth JWT** bound to `aud` (the AppView's DID)
+    /// and `lxm` (the lexicon method). This is what proves to the Connect hub
+    /// that a WebSocket connection genuinely belongs to this account.
+    pub async fn mint_service_auth(&self, aud: &str, lxm: &str) -> Result<String> {
+        use jacquard::api::com_atproto::server::get_service_auth::GetServiceAuth;
+        use jacquard::types::string::Nsid;
+        use jacquard_common::xrpc::XrpcClient;
+        use smol_str::SmolStr;
+
+        let nsid = Nsid::<SmolStr>::new_owned(lxm).map_err(|e| anyhow!("lxm: {e}"))?;
+        let exp = chrono::Utc::now().timestamp() + 60;
+        let req = GetServiceAuth::<SmolStr> {
+            aud: SmolStr::new(aud),
+            exp: Some(exp),
+            lxm: Some(nsid),
+        };
+
+        let resp = if self.is_oauth() {
+            let agent = Agent::from(self.resume_oauth().await?);
+            XrpcClient::send(&agent, req)
+                .await
+                .map_err(|e| anyhow!("service auth request failed: {e:?}"))?
+        } else {
+            let agent = self.credential_agent().await?;
+            XrpcClient::send(&agent, req)
+                .await
+                .map_err(|e| anyhow!("service auth request failed: {e:?}"))?
+        };
+        let out = resp
+            .parse::<SmolStr>()
+            .map_err(|e| anyhow!("service auth decode: {e:?}"))?;
+        Ok(out.token.to_string())
+    }
 }
 
 /// The OAuth scope set the CLI requests: atproto + write to the fm.atradio.*

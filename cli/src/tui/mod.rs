@@ -27,6 +27,7 @@ use crate::atproto::Atproto;
 use crate::config::Config;
 use crate::player::{Player, State as PlayState};
 use crate::radio::RadioBrowser;
+use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
 use state::{AddStationForm, App, HomeTab, Overlay, View};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
@@ -106,6 +107,37 @@ pub async fn run(config: Config) -> Result<()> {
     player.set_volume(settings.volume);
     player.apply_dsp(&app.dsp);
 
+    // atradio Connect: register this process as a controllable device and open
+    // the remote-control channel. Snapshots go out over a watch channel;
+    // inbound commands + roster/presence events come back over mpsc.
+    let device_id = crate::remote::load_or_create_device_id(&config.session_path);
+    let device_name = settings
+        .device_name
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(crate::remote::default_device_name);
+    let (local_state_tx, local_state_rx) = tokio::sync::watch::channel(WireState::default());
+    let (mut remote_cmd_rx, mut remote_evt_rx) = if atproto.is_logged_in() {
+        let remote = crate::remote::spawn(
+            RemoteConfig {
+                base_url: config.appview_url.clone(),
+                device_id: device_id.clone(),
+                device_name,
+                atproto: atproto.clone(),
+            },
+            local_state_rx,
+        );
+        app.remote_control = Some(remote.control);
+        (remote.cmd_rx, remote.evt_rx)
+    } else {
+        // Logged out: closed channels, so the select! arms below never fire
+        // (same trick as the non-Linux MPRIS branch).
+        let (_c, cmd_rx) = mpsc::unbounded_channel::<RemoteCmd>();
+        let (_e, evt_rx) = mpsc::unbounded_channel::<RemoteEvent>();
+        (cmd_rx, evt_rx)
+    };
+    app.self_device_id = Some(device_id);
+
     // Set up the terminal.
     let mut term = setup_terminal()?;
 
@@ -132,6 +164,14 @@ pub async fn run(config: Config) -> Result<()> {
         let _ = mpris_np_tx.send(np.clone());
         app.volume = player.volume();
         app.muted = player.is_muted();
+        // Broadcast this device's playback to the Connect hub.
+        let _ = local_state_tx.send(WireState {
+            playing: matches!(np.state, PlayState::Playing),
+            station: app.current.as_ref().map(station_to_lite),
+            title: np.line(),
+            volume: player.volume(),
+            muted: player.is_muted(),
+        });
         if let Err(e) = term.draw(|f| ui::draw(f, &app, &np)) {
             break Err(e.into());
         }
@@ -159,6 +199,14 @@ pub async fn run(config: Config) -> Result<()> {
                     MprisCmd::Stop => player.stop(),
                     MprisCmd::SetVolume(v) => player.set_volume(v),
                 }
+            }
+            // atradio Connect: a peer is controlling this device.
+            Some(cmd) = remote_cmd_rx.recv() => {
+                apply_remote_cmd(cmd, &mut app, &player, &browser, &atproto, &appview, &tx);
+            }
+            // atradio Connect: roster / presence / status updates.
+            Some(evt) = remote_evt_rx.recv() => {
+                apply_remote_event(evt, &mut app, &atproto);
             }
             _ = ticker.tick() => {
                 app.toast.tick();
@@ -286,6 +334,7 @@ fn handle_event(
         Overlay::Compose => return handle_compose_keys(key.code, app, atproto, tx),
         Overlay::SignIn => return handle_signin_keys(key.code, app),
         Overlay::AddStation => return handle_add_station_keys(key, app, appview, atproto, tx),
+        Overlay::Devices => return handle_devices_keys(key.code, app),
         Overlay::None => {}
     }
 
@@ -342,17 +391,29 @@ fn handle_event(
             }
         }
         KeyCode::Char(' ') => {
-            player.toggle();
+            if !route_remote(app, RemoteCmd::PlayPause) {
+                player.toggle();
+            }
         }
         KeyCode::Char('m') => {
-            player.toggle_mute();
+            if !route_remote(app, RemoteCmd::ToggleMute) {
+                player.toggle_mute();
+            }
+        }
+        KeyCode::Char('d') => {
+            if app.logged_in {
+                app.device_sel = 0;
+                app.overlay = Overlay::Devices;
+            } else {
+                app.toast.set("Sign in first (press s) to use Connect.");
+            }
         }
         KeyCode::Char('+') | KeyCode::Char('=') => {
             if app.view == View::Dsp {
                 if dsp_rows::adjust(&mut app.dsp, app.dsp_row, 1) {
                     player.apply_dsp(&app.dsp);
                 }
-            } else {
+            } else if !route_remote_volume(app, 0.05) {
                 player.bump_volume(0.05);
             }
         }
@@ -361,7 +422,7 @@ fn handle_event(
                 if dsp_rows::adjust(&mut app.dsp, app.dsp_row, -1) {
                     player.apply_dsp(&app.dsp);
                 }
-            } else {
+            } else if !route_remote_volume(app, -0.05) {
                 player.bump_volume(-0.05);
             }
         }
@@ -448,6 +509,13 @@ fn play_selected(
     let Some(station) = station else {
         return;
     };
+    // Controlling a remote device: send the station there instead of playing it.
+    if app.remote_active() {
+        if route_remote(app, RemoteCmd::LoadStation(station_to_lite(&station))) {
+            app.toast.set(format!("▶ {} → remote", station.name));
+            return;
+        }
+    }
     start_playing(app, player, browser, atproto, appview, tx, station);
 }
 
@@ -491,6 +559,161 @@ fn start_playing(
                 }
             }
         });
+    }
+}
+
+// ---- atradio Connect (remote control) --------------------------------------
+
+fn station_to_lite(s: &StationInfo) -> StationLite {
+    StationLite {
+        id: s.station_id.clone(),
+        name: s.name.clone(),
+        url: s.stream_url.clone(),
+        favicon: s.logo.clone(),
+    }
+}
+
+fn lite_to_station(s: StationLite) -> StationInfo {
+    let source = if s.id.starts_with("tunein:") {
+        "tunein"
+    } else if s.id.starts_with("custom:") {
+        "custom"
+    } else {
+        "radio-browser"
+    };
+    StationInfo {
+        station_id: s.id,
+        name: s.name,
+        stream_url: s.url,
+        source: source.to_string(),
+        logo: s.favicon,
+        ..Default::default()
+    }
+}
+
+/// Route a transport command to the controlled remote device. Returns true when
+/// it was sent (i.e. a remote is active) so callers can skip the local action.
+fn route_remote(app: &App, cmd: RemoteCmd) -> bool {
+    if let (Some(target), Some(ctrl)) = (
+        app.remote_target.clone().filter(|_| app.remote_active()),
+        app.remote_control.clone(),
+    ) {
+        ctrl.command(target, cmd);
+        true
+    } else {
+        false
+    }
+}
+
+/// Route a relative volume change to the remote (from its last-known volume).
+fn route_remote_volume(app: &App, delta: f32) -> bool {
+    let Some(dev) = app.remote_target_device() else {
+        return false;
+    };
+    let next = (dev.state.volume + delta).clamp(0.0, 1.0);
+    route_remote(app, RemoteCmd::SetVolume(next))
+}
+
+/// Apply a command received from a peer to the local player.
+fn apply_remote_cmd(
+    cmd: RemoteCmd,
+    app: &mut App,
+    player: &Arc<Player>,
+    browser: &RadioBrowser,
+    atproto: &Arc<Atproto>,
+    appview: &AppView,
+    tx: &mpsc::UnboundedSender<Msg>,
+) {
+    match cmd {
+        RemoteCmd::Play => player.play(),
+        RemoteCmd::Pause => player.pause(),
+        RemoteCmd::PlayPause => player.toggle(),
+        RemoteCmd::Stop => player.stop(),
+        RemoteCmd::SetVolume(v) => player.set_volume(v),
+        RemoteCmd::ToggleMute => player.toggle_mute(),
+        RemoteCmd::LoadStation(s) => {
+            // Being told to play a station means this device becomes active.
+            app.remote_target = None;
+            start_playing(
+                app,
+                player,
+                browser,
+                atproto,
+                appview,
+                tx,
+                lite_to_station(s),
+            );
+        }
+    }
+}
+
+/// Apply a roster / presence / status event from the hub.
+fn apply_remote_event(evt: RemoteEvent, app: &mut App, atproto: &Arc<Atproto>) {
+    match evt {
+        RemoteEvent::Status(online) => app.connect_online = online,
+        RemoteEvent::Welcome(id) => app.self_device_id = Some(id),
+        RemoteEvent::Devices(devices) => {
+            app.remote_devices = devices;
+            // Forget a target that dropped off.
+            if let Some(t) = app.remote_target.clone() {
+                if !app.remote_devices.iter().any(|d| d.id == t && !d.is_self) {
+                    app.remote_target = None;
+                }
+            }
+            let len = app.remote_devices.len();
+            if len > 0 && app.device_sel >= len {
+                app.device_sel = len - 1;
+            }
+        }
+        RemoteEvent::Presence {
+            any_playing: _,
+            cleanup,
+        } => {
+            if cleanup && atproto.is_logged_in() {
+                let at = atproto.clone();
+                tokio::spawn(async move {
+                    let _ = at.delete_play_status().await;
+                });
+            }
+        }
+    }
+}
+
+/// Keys for the device-picker overlay. The list is [this device, …peers];
+/// Enter picks the active device (Spotify-style transfer handled by the hub +
+/// state broadcast).
+fn handle_devices_keys(code: KeyCode, app: &mut App) {
+    let others = app.other_devices().len();
+    let total = 1 + others; // "this device" + peers
+    match code {
+        KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('q') => app.overlay = Overlay::None,
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.device_sel = app.device_sel.saturating_sub(1);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if app.device_sel + 1 < total {
+                app.device_sel += 1;
+            }
+        }
+        KeyCode::Enter => {
+            if app.device_sel == 0 {
+                // "This device" — take back control.
+                if let (Some(prev), Some(ctrl)) =
+                    (app.remote_target.take(), app.remote_control.clone())
+                {
+                    // Ask the device we were controlling to stop.
+                    ctrl.command(prev, RemoteCmd::Stop);
+                }
+                app.toast.set("Playing on this device");
+            } else if let Some(dev) = app.other_devices().get(app.device_sel - 1) {
+                let id = dev.id.clone();
+                let name = dev.name.clone();
+                app.remote_target = Some(id);
+                app.toast.set(format!("Controlling {name}"));
+            }
+            app.overlay = Overlay::None;
+        }
+        _ => {}
     }
 }
 

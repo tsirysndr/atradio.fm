@@ -173,6 +173,28 @@ export async function putActorStatus(
   );
 }
 
+/** Delete the actor's listening-status record (rkey `self`). Used when no
+ *  player is online anymore, so the user stops appearing as "listening".
+ *  Idempotent — a missing record is treated as already-clean. */
+export async function deleteActorStatus(
+  client: Client,
+  did: Did,
+): Promise<void> {
+  try {
+    await ok(
+      client.post("com.atproto.repo.deleteRecord", {
+        input: {
+          repo: did,
+          collection: NSID.actorStatus as Nsid,
+          rkey: ACTOR_STATUS_RKEY,
+        },
+      }),
+    );
+  } catch {
+    /* already gone / transient — nothing to clean up */
+  }
+}
+
 /** Write a comment on a station to the user's repo; returns its rkey + uri. */
 export async function putComment(
   client: Client,

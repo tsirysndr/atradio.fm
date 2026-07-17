@@ -13,6 +13,13 @@ export const env = {
   /** Optional Redis cache; caching is disabled when unset. */
   REDIS_URL: process.env.REDIS_URL ?? "",
   PORT: Number(process.env.PORT ?? 8080),
+  /**
+   * This AppView's own DID — the `aud` (audience) that clients bind their
+   * atproto service-auth JWTs to when connecting to the Connect hub. Clients
+   * must request a token for exactly this DID. Served (as did:web) at
+   * `/.well-known/did.json` so the identifier is resolvable.
+   */
+  CONNECT_SERVICE_DID: process.env.CONNECT_SERVICE_DID ?? "did:web:api.atradio.fm",
   /** All Jetstream hosts we connect to simultaneously for redundancy. */
   JETSTREAM_HOSTS: (process.env.JETSTREAM_HOSTS
     ? process.env.JETSTREAM_HOSTS.split(",")

@@ -1,0 +1,18 @@
+{
+  "title": "Connect to a device",
+  "buttonAria": "Connect to a device",
+  "buttonTitle": "Devices",
+  "thisDevice": "(this device)",
+  "noDevices": "No other devices online. Open atradio on another device or the CLI to control it from here.",
+  "statePlaying": "Playing",
+  "statePaused": "Paused",
+  "stateIdle": "Idle",
+  "stateWith": "{{state}} · {{station}}",
+  "nothingPlaying": "Nothing playing",
+  "playingOn": "Playing on {{name}}",
+  "play": "Play",
+  "pause": "Pause",
+  "stop": "Stop",
+  "remoteVolume": "Remote volume",
+  "playHere": "Play here"
+}

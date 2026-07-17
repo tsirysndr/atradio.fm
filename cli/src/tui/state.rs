@@ -35,6 +35,8 @@ pub enum Overlay {
     SignIn,
     /// Add-a-custom-station form.
     AddStation,
+    /// atradio Connect device picker.
+    Devices,
 }
 
 /// The add-station form: an ordered set of text fields.
@@ -202,6 +204,20 @@ pub struct App {
     pub volume: f32,
     pub muted: bool,
 
+    // ---- atradio Connect (remote control) ----
+    /// Handle for sending commands to other devices (None when logged out).
+    pub remote_control: Option<crate::remote::RemoteControl>,
+    /// Account roster (this device + peers), newest snapshot from the hub.
+    pub remote_devices: Vec<crate::remote::Device>,
+    /// The device we're currently controlling; None = play on this device.
+    pub remote_target: Option<String>,
+    /// This device's id, once the hub acknowledges it.
+    pub self_device_id: Option<String>,
+    /// Whether the Connect socket is currently online.
+    pub connect_online: bool,
+    /// Selection index within the device-picker overlay.
+    pub device_sel: usize,
+
     // ---- DSP ----
     pub dsp: AudioSettings,
     pub dsp_row: usize,
@@ -253,6 +269,12 @@ impl App {
             current: None,
             volume: 0.8,
             muted: false,
+            remote_control: None,
+            remote_devices: Vec::new(),
+            remote_target: None,
+            self_device_id: None,
+            connect_online: false,
+            device_sel: 0,
             dsp: AudioSettings::default(),
             dsp_row: 0,
             logged_in,
@@ -265,6 +287,24 @@ impl App {
             toast: Toast::default(),
             matcher: SkimMatcherV2::default(),
         }
+    }
+
+    /// The device we're controlling, if it's still present in the roster.
+    pub fn remote_target_device(&self) -> Option<&crate::remote::Device> {
+        let id = self.remote_target.as_ref()?;
+        self.remote_devices
+            .iter()
+            .find(|d| &d.id == id && !d.is_self)
+    }
+
+    /// True when transport actions should be routed to a remote device.
+    pub fn remote_active(&self) -> bool {
+        self.remote_target_device().is_some()
+    }
+
+    /// Peers (devices other than this one) — the remote targets in the picker.
+    pub fn other_devices(&self) -> Vec<&crate::remote::Device> {
+        self.remote_devices.iter().filter(|d| !d.is_self).collect()
     }
 
     /// The station list backing the active home tab.
