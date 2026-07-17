@@ -15,7 +15,7 @@ let
     inherit src;
 
     pname = "atradio";
-    version = "0.2.1";
+    version = "0.2.2";
     strictDeps = true;
 
     # rockbox-playback pulls in rockbox-codecs + rockbox-dsp, whose build
