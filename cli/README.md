@@ -48,12 +48,12 @@ Direct `.deb`:
 
 ```bash
 # amd64
-curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.2.2_amd64.deb
-sudo apt install ./atradio_0.2.2_amd64.deb
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.3.0_amd64.deb
+sudo apt install ./atradio_0.3.0_amd64.deb
 
 # arm64 (Raspberry Pi 4/5, Apple-silicon VM, …)
-curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.2.2_arm64.deb
-sudo apt install ./atradio_0.2.2_arm64.deb
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.3.0_arm64.deb
+sudo apt install ./atradio_0.3.0_arm64.deb
 ```
 
 Or via the Gemfury apt repo (auto-updates with `apt upgrade`):
@@ -70,7 +70,7 @@ Direct `.rpm`:
 
 ```bash
 sudo dnf install \
-  https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.2.2-1.x86_64.rpm
+  https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.3.0-1.x86_64.rpm
 ```
 
 Or via the Gemfury dnf/yum repo:
