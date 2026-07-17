@@ -11,10 +11,13 @@ import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
+import gleam/list
 import gleam/result
+import gleam/string
 import logging
 import media_proxy/cache
 import media_proxy/config
+import media_proxy/ratelimit
 import media_proxy/simple
 import media_proxy/stream
 import mist.{type Connection, type ResponseData}
@@ -22,8 +25,9 @@ import mist.{type Connection, type ResponseData}
 pub fn main() {
   logging.configure()
   logging.set_level(logging.Info)
-  // Owned by this (long-lived) process so it outlives request handlers.
+  // Owned by this (long-lived) process so they outlive request handlers.
   cache.init()
+  ratelimit.init()
 
   let port = config.port()
   let assert Ok(_) =
@@ -37,7 +41,10 @@ pub fn main() {
 
 /// Access log around the router: `GET /api/stream -> 200`.
 fn handle(req: Request(Connection)) -> Response(ResponseData) {
-  let res = route(req)
+  let res = case rate_check(req) {
+    ratelimit.Allowed(_) -> route(req)
+    ratelimit.Limited(retry_after) -> cors(too_many(retry_after))
+  }
   logging.log(
     logging.Info,
     http.method_to_string(req.method)
@@ -95,6 +102,45 @@ fn cors(res: Response(ResponseData)) -> Response(ResponseData) {
   res
   |> response.set_header("access-control-allow-origin", "*")
   |> response.set_header("access-control-expose-headers", cors_expose_headers)
+}
+
+/// Rate-limit the `/api/*` routes per client IP; health + root are exempt.
+fn rate_check(req: Request(Connection)) -> ratelimit.Decision {
+  case request.path_segments(req) {
+    ["api", ..] ->
+      ratelimit.check(client_ip(req), config.rate_limit(), config.rate_window())
+    _ -> ratelimit.Allowed(0)
+  }
+}
+
+/// Real client IP, trusting the reverse proxy's forwarding headers first.
+fn client_ip(req: Request(Connection)) -> String {
+  case request.get_header(req, "x-forwarded-for") {
+    Ok(xff) ->
+      xff
+      |> string.split(",")
+      |> list.first
+      |> result.unwrap(xff)
+      |> string.trim
+    Error(_) ->
+      case request.get_header(req, "x-real-ip") {
+        Ok(ip) -> ip
+        Error(_) ->
+          case mist.get_connection_info(req.body) {
+            Ok(info) -> mist.ip_address_to_string(info.ip_address)
+            Error(_) -> "unknown"
+          }
+      }
+  }
+}
+
+fn too_many(retry_after: Int) -> Response(ResponseData) {
+  response.new(429)
+  |> response.set_header("content-type", "application/json")
+  |> response.set_header("retry-after", int.to_string(retry_after))
+  |> response.set_body(
+    mist.Bytes(bytes_tree.from_string("{\"error\":\"TooManyRequests\"}")),
+  )
 }
 
 /// Answer a CORS preflight, reflecting whatever headers the browser asked to

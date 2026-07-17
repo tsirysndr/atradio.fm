@@ -23,6 +23,8 @@ headers exposed.
 | Env var | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `7081` | HTTP listen port. |
+| `RATE_LIMIT` | `120` | Max `/api/*` requests per IP per window (429 over it). |
+| `RATE_WINDOW` | `60` | Rate-limit window, seconds. |
 
 ## Develop
 
