@@ -59,8 +59,13 @@ src/
 ├─ media_proxy/simple.gleam    # /tunein, /image, /icy handlers
 ├─ media_proxy/icy.gleam       # ICY StreamTitle reader (via the FFI)
 ├─ media_proxy/playlist.gleam  # .pls/.m3u unwrapping
-└─ proxy_gun_ffi.erl           # gun: streaming pipe + bounded ICY read
+├─ media_proxy/cache.gleam     # per-node TTL cache (TuneIn 300s, ICY 20s)
+├─ proxy_gun_ffi.erl           # gun: streaming pipe + bounded ICY read
+└─ proxy_cache_ffi.erl         # ETS-backed TTL cache
 ```
+
+TuneIn + ICY responses are cached in a node-local ETS table (no Redis); a cache
+hit is served with `x-cache: HIT`.
 
 The `gun` FFI is the one piece Node hands you free (`stream.pipe`): a pump
 process owns the upstream connection and forwards each chunk to the Gleam

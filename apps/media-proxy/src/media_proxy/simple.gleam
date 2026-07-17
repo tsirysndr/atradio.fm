@@ -12,12 +12,19 @@ import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
 import logging
+import media_proxy/cache
 import media_proxy/config
 import media_proxy/icy as icy_meta
 import media_proxy/playlist
 import mist.{type Connection, type ResponseData}
 
 const upstream_timeout_ms = 8000
+
+/// Cache TTLs (seconds): TuneIn results are stable; ICY "now playing" changes
+/// per song, so keep it short but enough to absorb concurrent listeners.
+const tunein_ttl = 300
+
+const icy_ttl = 20
 
 /// Reverse-proxy `/api/tunein/*` to opml.radiotime.com (TuneIn sends no CORS).
 pub fn tunein(
@@ -29,19 +36,35 @@ pub fn tunein(
     Some(q) -> "?" <> q
     None -> ""
   }
-  let target = "https://opml.radiotime.com" <> path <> suffix
-  let accept =
-    request.get_header(req, "accept") |> result.unwrap("application/json")
+  let key = "tunein:" <> path <> suffix
 
-  // TODO(cache): TuneIn results are stable — add a ~300s ETS/actor cache.
-  case get_text(target, [#("accept", accept)]) {
-    Ok(res) -> {
-      let ct = response.get_header(res, "content-type") |> option.from_result
-      relay_text(res.status, ct, res.body)
-    }
+  case cache.get(key) {
+    // Cached value is `content-type <> "\n" <> body`.
+    Ok(cached) ->
+      case string.split_once(cached, "\n") {
+        Ok(#(ct, body)) -> x_cache(relay_text(200, Some(ct), body), "HIT")
+        Error(_) -> x_cache(relay_text(200, None, cached), "HIT")
+      }
     Error(_) -> {
-      logging.log(logging.Warning, "tunein: upstream failed: " <> target)
-      json_response(502, "{\"error\":\"BadGateway\"}")
+      let target = "https://opml.radiotime.com" <> path <> suffix
+      let accept =
+        request.get_header(req, "accept") |> result.unwrap("application/json")
+      case get_text(target, [#("accept", accept)]) {
+        Ok(res) -> {
+          let ct =
+            response.get_header(res, "content-type")
+            |> result.unwrap("application/json")
+          case is_ok(res.status) {
+            True -> cache.set(key, ct <> "\n" <> res.body, tunein_ttl)
+            False -> Nil
+          }
+          x_cache(relay_text(res.status, Some(ct), res.body), "MISS")
+        }
+        Error(_) -> {
+          logging.log(logging.Warning, "tunein: upstream failed: " <> target)
+          json_response(502, "{\"error\":\"BadGateway\"}")
+        }
+      }
     }
   }
 }
@@ -80,15 +103,24 @@ pub fn image(req: Request(Connection)) -> Response(ResponseData) {
 /// `/api/icy?url=<stream>` -> `{ "title": ... }`. Best-effort — a stream with
 /// no ICY metadata (or a transient read failure) simply reports `null`.
 pub fn icy(req: Request(Connection)) -> Response(ResponseData) {
-  // TODO(cache): now-playing changes per song — add a ~20s ETS/actor cache.
-  let title = case query_url(req) {
-    Some(url) -> icy_meta.read_title(resolve_stream(url))
-    None -> None
+  case query_url(req) {
+    None -> json_response(200, "{\"title\":null}")
+    Some(url) -> {
+      let key = "icy:" <> url
+      case cache.get(key) {
+        Ok(body) -> x_cache(json_response(200, body), "HIT")
+        Error(_) -> {
+          let title = icy_meta.read_title(resolve_stream(url))
+          let body =
+            json.to_string(
+              json.object([#("title", json.nullable(title, json.string))]),
+            )
+          cache.set(key, body, icy_ttl)
+          x_cache(json_response(200, body), "MISS")
+        }
+      }
+    }
   }
-  json_response(
-    200,
-    json.to_string(json.object([#("title", json.nullable(title, json.string))])),
-  )
 }
 
 /// `.pls`/`.m3u` playlists point at the real stream — unwrap before reading ICY.
@@ -190,6 +222,10 @@ fn json_response(status: Int, body: String) -> Response(ResponseData) {
   response.new(status)
   |> response.set_header("content-type", "application/json")
   |> response.set_body(mist.Bytes(bytes_tree.from_string(body)))
+}
+
+fn x_cache(res: Response(ResponseData), state: String) -> Response(ResponseData) {
+  response.set_header(res, "x-cache", state)
 }
 
 fn bad_request() -> Response(ResponseData) {

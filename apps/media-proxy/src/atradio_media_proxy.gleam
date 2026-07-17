@@ -12,6 +12,7 @@ import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
 import logging
+import media_proxy/cache
 import media_proxy/config
 import media_proxy/simple
 import media_proxy/stream
@@ -20,6 +21,8 @@ import mist.{type Connection, type ResponseData}
 pub fn main() {
   logging.configure()
   logging.set_level(logging.Info)
+  // Owned by this (long-lived) process so it outlives request handlers.
+  cache.init()
 
   let port = config.port()
   let assert Ok(_) =
