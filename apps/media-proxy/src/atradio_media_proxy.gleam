@@ -11,6 +11,7 @@ import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/int
+import gleam/result
 import logging
 import media_proxy/cache
 import media_proxy/config
@@ -49,15 +50,21 @@ fn handle(req: Request(Connection)) -> Response(ResponseData) {
 }
 
 fn route(req: Request(Connection)) -> Response(ResponseData) {
-  case request.path_segments(req) {
-    ["healthz"] -> cors(text(200, "ok"))
-    // The stream route sets its own headers (mist.chunked flushes them
-    // immediately), so CORS is applied inside `stream.handle`, not here.
-    ["api", "stream"] -> stream.handle(req)
-    ["api", "icy"] -> cors(simple.icy(req))
-    ["api", "image"] -> cors(simple.image(req))
-    ["api", "tunein", ..rest] -> cors(simple.tunein(req, rest))
-    _ -> cors(text(404, "not found"))
+  case req.method {
+    // CORS preflight (the decoder's `Icy-MetaData`/`Range` headers are
+    // non-simple, so the browser sends an OPTIONS first).
+    http.Options -> preflight(req)
+    _ ->
+      case request.path_segments(req) {
+        ["healthz"] -> cors(text(200, "ok"))
+        // The stream route sets its own headers (mist.chunked flushes them
+        // immediately), so CORS is applied inside `stream.handle`, not here.
+        ["api", "stream"] -> stream.handle(req)
+        ["api", "icy"] -> cors(simple.icy(req))
+        ["api", "image"] -> cors(simple.image(req))
+        ["api", "tunein", ..rest] -> cors(simple.tunein(req, rest))
+        _ -> cors(text(404, "not found"))
+      }
   }
 }
 
@@ -68,6 +75,20 @@ fn cors(res: Response(ResponseData)) -> Response(ResponseData) {
   res
   |> response.set_header("access-control-allow-origin", "*")
   |> response.set_header("access-control-expose-headers", cors_expose_headers)
+}
+
+/// Answer a CORS preflight, reflecting whatever headers the browser asked to
+/// send (e.g. `icy-metadata`, `range`) so the real request is allowed.
+fn preflight(req: Request(Connection)) -> Response(ResponseData) {
+  let allow_headers =
+    request.get_header(req, "access-control-request-headers")
+    |> result.unwrap("icy-metadata, range, content-type")
+  response.new(204)
+  |> response.set_header("access-control-allow-origin", "*")
+  |> response.set_header("access-control-allow-methods", "GET, HEAD, OPTIONS")
+  |> response.set_header("access-control-allow-headers", allow_headers)
+  |> response.set_header("access-control-max-age", "86400")
+  |> response.set_body(mist.Bytes(bytes_tree.new()))
 }
 
 fn text(status: Int, body: String) -> Response(ResponseData) {
