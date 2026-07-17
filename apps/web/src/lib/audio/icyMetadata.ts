@@ -1,3 +1,5 @@
+import { mediaProxyPath } from "@/lib/appview";
+
 /**
  * Best-effort ICY (Icecast/SHOUTcast) "now playing" reader.
  *
@@ -7,12 +9,13 @@
  * no stream host answers. So we ask our own proxy instead:
  *   - dev:  the `/api/icy` Vite middleware (see vite.config.ts) fetches the
  *           stream in Node (no CORS) and returns `{ title }`.
- *   - prod: point VITE_ICY_PROXY at an equivalent server-side endpoint.
+ *   - prod: point VITE_MEDIA_PROXY (the media-proxy service) or VITE_ICY_PROXY
+ *           at an equivalent server-side endpoint.
  *
  * When the proxy is absent (e.g. a static prod deploy with no backend), the
  * request fails and we simply show no track title.
  */
-const BASE = import.meta.env.VITE_ICY_PROXY ?? "/api/icy";
+const BASE = import.meta.env.VITE_ICY_PROXY ?? mediaProxyPath("/api/icy");
 
 async function fetchIcyTitle(
   streamUrl: string,

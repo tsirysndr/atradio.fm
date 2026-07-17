@@ -1,4 +1,5 @@
 import type { Station } from "@/lib/types";
+import { mediaProxyPath } from "@/lib/appview";
 
 /**
  * TuneIn's public OPML endpoint (opml.radiotime.com) powers its search. It is
@@ -6,11 +7,12 @@ import type { Station } from "@/lib/types";
  * requests are blocked. Every request therefore goes through a proxy:
  *   - dev: Vite's `/api/tunein` proxy (see vite.config.ts) rewrites to the real
  *     opml.radiotime.com host, same-origin so no CORS.
- *   - prod: set VITE_TUNEIN_PROXY to an equivalent server-side proxy path/URL.
+ *   - prod: set VITE_MEDIA_PROXY (the media-proxy service) or VITE_TUNEIN_PROXY
+ *     to an equivalent server-side proxy path/URL.
  * The unified search still treats a TuneIn failure as "no TuneIn results"
  * rather than failing the whole search.
  */
-const BASE = import.meta.env.VITE_TUNEIN_PROXY ?? "/api/tunein";
+const BASE = import.meta.env.VITE_TUNEIN_PROXY ?? mediaProxyPath("/api/tunein");
 
 /** Route any absolute opml.radiotime.com URL back through our proxy. */
 export function proxyTuneInUrl(url: string): string {

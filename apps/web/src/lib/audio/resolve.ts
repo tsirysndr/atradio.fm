@@ -1,5 +1,5 @@
 import type { Station } from "@/lib/types";
-import { APPVIEW_URL } from "@/lib/appview";
+import { MEDIA_PROXY } from "@/lib/appview";
 
 export interface ResolvedStream {
   url: string;
@@ -29,7 +29,7 @@ const isHlsUrl = (url: string) => /\.m3u8(\?|$)/i.test(url);
 export function proxiedStreamUrl(url: string): string {
   if (isHlsUrl(url)) return url;
   if (!/^https?:\/\//i.test(url)) return url;
-  return `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`;
+  return `${MEDIA_PROXY}/api/stream?url=${encodeURIComponent(url)}`;
 }
 
 /**

@@ -18,8 +18,27 @@ const BASE = (import.meta.env.VITE_APPVIEW_URL ?? "https://api.atradio.fm").repl
   "",
 );
 
-/** Base origin of the AppView API (also hosts the media proxies under /api). */
+/** Base origin of the AppView API (XRPC, Connect hub, discovery feeds). */
 export const APPVIEW_URL = BASE;
+
+/**
+ * Base origin for the media proxy routes (`/api/stream`, `/api/image`,
+ * `/api/tunein`, `/api/icy`). Defaults to the AppView (which still serves them)
+ * so nothing changes until `VITE_MEDIA_PROXY` points at the dedicated
+ * `apps/media-proxy` service — then those routes flip over with no code change.
+ */
+export const MEDIA_PROXY = (
+  import.meta.env.VITE_MEDIA_PROXY ?? APPVIEW_URL
+).replace(/\/$/, "");
+
+/**
+ * Resolve a media-proxy path. When `VITE_MEDIA_PROXY` is set, it points at the
+ * dedicated service; otherwise the path stays same-origin so the dev Vite
+ * middleware (`/api/tunein`, `/api/icy`) keeps working unchanged.
+ */
+export function mediaProxyPath(path: string): string {
+  return import.meta.env.VITE_MEDIA_PROXY ? `${MEDIA_PROXY}${path}` : path;
+}
 
 export interface ListQuery {
   limit?: number;

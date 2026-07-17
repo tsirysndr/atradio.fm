@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { proxiedStreamUrl, resolveStream } from "./resolve";
-import { APPVIEW_URL } from "@/lib/appview";
+import { MEDIA_PROXY } from "@/lib/appview";
 import type { Station } from "@/lib/types";
 
 function station(over: Partial<Station>): Station {
@@ -39,7 +39,7 @@ describe("proxiedStreamUrl", () => {
     ] as const) {
       setProtocol(page);
       expect(proxiedStreamUrl(url)).toBe(
-        `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`,
+        `${MEDIA_PROXY}/api/stream?url=${encodeURIComponent(url)}`,
       );
     }
   });

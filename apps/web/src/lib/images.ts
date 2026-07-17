@@ -1,4 +1,4 @@
-import { APPVIEW_URL } from "@/lib/appview";
+import { MEDIA_PROXY } from "@/lib/appview";
 
 /**
  * Route an `http://` image through the https API proxy so it isn't blocked as
@@ -13,5 +13,5 @@ export function proxiedImageUrl(url: string | undefined): string | undefined {
   const pageHttps =
     typeof window !== "undefined" && window.location.protocol === "https:";
   if (!isHttp || !pageHttps) return url;
-  return `${APPVIEW_URL}/api/image?url=${encodeURIComponent(url)}`;
+  return `${MEDIA_PROXY}/api/image?url=${encodeURIComponent(url)}`;
 }
