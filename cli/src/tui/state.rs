@@ -228,7 +228,7 @@ impl App {
             view: View::Home,
             overlay: Overlay::None,
             should_quit: false,
-            home_tab: HomeTab::Trending,
+            home_tab: HomeTab::Popular,
             trending: Vec::new(),
             popular: Vec::new(),
             favorites: Vec::new(),
