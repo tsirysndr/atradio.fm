@@ -49,6 +49,13 @@ pub struct Atproto {
     store: Arc<FileAuthStore>,
     resolver: Arc<Resolver>,
     session_path: PathBuf,
+    /// Serializes authenticated operations. atproto rotates the refresh token on
+    /// every refresh, so two operations refreshing at once would reuse the same
+    /// token — which PDSs treat as a compromise and revoke the whole session
+    /// (the daemon/TUI spawn play-status writes concurrently with the Connect
+    /// loop's service-auth minting). Holding this lock across each op keeps
+    /// refreshes strictly ordered so every op sees the latest persisted token.
+    auth_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl Atproto {
@@ -64,6 +71,7 @@ impl Atproto {
             store,
             resolver,
             session_path,
+            auth_lock: Arc::new(tokio::sync::Mutex::new(())),
         }
     }
 
@@ -227,6 +235,7 @@ impl Atproto {
     where
         R: jacquard_common::types::collection::Collection + serde::Serialize,
     {
+        let _guard = self.auth_lock.lock().await;
         if self.is_oauth() {
             let session = self.resume_oauth().await?;
             let out = Agent::from(session)
@@ -252,6 +261,7 @@ impl Atproto {
     where
         R: jacquard_common::types::collection::Collection + serde::Serialize,
     {
+        let _guard = self.auth_lock.lock().await;
         if self.is_oauth() {
             let session = self.resume_oauth().await?;
             Agent::from(session)
@@ -349,6 +359,7 @@ impl Atproto {
     /// Delete the actor's play-status singleton (rkey `self`). Used when no
     /// player is online anymore, so the user stops appearing as "listening".
     pub async fn delete_play_status(&self) -> Result<()> {
+        let _guard = self.auth_lock.lock().await;
         let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
         if self.is_oauth() {
             let session = self.resume_oauth().await?;
@@ -372,6 +383,7 @@ impl Atproto {
     /// rkey `self`) from the user's PDS, mapped into runtime DSP state. Returns
     /// `None` when the user has no record yet (first run on this account).
     pub async fn get_audio_settings(&self) -> Result<Option<AudioSettings>> {
+        let _guard = self.auth_lock.lock().await;
         let Some(did) = self.profile().map(|p| p.did) else {
             return Ok(None);
         };
@@ -415,6 +427,7 @@ impl Atproto {
     /// and `lxm` (the lexicon method). This is what proves to the Connect hub
     /// that a WebSocket connection genuinely belongs to this account.
     pub async fn mint_service_auth(&self, aud: &str, lxm: &str) -> Result<String> {
+        let _guard = self.auth_lock.lock().await;
         use jacquard::api::com_atproto::server::get_service_auth::GetServiceAuth;
         use jacquard::types::string::Nsid;
         use jacquard_common::xrpc::XrpcClient;
