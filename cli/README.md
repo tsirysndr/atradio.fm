@@ -12,6 +12,18 @@ when signed in — favorite stations, add your own, and post comments to your PD
 
 ![atradio](preview.png)
 
+## Contents
+
+- [Install](#install)
+- [Build (from a checkout)](#build-from-a-checkout)
+- [Usage](#usage)
+- [Signing in](#signing-in)
+- [Keybindings (TUI)](#keybindings-tui)
+- [Equalizer & DSP](#equalizer--dsp)
+- [atradio Connect (remote control)](#atradio-connect-remote-control)
+- [Platform notes](#platform-notes)
+- [Lexicon bindings](#lexicon-bindings)
+
 ## Install
 
 Prebuilt release tarballs, `.deb`, and `.rpm` packages are attached to every
@@ -116,6 +128,7 @@ Building compiles the vendored Rockbox codecs, so a C toolchain is required
 
 ```bash
 atradio                       # interactive TUI (default)
+atradio --no-tui              # headless Connect device (remote-controllable)
 atradio search lofi           # search radio-browser, print results
 atradio play "jazz"           # headless: play the top hit for a query…
 atradio play https://…/stream #   …or a stream URL directly
@@ -128,8 +141,9 @@ atradio logout
 
 ## Signing in
 
-Reads to the AppView are public; **favoriting, commenting, adding stations, and
-appearing in recently-played require a session.** Two ways to authenticate:
+Reads to the AppView are public; **favoriting, commenting, adding stations,
+appearing in recently-played, and [atradio Connect](#atradio-connect-remote-control)
+require a session.** Two ways to authenticate:
 
 - **App password** — set env vars, then `atradio login`:
   ```bash
@@ -155,6 +169,7 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 | `f`             | favorite the selected/current station                   |
 | `A`             | add a custom station (when signed in)                    |
 | `c` / `a`       | comments / add a comment                                 |
+| `d`             | Connect: pick a device to play/control (see below)       |
 | `n`             | notifications                                            |
 | `p`             | your profile (with playable recently-played)             |
 | `e`             | equalizer & DSP settings                                 |
@@ -169,6 +184,41 @@ crossfeed, perceptual bass, Haas surround, a compressor, and channel mode /
 stereo width. Changes apply live and persist to `settings.toml`. DSP stays
 **local** — the native EQ bands (32 Hz–16 kHz) differ from the web build's, so
 they are not synced to your PDS.
+
+## atradio Connect (remote control)
+
+Like Spotify Connect: when signed in, every atradio client you have open — this
+CLI, the web app, other terminals — shows up as a **device** on your account,
+and any of them can control the selected player. Requires a session (it's keyed
+to your DID and authenticated with an atproto service-auth token); logged-out
+clients don't participate.
+
+- Press **`d`** to open the device picker. Pick **This device** to play here, or
+  pick another device to **control it from here** — pressing `Enter` on a station,
+  `Space`, `m`, and `+`/`-` are then sent to that device instead of your local
+  audio. The player bar shows a `◉ Controlling <device>` indicator with the
+  remote's now-playing and volume.
+- Selecting a device **transfers** playback to it (Spotify-style): what you're
+  playing follows you to the device you pick; picking **This device** pulls it
+  back and stops the remote.
+- Your **listening status** (`fm.atradio.actor.status`) is now driven by Connect:
+  it's cleared automatically once none of your devices are playing.
+
+### Headless daemon (`--no-tui`)
+
+```bash
+atradio --no-tui              # stay online as a controllable device; Ctrl-C to stop
+```
+
+Runs with no TUI — just an online player you drive from the web app or another
+client (great for a Raspberry Pi or a always-on box wired to your speakers).
+
+The device name shown to your other clients defaults to a hostname-based label;
+set a custom one in `~/.config/atradio/settings.toml`:
+
+```toml
+device_name = "Living Room"
+```
 
 ## Platform notes
 
