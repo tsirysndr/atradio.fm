@@ -12,10 +12,10 @@ use crate::theme;
 // The `service` subcommand is compiled in only where we know how to manage a
 // background service, and dispatches to the matching init-system backend:
 // systemd on Linux, rc.d on FreeBSD/NetBSD. Other platforms compile it out.
-#[cfg(target_os = "linux")]
-use crate::systemd as service_impl;
 #[cfg(any(target_os = "freebsd", target_os = "netbsd"))]
 use crate::rcd as service_impl;
+#[cfg(target_os = "linux")]
+use crate::systemd as service_impl;
 
 #[derive(Parser)]
 #[command(
@@ -84,6 +84,18 @@ pub enum Command {
     /// Show the currently signed-in account.
     Whoami,
 
+    /// Push your local audio settings (EQ + DSP chain) to your AT Protocol repo.
+    ///
+    /// Uploads the settings from `settings.toml` to the `fm.atradio.audio.settings`
+    /// record so they sync to the web app and your other devices. Requires sign-in.
+    Push,
+
+    /// Pull your audio settings (EQ + DSP chain) from your AT Protocol repo.
+    ///
+    /// Downloads the `fm.atradio.audio.settings` record and writes it into your
+    /// local `settings.toml`, replacing the local DSP chain. Requires sign-in.
+    Pull,
+
     /// Manage a background service that runs atradio Connect headless.
     ///
     /// Installs `atradio --no-tui` under the platform's init system — systemd
@@ -126,6 +138,8 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Login { identifier, oauth } => cmd_login(identifier, oauth, &config).await,
         Command::Logout => cmd_logout(&config),
         Command::Whoami => cmd_whoami(&config),
+        Command::Push => cmd_push(&config).await,
+        Command::Pull => cmd_pull(&config).await,
         #[cfg(any(target_os = "linux", target_os = "freebsd", target_os = "netbsd"))]
         Command::Service { action } => match action {
             ServiceAction::Install => service_impl::install(),
@@ -398,6 +412,35 @@ fn cmd_logout(config: &Config) -> Result<()> {
         println!("Signed out.");
     } else {
         println!("Not signed in.");
+    }
+    Ok(())
+}
+
+async fn cmd_push(config: &Config) -> Result<()> {
+    let atproto = Atproto::new(config.session_path.clone());
+    if !atproto.is_logged_in() {
+        anyhow::bail!("pushing audio settings requires sign-in — run `atradio login` first");
+    }
+    let settings = crate::settings::Settings::load(&config.session_path);
+    atproto.put_audio_settings(&settings.audio()).await?;
+    println!("✓ Pushed your audio settings to your AT Protocol repo.");
+    Ok(())
+}
+
+async fn cmd_pull(config: &Config) -> Result<()> {
+    let atproto = Atproto::new(config.session_path.clone());
+    if !atproto.is_logged_in() {
+        anyhow::bail!("pulling audio settings requires sign-in — run `atradio login` first");
+    }
+    match atproto.get_audio_settings().await? {
+        Some(remote) => {
+            let mut settings = crate::settings::Settings::load(&config.session_path);
+            // Keep the local volume; only the DSP chain lives in the record.
+            settings.update_from(&remote, settings.volume);
+            settings.save(&config.session_path);
+            println!("✓ Pulled your audio settings into settings.toml.");
+        }
+        None => println!("No audio settings record found in your AT Protocol repo."),
     }
     Ok(())
 }

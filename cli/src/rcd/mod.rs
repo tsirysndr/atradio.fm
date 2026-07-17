@@ -46,7 +46,10 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 pub fn install() -> Result<()> {
     let path = script_path();
     if path.exists() {
-        println!("Service already installed at {}. Nothing to do.", path.display());
+        println!(
+            "Service already installed at {}. Nothing to do.",
+            path.display()
+        );
         return Ok(());
     }
 
@@ -140,7 +143,9 @@ fn set_rc_conf_enabled(enabled: bool) -> Result<()> {
     // Drop any prior atradio= line so we never duplicate or leave a stale value.
     let mut kept: Vec<&str> = existing
         .lines()
-        .filter(|l| l.trim_start() != line && !l.trim_start().starts_with(&format!("{SERVICE_NAME}=")))
+        .filter(|l| {
+            l.trim_start() != line && !l.trim_start().starts_with(&format!("{SERVICE_NAME}="))
+        })
         .collect();
     if enabled {
         kept.push(&line);
@@ -155,4 +160,3 @@ fn set_rc_conf_enabled(enabled: bool) -> Result<()> {
     })?;
     Ok(())
 }
-

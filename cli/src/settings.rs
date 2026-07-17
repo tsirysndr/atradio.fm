@@ -166,3 +166,116 @@ fn str_to_channel(s: &str) -> ChannelMode {
         _ => ChannelMode::Stereo,
     }
 }
+
+// ---- fm.atradio.audio.settings record <-> runtime DSP -----------------------
+//
+// The synced PDS record uses the same shape as the web app (integer gains,
+// `crossfeedDirect` in tenths of dB). Now that the CLI's EQ bands match the web
+// build (32 Hz…16 kHz), the record is index-aligned with our `eq_gains`, so we
+// can sync it. These mirror `packages/lexicons/src/mappers.ts`.
+
+use jacquard::types::string::Datetime;
+
+use crate::fm_atradio::audio::settings::{
+    Settings as AudioRecord, SettingsChannelMode, SettingsCrossfeedMode,
+};
+
+fn crossfeed_to_record(m: CrossfeedMode) -> SettingsCrossfeedMode {
+    match m {
+        CrossfeedMode::Off => SettingsCrossfeedMode::Off,
+        CrossfeedMode::Meier => SettingsCrossfeedMode::Meier,
+        CrossfeedMode::Custom => SettingsCrossfeedMode::Custom,
+    }
+}
+
+fn channel_to_record(m: ChannelMode) -> SettingsChannelMode {
+    match m {
+        ChannelMode::Stereo => SettingsChannelMode::Stereo,
+        ChannelMode::Mono => SettingsChannelMode::Mono,
+        ChannelMode::Custom => SettingsChannelMode::Custom,
+        ChannelMode::MonoLeft => SettingsChannelMode::MonoLeft,
+        ChannelMode::MonoRight => SettingsChannelMode::MonoRight,
+        ChannelMode::Karaoke => SettingsChannelMode::Karaoke,
+        ChannelMode::Swap => SettingsChannelMode::Swap,
+    }
+}
+
+/// Map a synced `fm.atradio.audio.settings` record into runtime DSP state,
+/// filling anything the record omits with defaults. `crossfeedDirect` comes in
+/// tenths of dB; gains are per-band integers indexed like [`crate::player::dsp::EQ_FREQS`].
+pub fn audio_from_record(r: &AudioRecord) -> AudioSettings {
+    let mut a = AudioSettings::default();
+    if let Some(v) = r.eq_enabled {
+        a.eq_enabled = v;
+    }
+    if let Some(gains) = r.eq_gains.as_ref() {
+        for (slot, g) in a.eq_gains.iter_mut().zip(gains.iter()) {
+            *slot = *g as f32;
+        }
+    }
+    if let Some(v) = r.bass {
+        a.bass = v as i32;
+    }
+    if let Some(v) = r.treble {
+        a.treble = v as i32;
+    }
+    if let Some(m) = r.crossfeed_mode.as_ref() {
+        a.crossfeed_mode = str_to_crossfeed(m.as_str());
+    }
+    if let Some(v) = r.crossfeed_direct {
+        a.crossfeed_direct = v as f32 / 10.0;
+    }
+    if let Some(v) = r.pbe {
+        a.pbe = v as i32;
+    }
+    if let Some(v) = r.pbe_precut {
+        a.pbe_precut = v as i32;
+    }
+    if let Some(v) = r.surround_delay {
+        a.surround_delay = v as i32;
+    }
+    if let Some(v) = r.surround_balance {
+        a.surround_balance = v as i32;
+    }
+    if let Some(v) = r.comp_threshold {
+        a.comp_threshold = v as i32;
+    }
+    if let Some(v) = r.comp_ratio {
+        a.comp_ratio = v as i32;
+    }
+    if let Some(m) = r.channel_mode.as_ref() {
+        a.channel_mode = str_to_channel(m.as_str());
+    }
+    if let Some(v) = r.stereo_width {
+        a.stereo_width = v as i32;
+    }
+    a
+}
+
+/// Build the singleton settings record from runtime DSP state. Inverse of
+/// [`audio_from_record`]: `crossfeedDirect` goes dB → tenths of dB and every
+/// gain is rounded to the integer the lexicon requires.
+pub fn audio_to_record(a: &AudioSettings) -> AudioRecord {
+    AudioRecord::new()
+        .updated_at(Datetime::now())
+        .eq_enabled(a.eq_enabled)
+        .eq_gains(
+            a.eq_gains
+                .iter()
+                .map(|g| g.round() as i64)
+                .collect::<Vec<_>>(),
+        )
+        .bass(a.bass as i64)
+        .treble(a.treble as i64)
+        .crossfeed_mode(crossfeed_to_record(a.crossfeed_mode))
+        .crossfeed_direct((a.crossfeed_direct * 10.0).round() as i64)
+        .pbe(a.pbe as i64)
+        .pbe_precut(a.pbe_precut as i64)
+        .surround_delay(a.surround_delay as i64)
+        .surround_balance(a.surround_balance as i64)
+        .comp_threshold(a.comp_threshold as i64)
+        .comp_ratio(a.comp_ratio as i64)
+        .channel_mode(channel_to_record(a.channel_mode))
+        .stereo_width(a.stereo_width as i64)
+        .build()
+}

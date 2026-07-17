@@ -194,6 +194,15 @@ export interface AudioSettingsData {
   stereoWidth: number;
 }
 
+/**
+ * EQ band centre frequencies (Hz), one per gain in `eqGains`. Matches the
+ * CLI's rockbox-playback `EQ_BAND_FREQUENCIES`, so web and CLI agree on which
+ * frequency each `eqGains` index controls and the record syncs across both.
+ */
+export const EQ_BANDS_HZ = [
+  32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
+] as const;
+
 export const DEFAULT_AUDIO_SETTINGS: AudioSettingsData = {
   eqEnabled: false,
   eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],

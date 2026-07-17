@@ -21,10 +21,13 @@ use jacquard_common::types::recordkey::{RecordKey, Rkey};
 
 use crate::appview::StationInfo;
 use crate::fm_atradio::actor::status::Status as ActorStatus;
+use crate::fm_atradio::audio::settings::{Settings as AudioSettingsRecord, SettingsRecord};
 use crate::fm_atradio::comment::Comment;
 use crate::fm_atradio::favorite::Favorite;
 use crate::fm_atradio::station::Station as StationRecord;
 use crate::fm_atradio::StationInfo as GenStation;
+use crate::player::dsp::AudioSettings;
+use crate::settings::{audio_from_record, audio_to_record};
 
 /// User input for creating a custom station.
 #[derive(Clone, Debug, Default)]
@@ -365,6 +368,49 @@ impl Atproto {
         Ok(())
     }
 
+    /// Fetch the synced audio-settings singleton (`fm.atradio.audio.settings`,
+    /// rkey `self`) from the user's PDS, mapped into runtime DSP state. Returns
+    /// `None` when the user has no record yet (first run on this account).
+    pub async fn get_audio_settings(&self) -> Result<Option<AudioSettings>> {
+        let Some(did) = self.profile().map(|p| p.did) else {
+            return Ok(None);
+        };
+        let uri = format!("at://{did}/fm.atradio.audio.settings/self");
+        let record_uri = AudioSettingsRecord::uri(smol_str::SmolStr::new(&uri))
+            .map_err(|e| anyhow!("audio settings uri: {e}"))?;
+        let fetched = if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .fetch_record::<SettingsRecord, _>(&record_uri)
+                .await
+        } else {
+            self.credential_agent()
+                .await?
+                .fetch_record::<SettingsRecord, _>(&record_uri)
+                .await
+        };
+        match fetched {
+            Ok(out) => Ok(Some(audio_from_record(&out.value))),
+            Err(e) => {
+                // A missing singleton is the normal first-run case, not an error.
+                let msg = format!("{e:?}");
+                if msg.contains("RecordNotFound") || msg.contains("not found") {
+                    Ok(None)
+                } else {
+                    Err(anyhow!("fetch audio settings: {msg}"))
+                }
+            }
+        }
+    }
+
+    /// Upsert the audio-settings singleton (rkey `self`) from runtime DSP state,
+    /// so the EQ + DSP chain follows the account to the web app and other devices.
+    pub async fn put_audio_settings(&self, dsp: &AudioSettings) -> Result<()> {
+        let record = audio_to_record(dsp);
+        let rkey: RecordKey<Rkey> = "self".parse().map_err(|e| anyhow!("rkey: {e}"))?;
+        self.put(rkey, record, "update audio settings").await
+    }
+
     /// Mint an atproto **service-auth JWT** bound to `aud` (the AppView's DID)
     /// and `lxm` (the lexicon method). This is what proves to the Connect hub
     /// that a WebSocket connection genuinely belongs to this account.
@@ -403,9 +449,10 @@ impl Atproto {
 /// The OAuth scope set the CLI requests: atproto + write to the fm.atradio.*
 /// collections it actually writes. Shared by login and write-resume.
 ///
-/// NOTE: `fm.atradio.audio.settings` is deliberately absent — the TUI's native
-/// Rockbox EQ bands (32 Hz…16 kHz) differ from the web build's (60 Hz…20 kHz),
-/// so DSP is persisted locally (settings.toml) and never synced to the PDS.
+/// `fm.atradio.audio.settings` is included: the TUI's native Rockbox EQ bands
+/// (32 Hz…16 kHz) now match the web build's, so the DSP chain is synced to the
+/// PDS (remote-wins on startup, written back on save) as well as cached locally
+/// in settings.toml.
 fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>> {
     use jacquard::oauth::scopes::Scope;
     jacquard::oauth::scopes::Scopes::builder()
@@ -419,6 +466,8 @@ fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>
         .repo_collection("fm.atradio.reaction")
         .map_err(to_anyhow)?
         .repo_collection("fm.atradio.actor.status")
+        .map_err(to_anyhow)?
+        .repo_collection("fm.atradio.audio.settings")
         .map_err(to_anyhow)?
         // Allow minting the service-auth token that authenticates the atradio
         // Connect WebSocket (com.atproto.server.getServiceAuth). The audience is
