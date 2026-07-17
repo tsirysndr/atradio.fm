@@ -1,0 +1,18 @@
+{
+  "title": "Conectar a um dispositivo",
+  "buttonAria": "Conectar a um dispositivo",
+  "buttonTitle": "Dispositivos",
+  "thisDevice": "(este dispositivo)",
+  "noDevices": "Nenhum outro dispositivo online. Abra o atradio em outro dispositivo ou na CLI para controlá-lo daqui.",
+  "statePlaying": "Tocando",
+  "statePaused": "Pausado",
+  "stateIdle": "Inativo",
+  "stateWith": "{{state}} · {{station}}",
+  "nothingPlaying": "Nada tocando",
+  "playingOn": "Tocando em {{name}}",
+  "play": "Tocar",
+  "pause": "Pausar",
+  "stop": "Parar",
+  "remoteVolume": "Volume remoto",
+  "playHere": "Tocar aqui"
+}

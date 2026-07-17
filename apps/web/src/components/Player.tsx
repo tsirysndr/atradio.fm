@@ -31,6 +31,7 @@ import {
   volumeAtom,
   type StreamInfo,
 } from "@/atoms/player";
+import { isRemoteActiveAtom } from "@/atoms/connect";
 import { favoriteIdsAtom, toggleFavoriteAtom } from "@/atoms/favorites";
 import {
   audioSettingsOpenAtom,
@@ -83,6 +84,9 @@ export function Player() {
   const [muted, setMuted] = useAtom(mutedAtom);
   const [nowPlaying, setNowPlaying] = useAtom(nowPlayingAtom);
   const [streamInfo, setStreamInfo] = useAtom(streamInfoAtom);
+  // When controlling a remote device, this browser is a controller, not a
+  // player: local audio is silenced and the Connect banner replaces the bar.
+  const remoteActive = useAtomValue(isRemoteActiveAtom);
   const favoriteIds = useAtomValue(favoriteIdsAtom);
   const toggleFavorite = useSetAtom(toggleFavoriteAtom);
   const openAudioSettings = useSetAtom(audioSettingsOpenAtom);
@@ -348,6 +352,12 @@ export function Player() {
     const p = getRockboxPlayer();
     if (p.ready) p.setVolume(muted ? 0 : volume);
   }, [volume, muted, station?.id]);
+
+  // Handing off to a remote device: silence local playback. The play/pause
+  // effect above then pauses whichever backend is active.
+  useEffect(() => {
+    if (remoteActive && isPlaying) setIsPlaying(false);
+  }, [remoteActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isFavorite = station ? favoriteIds.has(station.id) : false;
 
@@ -704,7 +714,9 @@ export function Player() {
 
       <div
         className={`pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 transition-transform duration-300 ${
-          station ? "translate-y-0" : "translate-y-[calc(100%+1.5rem)]"
+          station && !remoteActive
+            ? "translate-y-0"
+            : "translate-y-[calc(100%+1.5rem)]"
         }`}
       >
         <div className="pointer-events-auto mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/10 bg-synth-surface/40 shadow-2xl shadow-black/40 backdrop-blur-2xl">

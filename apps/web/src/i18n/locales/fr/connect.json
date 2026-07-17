@@ -1,0 +1,18 @@
+{
+  "title": "Connecter à un appareil",
+  "buttonAria": "Connecter à un appareil",
+  "buttonTitle": "Appareils",
+  "thisDevice": "(cet appareil)",
+  "noDevices": "Aucun autre appareil en ligne. Ouvrez atradio sur un autre appareil ou la CLI pour le contrôler d'ici.",
+  "statePlaying": "En lecture",
+  "statePaused": "En pause",
+  "stateIdle": "Inactif",
+  "stateWith": "{{state}} · {{station}}",
+  "nothingPlaying": "Aucune lecture",
+  "playingOn": "Lecture sur {{name}}",
+  "play": "Lecture",
+  "pause": "Pause",
+  "stop": "Arrêter",
+  "remoteVolume": "Volume distant",
+  "playHere": "Lire ici"
+}
