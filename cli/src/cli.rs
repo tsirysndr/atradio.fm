@@ -84,13 +84,13 @@ pub enum Command {
     /// Show the currently signed-in account.
     Whoami,
 
-    /// Push your local audio settings (EQ + DSP chain) to your AT Protocol repo.
+    /// Push your local audio settings (EQ + DSP chain) to your PDS.
     ///
     /// Uploads the settings from `settings.toml` to the `fm.atradio.audio.settings`
     /// record so they sync to the web app and your other devices. Requires sign-in.
     Push,
 
-    /// Pull your audio settings (EQ + DSP chain) from your AT Protocol repo.
+    /// Pull your audio settings (EQ + DSP chain) from your PDS.
     ///
     /// Downloads the `fm.atradio.audio.settings` record and writes it into your
     /// local `settings.toml`, replacing the local DSP chain. Requires sign-in.
@@ -423,7 +423,7 @@ async fn cmd_push(config: &Config) -> Result<()> {
     }
     let settings = crate::settings::Settings::load(&config.session_path);
     atproto.put_audio_settings(&settings.audio()).await?;
-    println!("✓ Pushed your audio settings to your AT Protocol repo.");
+    println!("✓ Pushed your audio settings to your PDS.");
     Ok(())
 }
 
@@ -440,7 +440,7 @@ async fn cmd_pull(config: &Config) -> Result<()> {
             settings.save(&config.session_path);
             println!("✓ Pulled your audio settings into settings.toml.");
         }
-        None => println!("No audio settings record found in your AT Protocol repo."),
+        None => println!("No audio settings record found in your PDS."),
     }
     Ok(())
 }
