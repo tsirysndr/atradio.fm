@@ -36,7 +36,7 @@ export function Layout() {
       </main>
 
       <Footer />
-      <div className="pb-24" aria-hidden="true" />
+      {station ? <div className="pb-24" aria-hidden="true" /> : null}
 
       <button
         type="button"
