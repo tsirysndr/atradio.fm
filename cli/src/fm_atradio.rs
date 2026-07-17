@@ -21,34 +21,36 @@ pub mod reaction;
 pub mod station;
 pub mod update_seen;
 
-
 #[allow(unused_imports)]
 use alloc::collections::BTreeMap;
 
 #[allow(unused_imports)]
 use core::marker::PhantomData;
-use jacquard_common::{CowStr, BosStr, DefaultStr, FromStaticStr};
+use jacquard_common::{BosStr, CowStr, DefaultStr, FromStaticStr};
 
 #[allow(unused_imports)]
 use jacquard_common::deps::codegen::unicode_segmentation::UnicodeSegmentation;
 use jacquard_common::deps::smol_str::SmolStr;
 use jacquard_common::types::ident::AtIdentifier;
-use jacquard_common::types::string::{Did, AtUri, Datetime, UriValue};
+use jacquard_common::types::string::{AtUri, Datetime, Did, UriValue};
 use jacquard_common::types::value::Data;
 use jacquard_derive::IntoStatic;
 use jacquard_lexicon::lexicon::LexiconDoc;
 use jacquard_lexicon::schema::LexiconSchema;
 
-#[allow(unused_imports)]
-use jacquard_lexicon::validation::{ConstraintError, ValidationPath};
-use serde::{Serialize, Deserialize};
+use crate::fm_atradio;
 use crate::fm_atradio::comment::Gif;
 use crate::fm_atradio::comment::Mention;
-use crate::fm_atradio;
+#[allow(unused_imports)]
+use jacquard_lexicon::validation::{ConstraintError, ValidationPath};
+use serde::{Deserialize, Serialize};
 /// A minimal public snapshot of an actor.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct ActorInfo<S: BosStr = DefaultStr> {
     ///Avatar URL.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -65,7 +67,10 @@ pub struct ActorInfo<S: BosStr = DefaultStr> {
 /// A comment on a station, paired with its record uri and author.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct CommentView<S: BosStr = DefaultStr> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub author: Option<fm_atradio::ActorInfo<S>>,
@@ -84,7 +89,10 @@ pub struct CommentView<S: BosStr = DefaultStr> {
 /// Unique-listener count for a single station.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct ListenerCount<S: BosStr = DefaultStr> {
     ///Number of distinct actors who have played this station.
     pub listeners: i64,
@@ -96,7 +104,10 @@ pub struct ListenerCount<S: BosStr = DefaultStr> {
 /// A single notification for an actor.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct NotificationView<S: BosStr = DefaultStr> {
     pub author: fm_atradio::ActorInfo<S>,
     pub created_at: Datetime,
@@ -117,7 +128,10 @@ pub struct NotificationView<S: BosStr = DefaultStr> {
 /// A single play event: a station an actor listened to at a point in time.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct PlayView<S: BosStr = DefaultStr> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actor: Option<fm_atradio::ActorInfo<S>>,
@@ -130,7 +144,10 @@ pub struct PlayView<S: BosStr = DefaultStr> {
 /// A self-contained snapshot of a radio station.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct StationInfo<S: BosStr = DefaultStr> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bitrate: Option<i64>,
@@ -165,7 +182,10 @@ pub struct StationInfo<S: BosStr = DefaultStr> {
 /// A station snapshot paired with its record uri (query output item).
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct StationView<S: BosStr = DefaultStr> {
     pub created_at: Datetime,
     pub station: fm_atradio::StationInfo<S>,
@@ -353,7 +373,7 @@ impl<S: BosStr> LexiconSchema for StationView<S> {
 
 pub mod actor_info_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -386,7 +406,12 @@ pub mod actor_info_state {
 /// Builder for constructing an instance of this type.
 pub struct ActorInfoBuilder<St: actor_info_state::State, S: BosStr = DefaultStr> {
     _state: PhantomData<fn() -> St>,
-    _fields: (Option<UriValue<S>>, Option<Did<S>>, Option<S>, Option<AtIdentifier<S>>),
+    _fields: (
+        Option<UriValue<S>>,
+        Option<Did<S>>,
+        Option<S>,
+        Option<AtIdentifier<S>>,
+    ),
     _type: PhantomData<fn() -> S>,
 }
 
@@ -500,10 +525,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> ActorInfo<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> ActorInfo<S> {
         ActorInfo {
             avatar: self._fields.0,
             did: self._fields.1.unwrap(),
@@ -515,10 +537,10 @@ where
 }
 
 fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
-    #[allow(unused_imports)]
-    use jacquard_common::{CowStr, deps::smol_str::SmolStr, types::blob::MimeType};
-    use jacquard_lexicon::lexicon::*;
     use alloc::collections::BTreeMap;
+    #[allow(unused_imports)]
+    use jacquard_common::{deps::smol_str::SmolStr, types::blob::MimeType, CowStr};
+    use jacquard_lexicon::lexicon::*;
     LexiconDoc {
         lexicon: Lexicon::Lexicon1,
         id: CowStr::new_static("fm.atradio.defs"),
@@ -527,9 +549,7 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("actorInfo"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static("A minimal public snapshot of an actor."),
-                    ),
+                    description: Some(CowStr::new_static("A minimal public snapshot of an actor.")),
                     required: Some(vec![SmolStr::new_static("did")]),
                     properties: {
                         #[allow(unused_mut)]
@@ -551,7 +571,9 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
                         );
                         map.insert(
                             SmolStr::new_static("displayName"),
-                            LexObjectProperty::String(LexString { ..Default::default() }),
+                            LexObjectProperty::String(LexString {
+                                ..Default::default()
+                            }),
                         );
                         map.insert(
                             SmolStr::new_static("handle"),
@@ -568,17 +590,15 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("commentView"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static(
-                            "A comment on a station, paired with its record uri and author.",
-                        ),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("uri"), SmolStr::new_static("station"),
-                            SmolStr::new_static("text"), SmolStr::new_static("createdAt")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static(
+                        "A comment on a station, paired with its record uri and author.",
+                    )),
+                    required: Some(vec![
+                        SmolStr::new_static("uri"),
+                        SmolStr::new_static("station"),
+                        SmolStr::new_static("text"),
+                        SmolStr::new_static("createdAt"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -622,7 +642,9 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
                         );
                         map.insert(
                             SmolStr::new_static("text"),
-                            LexObjectProperty::String(LexString { ..Default::default() }),
+                            LexObjectProperty::String(LexString {
+                                ..Default::default()
+                            }),
                         );
                         map.insert(
                             SmolStr::new_static("uri"),
@@ -639,15 +661,13 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("listenerCount"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static("Unique-listener count for a single station."),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("stationId"),
-                            SmolStr::new_static("listeners")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static(
+                        "Unique-listener count for a single station.",
+                    )),
+                    required: Some(vec![
+                        SmolStr::new_static("stationId"),
+                        SmolStr::new_static("listeners"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -660,7 +680,9 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
                         );
                         map.insert(
                             SmolStr::new_static("stationId"),
-                            LexObjectProperty::String(LexString { ..Default::default() }),
+                            LexObjectProperty::String(LexString {
+                                ..Default::default()
+                            }),
                         );
                         map
                     },
@@ -670,17 +692,14 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("notificationView"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static("A single notification for an actor."),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("uri"), SmolStr::new_static("reason"),
-                            SmolStr::new_static("author"),
-                            SmolStr::new_static("createdAt"),
-                            SmolStr::new_static("isRead")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static("A single notification for an actor.")),
+                    required: Some(vec![
+                        SmolStr::new_static("uri"),
+                        SmolStr::new_static("reason"),
+                        SmolStr::new_static("author"),
+                        SmolStr::new_static("createdAt"),
+                        SmolStr::new_static("isRead"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -707,11 +726,9 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
                         map.insert(
                             SmolStr::new_static("reason"),
                             LexObjectProperty::String(LexString {
-                                description: Some(
-                                    CowStr::new_static(
-                                        "Why this notification exists: mention | comment.",
-                                    ),
-                                ),
+                                description: Some(CowStr::new_static(
+                                    "Why this notification exists: mention | comment.",
+                                )),
                                 ..Default::default()
                             }),
                         );
@@ -725,20 +742,18 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
                         map.insert(
                             SmolStr::new_static("text"),
                             LexObjectProperty::String(LexString {
-                                description: Some(
-                                    CowStr::new_static("Snapshot of the comment text."),
-                                ),
+                                description: Some(CowStr::new_static(
+                                    "Snapshot of the comment text.",
+                                )),
                                 ..Default::default()
                             }),
                         );
                         map.insert(
                             SmolStr::new_static("uri"),
                             LexObjectProperty::String(LexString {
-                                description: Some(
-                                    CowStr::new_static(
-                                        "URI of the subject record (the comment).",
-                                    ),
-                                ),
+                                description: Some(CowStr::new_static(
+                                    "URI of the subject record (the comment).",
+                                )),
                                 format: Some(LexStringFormat::AtUri),
                                 ..Default::default()
                             }),
@@ -751,17 +766,13 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("playView"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static(
-                            "A single play event: a station an actor listened to at a point in time.",
-                        ),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("station"),
-                            SmolStr::new_static("playedAt")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static(
+                        "A single play event: a station an actor listened to at a point in time.",
+                    )),
+                    required: Some(vec![
+                        SmolStr::new_static("station"),
+                        SmolStr::new_static("playedAt"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -916,17 +927,14 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("stationView"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static(
-                            "A station snapshot paired with its record uri (query output item).",
-                        ),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("uri"), SmolStr::new_static("station"),
-                            SmolStr::new_static("createdAt")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static(
+                        "A station snapshot paired with its record uri (query output item).",
+                    )),
+                    required: Some(vec![
+                        SmolStr::new_static("uri"),
+                        SmolStr::new_static("station"),
+                        SmolStr::new_static("createdAt"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -964,7 +972,7 @@ fn lexicon_doc_fm_atradio_defs() -> LexiconDoc<'static> {
 
 pub mod comment_view_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -1224,10 +1232,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> CommentView<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> CommentView<S> {
         CommentView {
             author: self._fields.0,
             created_at: self._fields.1.unwrap(),
@@ -1243,7 +1248,7 @@ where
 
 pub mod listener_count_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -1286,10 +1291,7 @@ pub mod listener_count_state {
 }
 
 /// Builder for constructing an instance of this type.
-pub struct ListenerCountBuilder<
-    St: listener_count_state::State,
-    S: BosStr = DefaultStr,
-> {
+pub struct ListenerCountBuilder<St: listener_count_state::State, S: BosStr = DefaultStr> {
     _state: PhantomData<fn() -> St>,
     _fields: (Option<i64>, Option<S>),
     _type: PhantomData<fn() -> S>,
@@ -1384,10 +1386,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> ListenerCount<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> ListenerCount<S> {
         ListenerCount {
             listeners: self._fields.0.unwrap(),
             station_id: self._fields.1.unwrap(),
@@ -1398,7 +1397,7 @@ where
 
 pub mod notification_view_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -1489,10 +1488,7 @@ pub mod notification_view_state {
 }
 
 /// Builder for constructing an instance of this type.
-pub struct NotificationViewBuilder<
-    St: notification_view_state::State,
-    S: BosStr = DefaultStr,
-> {
+pub struct NotificationViewBuilder<St: notification_view_state::State, S: BosStr = DefaultStr> {
     _state: PhantomData<fn() -> St>,
     _fields: (
         Option<fm_atradio::ActorInfo<S>>,
@@ -1620,10 +1616,7 @@ where
 
 impl<St: notification_view_state::State, S: BosStr> NotificationViewBuilder<St, S> {
     /// Set the `station` field (optional)
-    pub fn station(
-        mut self,
-        value: impl Into<Option<fm_atradio::StationInfo<S>>>,
-    ) -> Self {
+    pub fn station(mut self, value: impl Into<Option<fm_atradio::StationInfo<S>>>) -> Self {
         self._fields.4 = value.into();
         self
     }
@@ -1689,10 +1682,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> NotificationView<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> NotificationView<S> {
         NotificationView {
             author: self._fields.0.unwrap(),
             created_at: self._fields.1.unwrap(),
@@ -1708,7 +1698,7 @@ where
 
 pub mod play_view_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -1876,7 +1866,7 @@ where
 
 pub mod station_info_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -1989,19 +1979,7 @@ impl StationInfoBuilder<station_info_state::Empty, DefaultStr> {
         StationInfoBuilder {
             _state: PhantomData,
             _fields: (
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None,
             ),
             _type: PhantomData,
         }
@@ -2014,19 +1992,7 @@ impl<S: BosStr> StationInfoBuilder<station_info_state::Empty, S> {
         StationInfoBuilder {
             _state: PhantomData,
             _fields: (
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None,
             ),
             _type: PhantomData,
         }
@@ -2254,10 +2220,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> StationInfo<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> StationInfo<S> {
         StationInfo {
             bitrate: self._fields.0,
             codec: self._fields.1,
@@ -2279,7 +2242,7 @@ where
 
 pub mod station_view_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -2338,7 +2301,11 @@ pub mod station_view_state {
 /// Builder for constructing an instance of this type.
 pub struct StationViewBuilder<St: station_view_state::State, S: BosStr = DefaultStr> {
     _state: PhantomData<fn() -> St>,
-    _fields: (Option<Datetime>, Option<fm_atradio::StationInfo<S>>, Option<AtUri<S>>),
+    _fields: (
+        Option<Datetime>,
+        Option<fm_atradio::StationInfo<S>>,
+        Option<AtUri<S>>,
+    ),
     _type: PhantomData<fn() -> S>,
 }
 
@@ -2452,10 +2419,7 @@ where
         }
     }
     /// Build the final struct with custom extra_data.
-    pub fn build_with_data(
-        self,
-        extra_data: BTreeMap<SmolStr, Data<S>>,
-    ) -> StationView<S> {
+    pub fn build_with_data(self, extra_data: BTreeMap<SmolStr, Data<S>>) -> StationView<S> {
         StationView {
             created_at: self._fields.0.unwrap(),
             station: self._fields.1.unwrap(),

@@ -8,18 +8,21 @@
 #[allow(unused_imports)]
 use alloc::collections::BTreeMap;
 
+use crate::fm_atradio::PlayView;
 #[allow(unused_imports)]
 use core::marker::PhantomData;
-use jacquard_common::{CowStr, BosStr, DefaultStr, FromStaticStr};
 use jacquard_common::deps::smol_str::SmolStr;
 use jacquard_common::types::ident::AtIdentifier;
 use jacquard_common::types::value::Data;
+use jacquard_common::{BosStr, CowStr, DefaultStr, FromStaticStr};
 use jacquard_derive::IntoStatic;
-use serde::{Serialize, Deserialize};
-use crate::fm_atradio::PlayView;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct GetRecentlyPlayed<S: BosStr = DefaultStr> {
     pub actor: AtIdentifier<S>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -29,9 +32,11 @@ pub struct GetRecentlyPlayed<S: BosStr = DefaultStr> {
     pub limit: Option<i64>,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct GetRecentlyPlayedOutput<S: BosStr = DefaultStr> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cursor: Option<S>,
@@ -70,7 +75,7 @@ impl jacquard_common::xrpc::XrpcEndpoint for GetRecentlyPlayedRequest {
 
 pub mod get_recently_played_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -101,10 +106,7 @@ pub mod get_recently_played_state {
 }
 
 /// Builder for constructing an instance of this type.
-pub struct GetRecentlyPlayedBuilder<
-    St: get_recently_played_state::State,
-    S: BosStr = DefaultStr,
-> {
+pub struct GetRecentlyPlayedBuilder<St: get_recently_played_state::State, S: BosStr = DefaultStr> {
     _state: PhantomData<fn() -> St>,
     _fields: (Option<AtIdentifier<S>>, Option<S>, Option<i64>),
     _type: PhantomData<fn() -> S>,
@@ -112,10 +114,7 @@ pub struct GetRecentlyPlayedBuilder<
 
 impl GetRecentlyPlayed<DefaultStr> {
     /// Create a new builder for this type, using the default string type (DefaultStr = SmolStr) if needed
-    pub fn new() -> GetRecentlyPlayedBuilder<
-        get_recently_played_state::Empty,
-        DefaultStr,
-    > {
+    pub fn new() -> GetRecentlyPlayedBuilder<get_recently_played_state::Empty, DefaultStr> {
         GetRecentlyPlayedBuilder::new()
     }
 }

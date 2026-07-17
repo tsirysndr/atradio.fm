@@ -25,7 +25,10 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         .split(f.area());
 
     // Background fill.
-    f.render_widget(Block::default().style(Style::default().bg(theme::BG)), f.area());
+    f.render_widget(
+        Block::default().style(Style::default().bg(theme::BG)),
+        f.area(),
+    );
 
     draw_topbar(f, root[0], app);
     match app.view {
@@ -61,7 +64,9 @@ fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
                     .clamp(6, 24) as usize;
                 spans.push(Span::styled(
                     truncate(name, name_budget),
-                    Style::default().fg(theme::GREEN).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(theme::GREEN)
+                        .add_modifier(Modifier::BOLD),
                 ));
                 spans.push(Span::raw(" "));
             }
@@ -90,9 +95,22 @@ fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
         .split(area);
 
     let brand = Line::from(vec![
-        Span::styled("atradio", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
-        Span::styled(".fm", Style::default().fg(theme::CYAN).add_modifier(Modifier::BOLD)),
-        Span::styled("  ·  social radio in your terminal", Style::default().fg(theme::MUTED)),
+        Span::styled(
+            "atradio",
+            Style::default()
+                .fg(theme::TEAL)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            ".fm",
+            Style::default()
+                .fg(theme::CYAN)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "  ·  social radio in your terminal",
+            Style::default().fg(theme::MUTED),
+        ),
     ]);
     f.render_widget(
         Paragraph::new(brand).style(Style::default().bg(theme::SURFACE)),
@@ -110,7 +128,9 @@ fn bell(unread: u32) -> Span<'static> {
     if unread > 0 {
         Span::styled(
             format!("🔔{unread}"),
-            Style::default().fg(theme::ORANGE).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(theme::ORANGE)
+                .add_modifier(Modifier::BOLD),
         )
     } else {
         Span::styled("🔔", Style::default().fg(theme::MUTED))
@@ -142,7 +162,10 @@ fn draw_home(f: &mut Frame, area: Rect, app: &App) {
     for (i, t) in HomeTab::all().into_iter().enumerate() {
         let active = t == app.home_tab;
         let style = if active {
-            Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(theme::BG)
+                .bg(theme::TEAL)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme::MUTED)
         };
@@ -189,10 +212,21 @@ fn render_station_list(
     let mut lines: Vec<Line> = Vec::new();
     for (i, s) in list.iter().enumerate().skip(start).take(height) {
         let is_sel = i == selected;
-        let is_cur = current.map(|c| c.station_id == s.station_id).unwrap_or(false);
-        let marker = if is_cur { "♪ " } else if is_sel { "› " } else { "  " };
+        let is_cur = current
+            .map(|c| c.station_id == s.station_id)
+            .unwrap_or(false);
+        let marker = if is_cur {
+            "♪ "
+        } else if is_sel {
+            "› "
+        } else {
+            "  "
+        };
         let name_style = if is_sel {
-            Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(theme::BG)
+                .bg(theme::TEAL)
+                .add_modifier(Modifier::BOLD)
         } else if is_cur {
             Style::default().fg(theme::GREEN)
         } else {
@@ -211,7 +245,10 @@ fn render_station_list(
             None => {
                 let sub = s.subtitle();
                 if !sub.is_empty() {
-                    spans.push(Span::styled(format!("  {sub}"), Style::default().fg(theme::MUTED)));
+                    spans.push(Span::styled(
+                        format!("  {sub}"),
+                        Style::default().fg(theme::MUTED),
+                    ));
                 }
             }
         }
@@ -237,14 +274,19 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
 
         let label_w = 18u16.min(inner.width);
         let label_style = if is_sel {
-            Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(theme::TEAL)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme::FG)
         };
         let label_area = Rect::new(line_area.x, line_area.y, label_w, 1);
         f.render_widget(
             Paragraph::new(Line::from(vec![
-                Span::styled(if is_sel { "› " } else { "  " }, Style::default().fg(theme::CYAN)),
+                Span::styled(
+                    if is_sel { "› " } else { "  " },
+                    Style::default().fg(theme::CYAN),
+                ),
                 Span::styled(truncate(&row.label, label_w as usize - 2), label_style),
             ])),
             label_area,
@@ -261,11 +303,16 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
                 let bar_w = rest.width.saturating_sub(9);
                 let bar_area = Rect::new(rest.x, rest.y, bar_w, 1);
                 let g = Gauge::default()
-                    .gauge_style(Style::default().fg(if is_sel { theme::TEAL } else { theme::INDIGO }))
+                    .gauge_style(Style::default().fg(if is_sel {
+                        theme::TEAL
+                    } else {
+                        theme::INDIGO
+                    }))
                     .ratio(fill as f64)
                     .label("");
                 f.render_widget(g, bar_area);
-                let val_area = Rect::new(rest.x + bar_w, rest.y, rest.width.saturating_sub(bar_w), 1);
+                let val_area =
+                    Rect::new(rest.x + bar_w, rest.y, rest.width.saturating_sub(bar_w), 1);
                 f.render_widget(
                     Paragraph::new(Span::styled(
                         format!(" {}", row.value),
@@ -275,8 +322,11 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
                 );
             }
             None => {
-                let style = Style::default()
-                    .fg(if row.value == "Off" { theme::MUTED } else { theme::GREEN });
+                let style = Style::default().fg(if row.value == "Off" {
+                    theme::MUTED
+                } else {
+                    theme::GREEN
+                });
                 f.render_widget(Paragraph::new(Span::styled(row.value.clone(), style)), rest);
             }
         }
@@ -317,7 +367,12 @@ fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
             .map(|a| a.name())
             .unwrap_or_else(|| "someone".into());
         lines.push(Line::from(vec![
-            Span::styled(format!("{who} "), Style::default().fg(theme::CYAN).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{who} "),
+                Style::default()
+                    .fg(theme::CYAN)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(c.text.clone(), Style::default().fg(theme::FG)),
         ]));
     }
@@ -344,11 +399,20 @@ fn draw_notifications(f: &mut Frame, area: Rect, app: &App) {
     }
     let mut lines: Vec<Line> = Vec::new();
     for n in &app.notifications {
-        let verb = if n.reason == "mention" { "mentioned you" } else { "commented on your station" };
+        let verb = if n.reason == "mention" {
+            "mentioned you"
+        } else {
+            "commented on your station"
+        };
         let dot = if n.is_read { "  " } else { "• " };
         lines.push(Line::from(vec![
             Span::styled(dot, Style::default().fg(theme::ORANGE)),
-            Span::styled(format!("{} ", n.author.name()), Style::default().fg(theme::GREEN).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("{} ", n.author.name()),
+                Style::default()
+                    .fg(theme::GREEN)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(verb, Style::default().fg(theme::FG)),
         ]));
         if let Some(t) = &n.text {
@@ -418,7 +482,9 @@ fn draw_profile(f: &mut Frame, area: Rect, app: &App) {
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Recently played",
-        Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD),
+        Style::default()
+            .fg(theme::TEAL)
+            .add_modifier(Modifier::BOLD),
     )));
     if app.profile_recent.is_empty() {
         lines.push(Line::from(Span::styled(
@@ -434,13 +500,22 @@ fn draw_profile(f: &mut Frame, area: Rect, app: &App) {
                 .unwrap_or(false);
             let is_sel = i == app.profile_recent_selected;
             let name_style = if is_sel {
-                Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(theme::BG)
+                    .bg(theme::TEAL)
+                    .add_modifier(Modifier::BOLD)
             } else if is_cur {
                 Style::default().fg(theme::GREEN)
             } else {
                 Style::default().fg(theme::FG)
             };
-            let marker = if is_cur { "♪ " } else if is_sel { "› " } else { "  " };
+            let marker = if is_cur {
+                "♪ "
+            } else if is_sel {
+                "› "
+            } else {
+                "  "
+            };
             lines.push(Line::from(vec![
                 Span::styled(format!("    {marker}"), Style::default().fg(theme::CYAN)),
                 Span::styled(truncate(&s.name, 44), name_style),
@@ -469,7 +544,10 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let keys = [
         ("↑/↓ j/k", "move selection"),
         ("←/→ Tab", "switch home tab"),
-        ("1 … 5", "tabs: Trending / Popular / Recent / Favorites / Yours"),
+        (
+            "1 … 5",
+            "tabs: Trending / Popular / Recent / Favorites / Yours",
+        ),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
@@ -490,7 +568,12 @@ fn draw_help(f: &mut Frame, area: Rect) {
     let mut lines: Vec<Line> = Vec::new();
     for (k, d) in keys {
         lines.push(Line::from(vec![
-            Span::styled(format!("  {k:<10}"), Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                format!("  {k:<10}"),
+                Style::default()
+                    .fg(theme::TEAL)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(d, Style::default().fg(theme::FG)),
         ]));
     }
@@ -507,7 +590,11 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
         .split(inner);
 
     match &app.current {
@@ -516,8 +603,14 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
             f.render_widget(
                 Paragraph::new(Line::from(vec![
                     Span::styled(format!("{state} "), Style::default().fg(theme::GREEN)),
-                    Span::styled(truncate(&s.name, 48), Style::default().fg(theme::FG).add_modifier(Modifier::BOLD)),
-                    Span::styled(format!("   {}", s.subtitle()), Style::default().fg(theme::MUTED)),
+                    Span::styled(
+                        truncate(&s.name, 48),
+                        Style::default().fg(theme::FG).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("   {}", s.subtitle()),
+                        Style::default().fg(theme::MUTED),
+                    ),
                 ])),
                 rows[0],
             );
@@ -547,11 +640,18 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
     // Volume line.
     let vol = (app.volume_pct()).min(100);
     let muted = app.muted;
-    let vol_label = if muted { "muted".to_string() } else { format!("{vol}%") };
+    let vol_label = if muted {
+        "muted".to_string()
+    } else {
+        format!("{vol}%")
+    };
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled("vol ", Style::default().fg(theme::MUTED)),
-            Span::styled(volume_bar(vol), Style::default().fg(if muted { theme::MUTED } else { theme::TEAL })),
+            Span::styled(
+                volume_bar(vol),
+                Style::default().fg(if muted { theme::MUTED } else { theme::TEAL }),
+            ),
             Span::styled(format!(" {vol_label}"), Style::default().fg(theme::MUTED)),
         ])),
         rows[2],
@@ -587,12 +687,21 @@ fn draw_search(f: &mut Frame, area: Rect, app: &App) {
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(1), Constraint::Length(1), Constraint::Min(1)])
+        .constraints([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Min(1),
+        ])
         .split(inner);
 
     f.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("/ ", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "/ ",
+                Style::default()
+                    .fg(theme::TEAL)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(&app.search_query, Style::default().fg(theme::FG)),
             Span::styled("█", Style::default().fg(theme::TEAL)),
         ])),
@@ -613,17 +722,26 @@ fn draw_search(f: &mut Frame, area: Rect, app: &App) {
     for (i, (_, s)) in ranked.iter().enumerate().skip(start).take(height) {
         let is_sel = i == app.search_selected;
         let style = if is_sel {
-            Style::default().fg(theme::BG).bg(theme::TEAL).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(theme::BG)
+                .bg(theme::TEAL)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(theme::FG)
         };
         let sub = s.subtitle();
         let mut spans = vec![
-            Span::styled(if is_sel { "› " } else { "  " }, Style::default().fg(theme::CYAN)),
+            Span::styled(
+                if is_sel { "› " } else { "  " },
+                Style::default().fg(theme::CYAN),
+            ),
             Span::styled(truncate(&s.name, 44), style),
         ];
         if !sub.is_empty() {
-            spans.push(Span::styled(format!("  {sub}"), Style::default().fg(theme::MUTED)));
+            spans.push(Span::styled(
+                format!("  {sub}"),
+                Style::default().fg(theme::MUTED),
+            ));
         }
         lines.push(Line::from(spans));
     }
@@ -695,7 +813,12 @@ fn draw_signin(f: &mut Frame, area: Rect, app: &App) {
     );
     f.render_widget(
         Paragraph::new(Line::from(vec![
-            Span::styled("@ ", Style::default().fg(theme::TEAL).add_modifier(Modifier::BOLD)),
+            Span::styled(
+                "@ ",
+                Style::default()
+                    .fg(theme::TEAL)
+                    .add_modifier(Modifier::BOLD),
+            ),
             Span::styled(&app.signin_input, Style::default().fg(theme::FG)),
             Span::styled("█", Style::default().fg(theme::TEAL)),
         ])),
@@ -720,8 +843,9 @@ fn draw_add_station(f: &mut Frame, area: Rect, app: &App) {
 
     let labels = AddStationForm::labels();
     // Two lines per field (label + input) + a footer line.
-    let mut constraints: Vec<Constraint> =
-        (0..labels.len()).flat_map(|_| [Constraint::Length(1), Constraint::Length(1)]).collect();
+    let mut constraints: Vec<Constraint> = (0..labels.len())
+        .flat_map(|_| [Constraint::Length(1), Constraint::Length(1)])
+        .collect();
     constraints.push(Constraint::Length(1)); // spacer
     constraints.push(Constraint::Min(1)); // hint
     let rows = Layout::default()
@@ -744,7 +868,10 @@ fn draw_add_station(f: &mut Frame, area: Rect, app: &App) {
 
         let value = app.add_form.field(i);
         let mut spans = vec![
-            Span::styled(if focused { "› " } else { "  " }, Style::default().fg(theme::CYAN)),
+            Span::styled(
+                if focused { "› " } else { "  " },
+                Style::default().fg(theme::CYAN),
+            ),
             Span::styled(value.to_string(), Style::default().fg(theme::FG)),
         ];
         if focused {

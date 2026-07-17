@@ -10,29 +10,32 @@ use alloc::collections::BTreeMap;
 
 #[allow(unused_imports)]
 use core::marker::PhantomData;
-use jacquard_common::{CowStr, BosStr, DefaultStr, FromStaticStr};
+use jacquard_common::{BosStr, CowStr, DefaultStr, FromStaticStr};
 
 #[allow(unused_imports)]
 use jacquard_common::deps::codegen::unicode_segmentation::UnicodeSegmentation;
 use jacquard_common::deps::smol_str::SmolStr;
 use jacquard_common::types::collection::{Collection, RecordError};
-use jacquard_common::types::string::{Did, AtUri, Cid, Datetime, UriValue};
+use jacquard_common::types::string::{AtUri, Cid, Datetime, Did, UriValue};
 use jacquard_common::types::uri::{RecordUri, UriError};
 use jacquard_common::types::value::Data;
 use jacquard_common::xrpc::XrpcResp;
-use jacquard_derive::{IntoStatic, lexicon};
+use jacquard_derive::{lexicon, IntoStatic};
 use jacquard_lexicon::lexicon::LexiconDoc;
 use jacquard_lexicon::schema::LexiconSchema;
 
+use crate::fm_atradio::comment;
+use crate::fm_atradio::StationInfo;
 #[allow(unused_imports)]
 use jacquard_lexicon::validation::{ConstraintError, ValidationPath};
-use serde::{Serialize, Deserialize};
-use crate::fm_atradio::StationInfo;
-use crate::fm_atradio::comment;
+use serde::{Deserialize, Serialize};
 /// An animated GIF embedded in a comment (e.g. from Giphy).
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct Gif<S: BosStr = DefaultStr> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub alt: Option<S>,
@@ -86,7 +89,10 @@ pub struct CommentGetRecordOutput<S: BosStr = DefaultStr> {
 /// A mention of another actor within the comment text.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
-#[serde(rename_all = "camelCase", bound(deserialize = "S: Deserialize<'de> + BosStr"))]
+#[serde(
+    rename_all = "camelCase",
+    bound(deserialize = "S: Deserialize<'de> + BosStr")
+)]
 pub struct Mention<S: BosStr = DefaultStr> {
     ///Exclusive UTF-8 byte offset of the mention end.
     pub byte_end: i64,
@@ -249,7 +255,7 @@ impl<S: BosStr> LexiconSchema for Mention<S> {
 
 pub mod gif_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -373,10 +379,7 @@ where
     St::Url: gif_state::IsUnset,
 {
     /// Set the `url` field (required)
-    pub fn url(
-        mut self,
-        value: impl Into<UriValue<S>>,
-    ) -> GifBuilder<gif_state::SetUrl<St>, S> {
+    pub fn url(mut self, value: impl Into<UriValue<S>>) -> GifBuilder<gif_state::SetUrl<St>, S> {
         self._fields.3 = Option::Some(value.into());
         GifBuilder {
             _state: PhantomData,
@@ -429,10 +432,10 @@ where
 }
 
 fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
-    #[allow(unused_imports)]
-    use jacquard_common::{CowStr, deps::smol_str::SmolStr, types::blob::MimeType};
-    use jacquard_lexicon::lexicon::*;
     use alloc::collections::BTreeMap;
+    #[allow(unused_imports)]
+    use jacquard_common::{deps::smol_str::SmolStr, types::blob::MimeType, CowStr};
+    use jacquard_lexicon::lexicon::*;
     LexiconDoc {
         lexicon: Lexicon::Lexicon1,
         id: CowStr::new_static("fm.atradio.comment"),
@@ -441,11 +444,9 @@ fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("gif"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static(
-                            "An animated GIF embedded in a comment (e.g. from Giphy).",
-                        ),
-                    ),
+                    description: Some(CowStr::new_static(
+                        "An animated GIF embedded in a comment (e.g. from Giphy).",
+                    )),
                     required: Some(vec![SmolStr::new_static("url")]),
                     properties: {
                         #[allow(unused_mut)]
@@ -467,9 +468,9 @@ fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
                         map.insert(
                             SmolStr::new_static("previewUrl"),
                             LexObjectProperty::String(LexString {
-                                description: Some(
-                                    CowStr::new_static("Smaller still/preview image URL."),
-                                ),
+                                description: Some(CowStr::new_static(
+                                    "Smaller still/preview image URL.",
+                                )),
                                 format: Some(LexStringFormat::Uri),
                                 ..Default::default()
                             }),
@@ -477,9 +478,9 @@ fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
                         map.insert(
                             SmolStr::new_static("url"),
                             LexObjectProperty::String(LexString {
-                                description: Some(
-                                    CowStr::new_static("Direct URL of the animated GIF/MP4."),
-                                ),
+                                description: Some(CowStr::new_static(
+                                    "Direct URL of the animated GIF/MP4.",
+                                )),
                                 format: Some(LexStringFormat::Uri),
                                 ..Default::default()
                             }),
@@ -570,17 +571,14 @@ fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("mention"),
                 LexUserType::Object(LexObject {
-                    description: Some(
-                        CowStr::new_static(
-                            "A mention of another actor within the comment text.",
-                        ),
-                    ),
-                    required: Some(
-                        vec![
-                            SmolStr::new_static("did"), SmolStr::new_static("byteStart"),
-                            SmolStr::new_static("byteEnd")
-                        ],
-                    ),
+                    description: Some(CowStr::new_static(
+                        "A mention of another actor within the comment text.",
+                    )),
+                    required: Some(vec![
+                        SmolStr::new_static("did"),
+                        SmolStr::new_static("byteStart"),
+                        SmolStr::new_static("byteEnd"),
+                    ]),
                     properties: {
                         #[allow(unused_mut)]
                         let mut map = BTreeMap::new();
@@ -618,7 +616,7 @@ fn lexicon_doc_fm_atradio_comment() -> LexiconDoc<'static> {
 
 pub mod comment_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -793,10 +791,7 @@ where
     St::Text: comment_state::IsUnset,
 {
     /// Set the `text` field (required)
-    pub fn text(
-        mut self,
-        value: impl Into<S>,
-    ) -> CommentBuilder<comment_state::SetText<St>, S> {
+    pub fn text(mut self, value: impl Into<S>) -> CommentBuilder<comment_state::SetText<St>, S> {
         self._fields.4 = Option::Some(value.into());
         CommentBuilder {
             _state: PhantomData,
@@ -839,7 +834,7 @@ where
 
 pub mod mention_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -982,10 +977,7 @@ where
     St::Did: mention_state::IsUnset,
 {
     /// Set the `did` field (required)
-    pub fn did(
-        mut self,
-        value: impl Into<Did<S>>,
-    ) -> MentionBuilder<mention_state::SetDid<St>, S> {
+    pub fn did(mut self, value: impl Into<Did<S>>) -> MentionBuilder<mention_state::SetDid<St>, S> {
         self._fields.2 = Option::Some(value.into());
         MentionBuilder {
             _state: PhantomData,

@@ -365,7 +365,9 @@ fn gen_station(s: &StationInfo) -> GenStation {
     GenStation::new()
         .station_id(s.station_id.clone())
         .name(s.name.clone())
-        .stream_url(parse_uri(&s.stream_url).unwrap_or_else(|| UriValue::Any(s.stream_url.clone().into())))
+        .stream_url(
+            parse_uri(&s.stream_url).unwrap_or_else(|| UriValue::Any(s.stream_url.clone().into())),
+        )
         .source(s.source.clone())
         .maybe_description(s.description.clone().map(Into::into))
         .maybe_genre(s.genre.clone().map(Into::into))
@@ -399,9 +401,7 @@ async fn fetch_profile(actor: &str) -> Option<(Option<String>, Option<String>)> 
         #[serde(default)]
         display_name: Option<String>,
     }
-    let url = format!(
-        "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={actor}"
-    );
+    let url = format!("https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor={actor}");
     let out: ProfileOut = reqwest::get(&url).await.ok()?.json().await.ok()?;
     let clean = |s: Option<String>| s.filter(|v| !v.trim().is_empty());
     Some((clean(out.handle), clean(out.display_name)))

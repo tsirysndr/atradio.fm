@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use anyhow::Result;
 use crossterm::event::{
-    DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind, KeyModifiers,
+    DisableMouseCapture, EnableMouseCapture, Event, EventStream, KeyCode, KeyEventKind,
+    KeyModifiers,
 };
 use crossterm::execute;
 use crossterm::terminal::{
@@ -36,11 +37,20 @@ enum Msg {
     Popular(Vec<StationInfo>),
     Favorites(Vec<StationInfo>),
     Stations(Vec<StationInfo>),
-    RecentGlobal { stations: Vec<StationInfo>, actors: Vec<String> },
+    RecentGlobal {
+        stations: Vec<StationInfo>,
+        actors: Vec<String>,
+    },
     ProfileRecent(Vec<StationInfo>),
-    SearchResults { query: String, items: Vec<StationInfo> },
+    SearchResults {
+        query: String,
+        items: Vec<StationInfo>,
+    },
     Comments(Vec<crate::appview::CommentView>),
-    Notifications { items: Vec<crate::appview::NotificationView>, unread: u32 },
+    Notifications {
+        items: Vec<crate::appview::NotificationView>,
+        unread: u32,
+    },
     SignedIn(crate::atproto::Profile),
     Toast(String),
 }
@@ -293,30 +303,12 @@ fn handle_event(
             app.search_selected = 0;
         }
         KeyCode::Char('h') => app.view = View::Home,
-        // Number keys jump straight to a home tab.
-        KeyCode::Char('1') => {
+        // Number keys jump straight to a home tab, matching the numbered
+        // labels shown in the tab bar (which follow `HomeTab::ORDER`).
+        KeyCode::Char(c @ '1'..='5') => {
+            let idx = c as usize - '1' as usize;
             app.view = View::Home;
-            app.home_tab = HomeTab::Trending;
-            app.selected = 0;
-        }
-        KeyCode::Char('2') => {
-            app.view = View::Home;
-            app.home_tab = HomeTab::Popular;
-            app.selected = 0;
-        }
-        KeyCode::Char('3') => {
-            app.view = View::Home;
-            app.home_tab = HomeTab::Recent;
-            app.selected = 0;
-        }
-        KeyCode::Char('4') => {
-            app.view = View::Home;
-            app.home_tab = HomeTab::Favorites;
-            app.selected = 0;
-        }
-        KeyCode::Char('5') => {
-            app.view = View::Home;
-            app.home_tab = HomeTab::Yours;
+            app.home_tab = HomeTab::ORDER[idx];
             app.selected = 0;
         }
         KeyCode::Char('e') => app.view = View::Dsp,
@@ -749,7 +741,9 @@ fn spawn_load_trending(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>) {
     let tx = tx.clone();
     tokio::spawn(async move {
         if let Ok(items) = av.recent_stations(50).await {
-            let _ = tx.send(Msg::Trending(items.into_iter().map(|v| v.station).collect()));
+            let _ = tx.send(Msg::Trending(
+                items.into_iter().map(|v| v.station).collect(),
+            ));
         }
     });
 }
@@ -769,7 +763,9 @@ fn spawn_load_favorites(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, acto
     let tx = tx.clone();
     tokio::spawn(async move {
         if let Ok(out) = av.favorites(&actor, 100).await {
-            let _ = tx.send(Msg::Favorites(out.items.into_iter().map(|v| v.station).collect()));
+            let _ = tx.send(Msg::Favorites(
+                out.items.into_iter().map(|v| v.station).collect(),
+            ));
         }
     });
 }
@@ -795,7 +791,9 @@ fn spawn_load_profile_recent(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>,
     let tx = tx.clone();
     tokio::spawn(async move {
         if let Ok(items) = av.recently_played(&actor, 30).await {
-            let _ = tx.send(Msg::ProfileRecent(items.into_iter().map(|p| p.station).collect()));
+            let _ = tx.send(Msg::ProfileRecent(
+                items.into_iter().map(|p| p.station).collect(),
+            ));
         }
     });
 }
@@ -805,7 +803,9 @@ fn spawn_load_stations(appview: &AppView, tx: &mpsc::UnboundedSender<Msg>, actor
     let tx = tx.clone();
     tokio::spawn(async move {
         if let Ok(out) = av.stations(&actor, 100).await {
-            let _ = tx.send(Msg::Stations(out.items.into_iter().map(|v| v.station).collect()));
+            let _ = tx.send(Msg::Stations(
+                out.items.into_iter().map(|v| v.station).collect(),
+            ));
         }
     });
 }
@@ -857,7 +857,11 @@ fn setup_terminal() -> Result<Term> {
 
 fn restore_terminal(term: &mut Term) -> Result<()> {
     disable_raw_mode()?;
-    execute!(term.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        term.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     term.show_cursor()?;
     Ok(())
 }

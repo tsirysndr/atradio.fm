@@ -286,11 +286,7 @@ impl App {
     /// Returns ranked references for rendering.
     pub fn ranked_search(&self) -> Vec<(i64, &StationInfo)> {
         if self.search_query.is_empty() {
-            return self
-                .search_results
-                .iter()
-                .map(|s| (0i64, s))
-                .collect();
+            return self.search_results.iter().map(|s| (0i64, s)).collect();
         }
         let mut scored: Vec<(i64, &StationInfo)> = self
             .search_results

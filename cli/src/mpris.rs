@@ -305,10 +305,7 @@ pub fn spawn(state: watch::Receiver<NowPlaying>) -> mpsc::UnboundedReceiver<Mpri
             Err(_) => {
                 match Server::new(
                     &format!("atradio.instance{}", std::process::id()),
-                    Player {
-                        state,
-                        cmd: cmd_tx,
-                    },
+                    Player { state, cmd: cmd_tx },
                 )
                 .await
                 {

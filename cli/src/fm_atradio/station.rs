@@ -10,7 +10,7 @@ use alloc::collections::BTreeMap;
 
 #[allow(unused_imports)]
 use core::marker::PhantomData;
-use jacquard_common::{CowStr, BosStr, DefaultStr, FromStaticStr};
+use jacquard_common::{BosStr, CowStr, DefaultStr, FromStaticStr};
 
 #[allow(unused_imports)]
 use jacquard_common::deps::codegen::unicode_segmentation::UnicodeSegmentation;
@@ -20,13 +20,13 @@ use jacquard_common::types::string::{AtUri, Cid, Datetime, UriValue};
 use jacquard_common::types::uri::{RecordUri, UriError};
 use jacquard_common::types::value::Data;
 use jacquard_common::xrpc::XrpcResp;
-use jacquard_derive::{IntoStatic, lexicon};
+use jacquard_derive::{lexicon, IntoStatic};
 use jacquard_lexicon::lexicon::LexiconDoc;
 use jacquard_lexicon::schema::LexiconSchema;
 
 #[allow(unused_imports)]
 use jacquard_lexicon::validation::{ConstraintError, ValidationPath};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 /// A user-defined radio station.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
@@ -159,7 +159,7 @@ impl<S: BosStr> LexiconSchema for Station<S> {
 
 pub mod station_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -344,10 +344,7 @@ where
     St::Name: station_state::IsUnset,
 {
     /// Set the `name` field (required)
-    pub fn name(
-        mut self,
-        value: impl Into<S>,
-    ) -> StationBuilder<station_state::SetName<St>, S> {
+    pub fn name(mut self, value: impl Into<S>) -> StationBuilder<station_state::SetName<St>, S> {
         self._fields.5 = Option::Some(value.into());
         StationBuilder {
             _state: PhantomData,
@@ -427,10 +424,10 @@ where
 }
 
 fn lexicon_doc_fm_atradio_station() -> LexiconDoc<'static> {
-    #[allow(unused_imports)]
-    use jacquard_common::{CowStr, deps::smol_str::SmolStr, types::blob::MimeType};
-    use jacquard_lexicon::lexicon::*;
     use alloc::collections::BTreeMap;
+    #[allow(unused_imports)]
+    use jacquard_common::{deps::smol_str::SmolStr, types::blob::MimeType, CowStr};
+    use jacquard_lexicon::lexicon::*;
     LexiconDoc {
         lexicon: Lexicon::Lexicon1,
         id: CowStr::new_static("fm.atradio.station"),
@@ -439,18 +436,14 @@ fn lexicon_doc_fm_atradio_station() -> LexiconDoc<'static> {
             map.insert(
                 SmolStr::new_static("main"),
                 LexUserType::Record(LexRecord {
-                    description: Some(
-                        CowStr::new_static("A user-defined radio station."),
-                    ),
+                    description: Some(CowStr::new_static("A user-defined radio station.")),
                     key: Some(CowStr::new_static("tid")),
                     record: LexRecordRecord::Object(LexObject {
-                        required: Some(
-                            vec![
-                                SmolStr::new_static("name"),
-                                SmolStr::new_static("streamUrl"),
-                                SmolStr::new_static("createdAt")
-                            ],
-                        ),
+                        required: Some(vec![
+                            SmolStr::new_static("name"),
+                            SmolStr::new_static("streamUrl"),
+                            SmolStr::new_static("createdAt"),
+                        ]),
                         properties: {
                             #[allow(unused_mut)]
                             let mut map = BTreeMap::new();
@@ -501,9 +494,9 @@ fn lexicon_doc_fm_atradio_station() -> LexiconDoc<'static> {
                             map.insert(
                                 SmolStr::new_static("streamUrl"),
                                 LexObjectProperty::String(LexString {
-                                    description: Some(
-                                        CowStr::new_static("Direct, playable stream URL."),
-                                    ),
+                                    description: Some(CowStr::new_static(
+                                        "Direct, playable stream URL.",
+                                    )),
                                     format: Some(LexStringFormat::Uri),
                                     ..Default::default()
                                 }),

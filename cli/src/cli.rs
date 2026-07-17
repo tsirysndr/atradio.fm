@@ -192,12 +192,12 @@ async fn cmd_login(identifier: Option<String>, oauth: bool, config: &Config) -> 
         let id = identifier
             .or_else(|| config.identifier.clone())
             .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "provide a handle/DID (arg or ATPROTO_IDENTIFIER), or use --oauth"
-                )
+                anyhow::anyhow!("provide a handle/DID (arg or ATPROTO_IDENTIFIER), or use --oauth")
             })?;
         let pw = config.app_password.clone().ok_or_else(|| {
-            anyhow::anyhow!("set ATPROTO_APP_PASSWORD to sign in with an app password, or use --oauth")
+            anyhow::anyhow!(
+                "set ATPROTO_APP_PASSWORD to sign in with an app password, or use --oauth"
+            )
         })?;
         at.login_password(&id, &pw).await?
     };
@@ -223,7 +223,14 @@ fn cmd_whoami(config: &Config) -> Result<()> {
         Some(p) => {
             println!("@{}", p.handle);
             println!("  did:    {}", p.did);
-            println!("  via:    {}", if p.method.is_empty() { "password" } else { &p.method });
+            println!(
+                "  via:    {}",
+                if p.method.is_empty() {
+                    "password"
+                } else {
+                    &p.method
+                }
+            );
             if let Some(pds) = p.pds {
                 println!("  pds:    {pds}");
             }

@@ -49,7 +49,10 @@ impl AppView {
     /// Newest stations platform-wide.
     pub async fn recent_stations(&self, limit: u32) -> Result<Vec<StationView>> {
         let out: RecentStationsOutput = self
-            .query("fm.atradio.getRecentStations", &[("limit", limit.to_string())])
+            .query(
+                "fm.atradio.getRecentStations",
+                &[("limit", limit.to_string())],
+            )
             .await?;
         Ok(out.items)
     }
@@ -57,7 +60,10 @@ impl AppView {
     /// Most-favorited stations platform-wide.
     pub async fn popular_stations(&self, limit: u32) -> Result<Vec<PopularItem>> {
         let out: PopularStationsOutput = self
-            .query("fm.atradio.getPopularStations", &[("limit", limit.to_string())])
+            .query(
+                "fm.atradio.getPopularStations",
+                &[("limit", limit.to_string())],
+            )
             .await?;
         Ok(out.items)
     }

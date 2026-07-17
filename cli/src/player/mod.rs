@@ -142,7 +142,8 @@ impl Player {
     pub fn toggle_mute(&self) {
         if self.is_muted() {
             let restore = *self.last_volume.lock().unwrap();
-            self.rb.set_volume(if restore > 0.0 { restore } else { 0.8 });
+            self.rb
+                .set_volume(if restore > 0.0 { restore } else { 0.8 });
         } else {
             *self.last_volume.lock().unwrap() = self.rb.volume();
             self.rb.set_volume(0.0);

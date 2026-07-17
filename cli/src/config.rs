@@ -42,7 +42,6 @@ impl Config {
             session_path: session_path(),
         }
     }
-
 }
 
 fn env_nonempty(key: &str) -> Option<String> {

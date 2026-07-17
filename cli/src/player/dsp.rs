@@ -3,7 +3,7 @@
 
 use rockbox_playback::{
     BassEnhancement, ChannelMode, Compressor, Crossfeed, CrossfeedMode, EqBand, Equalizer, Player,
-    Surround, ToneControls, EQ_BAND_FREQUENCIES, EQ_BANDS,
+    Surround, ToneControls, EQ_BANDS, EQ_BAND_FREQUENCIES,
 };
 
 /// Band centre frequencies (Hz), from the engine: 32 … 16 000.
@@ -20,11 +20,11 @@ pub struct AudioSettings {
     pub crossfeed_mode: CrossfeedMode,
     pub crossfeed_direct: f32, // dB (≤ 0)
     pub pbe: i32,              // 0 … 100 %
-    pub pbe_precut: i32,      // dB cut (≥ 0)
-    pub surround_delay: i32,  // ms (0 = off)
+    pub pbe_precut: i32,       // dB cut (≥ 0)
+    pub surround_delay: i32,   // ms (0 = off)
     pub surround_balance: i32, // %
-    pub comp_threshold: i32,  // dB (0 = off)
-    pub comp_ratio: i32,      // 2 … 10
+    pub comp_threshold: i32,   // dB (0 = off)
+    pub comp_ratio: i32,       // 2 … 10
     pub channel_mode: ChannelMode,
     pub stereo_width: i32, // %
 }
@@ -134,8 +134,11 @@ fn ratio_index(ratio: i32) -> i32 {
 }
 
 /// The DSP "rows" shown in the equalizer/settings panel, in order.
-pub const CROSSFEED_MODES: [CrossfeedMode; 3] =
-    [CrossfeedMode::Off, CrossfeedMode::Meier, CrossfeedMode::Custom];
+pub const CROSSFEED_MODES: [CrossfeedMode; 3] = [
+    CrossfeedMode::Off,
+    CrossfeedMode::Meier,
+    CrossfeedMode::Custom,
+];
 
 pub const CHANNEL_MODES: [ChannelMode; 7] = [
     ChannelMode::Stereo,

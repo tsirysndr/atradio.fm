@@ -10,7 +10,7 @@ use alloc::collections::BTreeMap;
 
 #[allow(unused_imports)]
 use core::marker::PhantomData;
-use jacquard_common::{CowStr, BosStr, DefaultStr, FromStaticStr};
+use jacquard_common::{BosStr, CowStr, DefaultStr, FromStaticStr};
 
 #[allow(unused_imports)]
 use jacquard_common::deps::codegen::unicode_segmentation::UnicodeSegmentation;
@@ -20,13 +20,13 @@ use jacquard_common::types::string::{AtUri, Cid, Datetime};
 use jacquard_common::types::uri::{RecordUri, UriError};
 use jacquard_common::types::value::Data;
 use jacquard_common::xrpc::XrpcResp;
-use jacquard_derive::{IntoStatic, lexicon};
+use jacquard_derive::{lexicon, IntoStatic};
 use jacquard_lexicon::lexicon::LexiconDoc;
 use jacquard_lexicon::schema::LexiconSchema;
 
 #[allow(unused_imports)]
 use jacquard_lexicon::validation::{ConstraintError, ValidationPath};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 /// The actor's audio playback settings (10-band EQ + Rockbox DSP chain), a singleton record synced across devices. Gains are integers; the crossfeed direct gain is in tenths of dB, matching the Rockbox convention.
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, IntoStatic)]
@@ -261,9 +261,7 @@ where
             SettingsCrossfeedMode::Off => SettingsCrossfeedMode::Off,
             SettingsCrossfeedMode::Meier => SettingsCrossfeedMode::Meier,
             SettingsCrossfeedMode::Custom => SettingsCrossfeedMode::Custom,
-            SettingsCrossfeedMode::Other(v) => {
-                SettingsCrossfeedMode::Other(v.into_static())
-            }
+            SettingsCrossfeedMode::Other(v) => SettingsCrossfeedMode::Other(v.into_static()),
         }
     }
 }
@@ -509,7 +507,7 @@ impl<S: BosStr> LexiconSchema for Settings<S> {
 
 pub mod settings_state {
 
-    pub use crate::builder_types::{Set, Unset, IsSet, IsUnset};
+    pub use crate::builder_types::{IsSet, IsUnset, Set, Unset};
     #[allow(unused)]
     use ::core::marker::PhantomData;
     mod sealed {
@@ -582,20 +580,7 @@ impl SettingsBuilder<settings_state::Empty, DefaultStr> {
         SettingsBuilder {
             _state: PhantomData,
             _fields: (
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None,
             ),
             _type: PhantomData,
@@ -609,20 +594,7 @@ impl<S: BosStr> SettingsBuilder<settings_state::Empty, S> {
         SettingsBuilder {
             _state: PhantomData,
             _fields: (
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
                 None,
             ),
             _type: PhantomData,
@@ -645,10 +617,7 @@ impl<St: settings_state::State, S: BosStr> SettingsBuilder<St, S> {
 
 impl<St: settings_state::State, S: BosStr> SettingsBuilder<St, S> {
     /// Set the `channelMode` field (optional)
-    pub fn channel_mode(
-        mut self,
-        value: impl Into<Option<SettingsChannelMode<S>>>,
-    ) -> Self {
+    pub fn channel_mode(mut self, value: impl Into<Option<SettingsChannelMode<S>>>) -> Self {
         self._fields.1 = value.into();
         self
     }
@@ -700,18 +669,12 @@ impl<St: settings_state::State, S: BosStr> SettingsBuilder<St, S> {
 
 impl<St: settings_state::State, S: BosStr> SettingsBuilder<St, S> {
     /// Set the `crossfeedMode` field (optional)
-    pub fn crossfeed_mode(
-        mut self,
-        value: impl Into<Option<SettingsCrossfeedMode<S>>>,
-    ) -> Self {
+    pub fn crossfeed_mode(mut self, value: impl Into<Option<SettingsCrossfeedMode<S>>>) -> Self {
         self._fields.5 = value.into();
         self
     }
     /// Set the `crossfeedMode` field to an Option value (optional)
-    pub fn maybe_crossfeed_mode(
-        mut self,
-        value: Option<SettingsCrossfeedMode<S>>,
-    ) -> Self {
+    pub fn maybe_crossfeed_mode(mut self, value: Option<SettingsCrossfeedMode<S>>) -> Self {
         self._fields.5 = value;
         self
     }
@@ -890,10 +853,10 @@ where
 }
 
 fn lexicon_doc_fm_atradio_audio_settings() -> LexiconDoc<'static> {
-    #[allow(unused_imports)]
-    use jacquard_common::{CowStr, deps::smol_str::SmolStr, types::blob::MimeType};
-    use jacquard_lexicon::lexicon::*;
     use alloc::collections::BTreeMap;
+    #[allow(unused_imports)]
+    use jacquard_common::{deps::smol_str::SmolStr, types::blob::MimeType, CowStr};
+    use jacquard_lexicon::lexicon::*;
     LexiconDoc {
         lexicon: Lexicon::Lexicon1,
         id: CowStr::new_static("fm.atradio.audio.settings"),
