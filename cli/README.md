@@ -1,6 +1,7 @@
 # atradio
 
 [![nix](https://github.com/tsirysndr/atradio.fm/actions/workflows/nix.yml/badge.svg)](https://github.com/tsirysndr/atradio.fm/actions/workflows/nix.yml)
+[![FlakeHub](https://img.shields.io/endpoint?url=https://flakehub.com/f/tsirysndr/atradio.fm/badge)](https://flakehub.com/flake/tsirysndr/atradio.fm)
 [![discord](https://img.shields.io/discord/1527379646583144560?label=discord&logo=discord&color=5865F2)](https://discord.gg/WA9hq9Tmkz)
 
 `atradio.fm` in your terminal — a TUI radio player on the AT Protocol.
