@@ -56,6 +56,7 @@ fn route(req: Request(Connection)) -> Response(ResponseData) {
     http.Options -> preflight(req)
     _ ->
       case request.path_segments(req) {
+        [] -> cors(text(200, banner))
         ["healthz"] -> cors(text(200, "ok"))
         // The stream route sets its own headers (mist.chunked flushes them
         // immediately), so CORS is applied inside `stream.handle`, not here.
@@ -67,6 +68,25 @@ fn route(req: Request(Connection)) -> Response(ResponseData) {
       }
   }
 }
+
+/// Landing page served at `GET /`.
+const banner = "
+       )))
+   ((  •  ))     a t r a d i o
+       )))       m e d i a   p r o x y
+  ───────────────────────────────────────────────
+
+  Stateless reverse-proxy for radio streams, TuneIn,
+  artwork, and ICY \"now playing\" metadata.
+
+    GET /api/stream?url=   pipe an audio stream (CORS-safe)
+    GET /api/tunein/*      TuneIn OPML proxy
+    GET /api/image?url=    station artwork proxy
+    GET /api/icy?url=      ICY now-playing title
+    GET /healthz           liveness
+
+  Gleam · BEAM · https://atradio.fm
+"
 
 /// Headers to expose so the wasm decoder can read ICY metadata cross-origin.
 pub const cors_expose_headers = "content-type, icy-metaint, icy-name, icy-genre, icy-br, icy-description, icy-url"
