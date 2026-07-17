@@ -11,6 +11,7 @@ import { audioSettingsOpenAtom } from "@/atoms/ui";
 import { ModalCloseButton } from "./ModalCloseButton";
 import {
   EQ_CUTOFFS,
+  applyCompressor,
   bassAtom,
   channelModeAtom,
   compRatioAtom,
@@ -227,7 +228,7 @@ export function AudioSettingsModal() {
   const surround = (delay: number, balance: number) =>
     apply((p) => p.setSurround(delay, balance, 0, 0));
   const compressor = (thr: number, ratio: number) =>
-    apply((p) => p.setCompressor(thr, 0, ratio, 0, 0, 0));
+    apply((p) => applyCompressor(p, thr, ratio));
 
   return (
     <Modal state={state}>

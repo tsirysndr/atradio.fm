@@ -27,38 +27,37 @@ afterEach(() => {
 });
 
 describe("proxiedStreamUrl", () => {
-  it("proxies .pls/.m3u playlists so the server can unwrap them (any scheme)", () => {
-    setProtocol("http:"); // even on an http page, playlists must be unwrapped
-    for (const url of [
-      "https://host/stream.pls",
-      "http://host/stream.m3u",
-      "https://host/stream.PLS?x=1",
-    ]) {
+  // Every absolute http(s) stream is proxied so the Rockbox decoder worker can
+  // fetch it cross-origin (CORS) and the DSP/EQ stays in the signal path.
+  it("proxies every absolute http(s) stream (any scheme / page protocol)", () => {
+    for (const [page, url] of [
+      ["https:", "https://host/stream.aac"],
+      ["https:", "http://host/stream.aac"], // mixed content
+      ["http:", "http://host/stream.aac"], // dev
+      ["http:", "https://host/stream.pls"], // playlist, server unwraps
+      ["https:", "https://host/stream.PLS?x=1"],
+    ] as const) {
+      setProtocol(page);
       expect(proxiedStreamUrl(url)).toBe(
         `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`,
       );
     }
   });
 
-  it("proxies http streams on an https page (mixed content)", () => {
+  it("never proxies HLS .m3u8 (segments resolve against the manifest origin)", () => {
     setProtocol("https:");
-    const url = "http://host/stream.aac";
-    expect(proxiedStreamUrl(url)).toBe(
-      `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`,
+    expect(proxiedStreamUrl("https://host/live.m3u8")).toBe(
+      "https://host/live.m3u8",
+    );
+    expect(proxiedStreamUrl("http://host/live.m3u8?token=1")).toBe(
+      "http://host/live.m3u8?token=1",
     );
   });
 
-  it("leaves https direct streams untouched", () => {
+  it("leaves relative / same-origin urls untouched (e.g. the TuneIn probe)", () => {
     setProtocol("https:");
-    expect(proxiedStreamUrl("https://host/stream.aac")).toBe(
-      "https://host/stream.aac",
-    );
-  });
-
-  it("does not proxy http direct streams on an http page (dev)", () => {
-    setProtocol("http:");
-    expect(proxiedStreamUrl("http://host/stream.aac")).toBe(
-      "http://host/stream.aac",
+    expect(proxiedStreamUrl("/api/tunein/Tune.ashx?id=s1")).toBe(
+      "/api/tunein/Tune.ashx?id=s1",
     );
   });
 });

@@ -112,6 +112,29 @@ export function useAudioSettingsSnapshot(): AudioSettings {
   };
 }
 
+/** Map a plain N:1 compressor ratio (2/4/6/10) to the engine's 0–3 ratio
+ *  index, matching the CLI (rockbox-playback `ratio_index`). */
+export function compRatioIndex(ratio: number): number {
+  if (ratio <= 2) return 0; // 2:1
+  if (ratio <= 4) return 1; // 4:1
+  if (ratio <= 6) return 2; // 6:1
+  return 3; // 10:1
+}
+
+/**
+ * Apply the compressor with the CLI-matched characteristics: auto makeup-gain
+ * on, 2 dB soft knee, 5 ms attack, 200 ms release, and the ratio as a 0–3 index
+ * (not the raw N:1). `threshold` of 0 disables the stage.
+ * Signature: `setCompressor(threshold, makeup, ratioIndex, knee, releaseMs, attackMs)`.
+ */
+export function applyCompressor(
+  p: RockboxPlayer,
+  threshold: number,
+  ratio: number,
+) {
+  p.setCompressor(threshold, 1, compRatioIndex(ratio), 2, 200, 5);
+}
+
 /** Push every persisted setting to the engine (call once it's ready). */
 export function applyAudioSettings(p: RockboxPlayer, s: AudioSettings) {
   p.setEqEnabled(s.eqEnabled);
@@ -121,7 +144,7 @@ export function applyAudioSettings(p: RockboxPlayer, s: AudioSettings) {
   p.setCrossfeed(s.crossfeedMode, Math.round(s.crossfeedDirect * 10));
   p.setPbe(s.pbe, -Math.round(s.pbePrecut * 10));
   p.setSurround(s.surroundDelay, s.surroundBalance, 0, 0);
-  p.setCompressor(s.compThreshold, 0, s.compRatio, 0, 0, 0);
+  applyCompressor(p, s.compThreshold, s.compRatio);
   p.setChannelMode(s.channelMode);
   p.setStereoWidth(s.stereoWidth);
 }

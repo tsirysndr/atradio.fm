@@ -10,22 +10,25 @@ export interface ResolvedStream {
 const isHlsUrl = (url: string) => /\.m3u8(\?|$)/i.test(url);
 
 /**
- * Route an `http://` stream through our https API proxy so it isn't blocked as
- * mixed content when the app itself is served over https. `https://` URLs and
- * (dev) http pages are returned unchanged, so playback stays direct wherever it
- * safely can. HLS manifests are never proxied — their segment URIs would then
- * resolve against the proxy origin — so callers should skip HLS.
+ * Route a stream through our CORS-enabled `/api/stream` proxy.
+ *
+ * Every absolute `http(s)` stream is proxied. This is what keeps the Rockbox
+ * DSP/EQ in the signal path: the decoder worker fetches the stream itself, and
+ * cross-origin radio hosts almost never send `Access-Control-Allow-Origin`, so a
+ * direct fetch is CORS-blocked — the engine then errors and playback silently
+ * falls back to a bare `<audio>` element that bypasses the whole DSP chain
+ * (no EQ, no bass, nothing). Proxying makes the fetch same-origin/CORS-OK so the
+ * engine can always decode, and it also unwraps `.pls`/`.m3u` playlists.
+ *
+ * Not proxied:
+ * - HLS `.m3u8` — segment URIs must resolve against the manifest's own origin
+ *   (callers also branch on `isHls` first).
+ * - relative / same-origin URLs (e.g. the TuneIn `/api/tunein/…` probe) — they
+ *   are already CORS-safe and return a finite body, not a live stream.
  */
 export function proxiedStreamUrl(url: string): string {
-  const isHttp = /^http:\/\//i.test(url);
-  const isPlaylist = /\.(pls|m3u)(\?|$)/i.test(url);
-  const pageHttps =
-    typeof window !== "undefined" && window.location.protocol === "https:";
-  // Route through the proxy when either an `http://` stream would be blocked as
-  // mixed content on an https page, or the URL is a `.pls`/`.m3u` playlist the
-  // proxy must unwrap into a real stream (the decoder can't play a playlist
-  // file). HLS `.m3u8` is never proxied — callers branch on `isHls` first.
-  if (!((isHttp && pageHttps) || isPlaylist)) return url;
+  if (isHlsUrl(url)) return url;
+  if (!/^https?:\/\//i.test(url)) return url;
   return `${APPVIEW_URL}/api/stream?url=${encodeURIComponent(url)}`;
 }
 
