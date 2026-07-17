@@ -86,10 +86,11 @@ pub enum RemoteEvent {
     Devices(Vec<Device>),
     /// Presence summary; `cleanup` asks us to delete our `actor.status` record.
     Presence { any_playing: bool, cleanup: bool },
-    /// We repeatedly couldn't mint a service-auth token — the OAuth session is
-    /// stale/expired and the user needs to sign in again. Emitted at most once
-    /// per stretch of failures (reset once we reconnect).
-    AuthExpired,
+    /// We repeatedly couldn't mint a service-auth token. Carries the underlying
+    /// error so the cause is visible (an expired/insufficient session, or a
+    /// transient network failure — both surface here). Emitted at most once per
+    /// stretch of failures (reset once we reconnect).
+    AuthExpired(String),
 }
 
 /// Cloneable handle to send commands to *other* devices.
@@ -171,11 +172,13 @@ async fn run(
                 mint_failures = 0;
                 t
             }
-            Err(_) => {
+            Err(e) => {
                 mint_failures += 1;
                 if mint_failures >= AUTH_FAILURE_THRESHOLD && !auth_notified {
                     auth_notified = true;
-                    let _ = evt_tx.send(RemoteEvent::AuthExpired);
+                    // `{:#}` includes the anyhow cause chain (the real XRPC /
+                    // network error), so "session expired" isn't a blind guess.
+                    let _ = evt_tx.send(RemoteEvent::AuthExpired(format!("{e:#}")));
                 }
                 let _ = evt_tx.send(RemoteEvent::Status(false));
                 tokio::time::sleep(Duration::from_millis(backoff)).await;

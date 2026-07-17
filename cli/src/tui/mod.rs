@@ -736,9 +736,12 @@ fn apply_remote_event(evt: RemoteEvent, app: &mut App, atproto: &Arc<Atproto>) {
                 });
             }
         }
-        RemoteEvent::AuthExpired => {
+        RemoteEvent::AuthExpired(detail) => {
             app.connect_online = false;
-            app.toast.set("Session expired — press s to sign in again");
+            // Keep the toast short; the daemon logs the full detail to stdout.
+            let brief: String = detail.chars().take(80).collect();
+            app.toast
+                .set(format!("Connect auth failed ({brief}) — press s to sign in"));
         }
     }
 }

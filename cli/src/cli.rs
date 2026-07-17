@@ -356,9 +356,10 @@ async fn cmd_daemon(config: Config) -> Result<()> {
                         tokio::spawn(async move { let _ = at.delete_play_status().await; });
                     }
                 }
-                RemoteEvent::AuthExpired => {
+                RemoteEvent::AuthExpired(detail) => {
+                    println!("○ couldn't authenticate the Connect device: {detail}");
                     println!(
-                        "○ session expired — run `atradio login` to reconnect \
+                        "  run `atradio login` to reconnect \
                          (an app-password login lasts longer for a daemon)"
                     );
                 }
