@@ -1,5 +1,8 @@
 # atradio
 
+[![nix](https://github.com/tsirysndr/atradio.fm/actions/workflows/nix.yml/badge.svg)](https://github.com/tsirysndr/atradio.fm/actions/workflows/nix.yml)
+[![discord](https://img.shields.io/discord/1527379646583144560?label=discord&logo=discord&color=5865F2)](https://discord.gg/WA9hq9Tmkz)
+
 `atradio.fm` in your terminal — a TUI radio player on the AT Protocol.
 
 A native Rust client for [atradio.fm](https://atradio.fm): browse trending /
