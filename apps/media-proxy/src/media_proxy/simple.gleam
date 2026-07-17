@@ -13,6 +13,8 @@ import gleam/result
 import gleam/string
 import logging
 import media_proxy/config
+import media_proxy/icy as icy_meta
+import media_proxy/playlist
 import mist.{type Connection, type ResponseData}
 
 const upstream_timeout_ms = 8000
@@ -75,18 +77,30 @@ pub fn image(req: Request(Connection)) -> Response(ResponseData) {
   }
 }
 
-/// `/api/icy?url=<stream>` -> `{ "title": ... }`.
+/// `/api/icy?url=<stream>` -> `{ "title": ... }`. Best-effort — a stream with
+/// no ICY metadata (or a transient read failure) simply reports `null`.
 pub fn icy(req: Request(Connection)) -> Response(ResponseData) {
-  // TODO: port `readIcyTitle`. It needs a *bounded* streaming read
-  // (metaint*2 + 4096 bytes, then abort) — httpc buffers the whole body, which
-  // never returns on an endless stream. Reuse the gun-based reader from
-  // `proxy_gun_ffi` with a byte cap, then parse `StreamTitle='…'` out of the
-  // interleaved ICY metadata blocks. Until then, report no title.
-  let _ = query_url(req)
+  // TODO(cache): now-playing changes per song — add a ~20s ETS/actor cache.
+  let title = case query_url(req) {
+    Some(url) -> icy_meta.read_title(resolve_stream(url))
+    None -> None
+  }
   json_response(
     200,
-    json.to_string(json.object([#("title", json.nullable(None, json.string))])),
+    json.to_string(json.object([#("title", json.nullable(title, json.string))])),
   )
+}
+
+/// `.pls`/`.m3u` playlists point at the real stream — unwrap before reading ICY.
+fn resolve_stream(url: String) -> String {
+  case playlist.is_unwrappable(url) {
+    True ->
+      case get_text(url, []) {
+        Ok(res) -> playlist.first_stream_url(res.body) |> option.unwrap(url)
+        Error(_) -> url
+      }
+    False -> url
+  }
 }
 
 // ---- helpers ---------------------------------------------------------------

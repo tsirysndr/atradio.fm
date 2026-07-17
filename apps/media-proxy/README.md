@@ -12,7 +12,7 @@ scales and fails independently of discovery + the Connect hub.
 | `GET /api/stream?url=` | Reverse-proxy an audio stream, piped chunk-by-chunk so the Rockbox wasm decoder can fetch it cross-origin (keeps the DSP/EQ in the signal path). Unwraps `.pls`/`.m3u`; forwards ICY metadata + `Range`; follows redirects. |
 | `GET /api/tunein/*` | Proxy `opml.radiotime.com/*` (TuneIn sends no CORS). |
 | `GET /api/image?url=` | Proxy `http://` station artwork (mixed-content). Only image responses are relayed. |
-| `GET /api/icy?url=` | ICY "now playing" (`{ "title": … }`). **Stub** — see the TODO in `simple.gleam`. |
+| `GET /api/icy?url=` | ICY "now playing" (`{ "title": … }`). Bounded `gun` read of the interleaved metadata blocks; unwraps playlists first. |
 | `GET /healthz` | Liveness. |
 
 Every route is public + read-only, so CORS is a blanket `origin: *` with the ICY
@@ -56,9 +56,10 @@ src/
 ├─ atradio_media_proxy.gleam   # mist server + router + CORS + PORT env
 ├─ media_proxy/config.gleam    # env config (PORT)
 ├─ media_proxy/stream.gleam    # /stream — streaming reverse-proxy
-├─ media_proxy/simple.gleam    # /tunein, /image, /icy (buffered)
+├─ media_proxy/simple.gleam    # /tunein, /image, /icy handlers
+├─ media_proxy/icy.gleam       # ICY StreamTitle reader (via the FFI)
 ├─ media_proxy/playlist.gleam  # .pls/.m3u unwrapping
-└─ proxy_gun_ffi.erl           # gun streaming ↔ mist.chunked bridge
+└─ proxy_gun_ffi.erl           # gun: streaming pipe + bounded ICY read
 ```
 
 The `gun` FFI is the one piece Node hands you free (`stream.pipe`): a pump
