@@ -367,15 +367,32 @@ fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
             .as_ref()
             .map(|a| a.name())
             .unwrap_or_else(|| "someone".into());
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("{who} "),
+        let mut spans = vec![Span::styled(
+            format!("{who} "),
+            Style::default()
+                .fg(theme::CYAN)
+                .add_modifier(Modifier::BOLD),
+        )];
+        let text = c.text.trim();
+        if !text.is_empty() {
+            spans.push(Span::styled(c.text.clone(), Style::default().fg(theme::FG)));
+        }
+        // Non-text media (a GIF or video embed) can't render in a terminal —
+        // show a labelled placeholder so the comment isn't invisible.
+        if let Some(label) = media_placeholder(c) {
+            if !text.is_empty() {
+                spans.push(Span::raw(" "));
+            }
+            spans.push(Span::styled(
+                label,
                 Style::default()
-                    .fg(theme::CYAN)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(c.text.clone(), Style::default().fg(theme::FG)),
-        ]));
+                    .fg(theme::INDIGO)
+                    .add_modifier(Modifier::ITALIC),
+            ));
+        } else if text.is_empty() {
+            spans.push(Span::styled("[no text]", Style::default().fg(theme::MUTED)));
+        }
+        lines.push(Line::from(spans));
     }
     f.render_widget(Paragraph::new(lines), inner);
 }
@@ -1052,6 +1069,24 @@ fn draw_devices(f: &mut Frame, area: Rect, app: &App) {
 }
 
 // ---- helpers -------------------------------------------------------------
+
+/// A `[GIF]` / `[Video]` placeholder for a comment's embedded media (which the
+/// terminal can't render), including its alt text. `None` when there's no embed.
+fn media_placeholder(c: &crate::appview::CommentView) -> Option<String> {
+    let gif = c.gif.as_ref()?;
+    // Klipy/Giphy embeds are `.mp4` videos or animated GIFs (mirrors the web).
+    let kind = if gif.url.to_lowercase().contains(".mp4") {
+        "Video"
+    } else {
+        "GIF"
+    };
+    let alt = gif.alt.as_deref().unwrap_or("").trim();
+    Some(if alt.is_empty() {
+        format!("[{kind}]")
+    } else {
+        format!("[{kind}: {alt}]")
+    })
+}
 
 fn centered(area: Rect, pct_w: u16, pct_h: u16) -> Rect {
     let w = area.width * pct_w / 100;

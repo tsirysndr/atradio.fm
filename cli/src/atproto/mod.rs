@@ -418,8 +418,11 @@ fn atradio_scopes() -> Result<jacquard::oauth::scopes::Scopes<smol_str::SmolStr>
         // a DID *service reference* (bare DID is rejected by the scope parser)
         // and must match the AppView's CONNECT_SERVICE_AUD.
         .scope(
-            Scope::rpc_aud("fm.atradio.connect", "did:web:api.atradio.fm#atradio_appview")
-                .map_err(to_anyhow)?,
+            Scope::rpc_aud(
+                "fm.atradio.connect",
+                "did:web:api.atradio.fm#atradio_appview",
+            )
+            .map_err(to_anyhow)?,
         )
         .build()
         .map_err(to_anyhow)
