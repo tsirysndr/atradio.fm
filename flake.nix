@@ -15,7 +15,12 @@
   # source (sharing cli/package.nix with cli/flake.nix) rather than importing
   # the sub-flake — a `path:./cli` input can't be locked inside a git repo.
   outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+    # x86_64-darwin is no longer supported on FlakeHub — build the other three.
+    flake-utils.lib.eachSystem [
+      "x86_64-linux"
+      "aarch64-linux"
+      "aarch64-darwin"
+    ] (system:
       let
         pkgs = import nixpkgs { inherit system; };
         craneLib = crane.mkLib pkgs;
