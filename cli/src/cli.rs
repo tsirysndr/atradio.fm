@@ -36,6 +36,25 @@ pub struct Cli {
     /// the web app or other clients control playback. Waits until Ctrl-C.
     #[arg(long, global = true)]
     pub no_tui: bool,
+
+    /// Control another running atradio over its gRPC API instead of playing
+    /// locally. With no value, connects to the default unix socket; otherwise
+    /// give a `unix:PATH`, `host:port`, or `http://host:port` address.
+    #[arg(long, value_name = "ADDR", num_args = 0..=1, default_missing_value = "", global = true)]
+    pub connect: Option<String>,
+
+    /// Serve the gRPC control API over TCP on this port (implies [grpc].http).
+    #[arg(long, value_name = "PORT", global = true)]
+    pub grpc_port: Option<u16>,
+
+    /// Don't start or connect to the gRPC control API — run fully local.
+    #[arg(long, global = true)]
+    pub no_grpc: bool,
+
+    /// Bearer token for a TCP gRPC endpoint (overrides [grpc].token). Used both
+    /// when serving `--grpc-port` and when connecting with `--connect host:port`.
+    #[arg(long, value_name = "TOKEN", global = true)]
+    pub token: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -120,16 +139,35 @@ pub enum ServiceAction {
     Uninstall,
 }
 
+/// gRPC-related CLI flags, resolved from `Cli` and threaded into the TUI/daemon.
+#[derive(Clone, Default)]
+pub struct GrpcOpts {
+    /// `--connect [ADDR]`: control a remote instead of playing locally.
+    pub connect: Option<String>,
+    /// `--grpc-port`: serve the control API over TCP on this port.
+    pub port: Option<u16>,
+    /// `--no-grpc`: don't serve or connect.
+    pub disabled: bool,
+    /// `--token`: bearer token for a TCP endpoint (serve or connect).
+    pub token: Option<String>,
+}
+
 pub async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env();
     let no_tui = cli.no_tui;
+    let grpc = GrpcOpts {
+        connect: cli.connect,
+        port: cli.grpc_port,
+        disabled: cli.no_grpc,
+        token: cli.token,
+    };
 
     match cli.command.unwrap_or(Command::Tui) {
         Command::Tui => {
             if no_tui {
-                cmd_daemon(config).await
+                cmd_daemon(config, grpc).await
             } else {
-                crate::tui::run(config).await
+                cmd_tui(config, grpc).await
             }
         }
         Command::Search { query, limit } => cmd_search(query.join(" "), limit).await,
@@ -257,12 +295,19 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
 }
 
 /// Headless atradio Connect device: no TUI, just an online controllable player.
-async fn cmd_daemon(config: Config) -> Result<()> {
+async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
     use std::sync::Arc;
     use std::time::Duration;
 
     use crate::player::State as PlayState;
     use crate::remote::{RemoteConfig, RemoteEvent, StationLite, WireState};
+
+    if grpc.connect.is_some() {
+        anyhow::bail!(
+            "`--connect` controls another instance and needs the TUI — \
+             drop `--no-tui` to use it"
+        );
+    }
 
     let atproto = Arc::new(Atproto::new(config.session_path.clone()));
     if !atproto.is_logged_in() {
@@ -291,7 +336,7 @@ async fn cmd_daemon(config: Config) -> Result<()> {
         tokio::sync::mpsc::unbounded_channel::<crate::grpc::GrpcCmd>();
     let (grpc_state_tx, grpc_state_rx) =
         tokio::sync::watch::channel(crate::grpc::GrpcState::default());
-    match resolve_grpc_endpoints(&config, &settings)? {
+    match resolve_grpc_endpoints(&config, &settings, &grpc)? {
         Some(eps) => {
             let bound = crate::grpc::server::spawn(eps, grpc_cmd_tx, grpc_state_rx)?;
             if let Some(p) = &bound.socket {
@@ -475,38 +520,69 @@ async fn apply_grpc_cmd(
     }
 }
 
-/// Resolve the gRPC endpoints from settings (CLI flag overrides land later).
-/// Generates + persists the TCP bearer token on first use.
+/// Interactive TUI, with gRPC startup negotiation: if another atradio already
+/// owns the control socket (or `--connect` was given), we don't start a second
+/// server — a later step connects to it. Otherwise we serve the control API so
+/// other instances / `grpcurl` can drive this one.
+async fn cmd_tui(config: Config, grpc: GrpcOpts) -> Result<()> {
+    let settings = crate::settings::Settings::load(&config.session_path);
+    let socket = settings.grpc_socket_path(&config.session_path);
+
+    // Defer to an existing instance rather than binding a live socket. (The
+    // client that controls it lands in the next step; for now we run locally.)
+    let defer = grpc.connect.is_some()
+        || (!grpc.disabled
+            && settings.grpc.enabled
+            && crate::grpc::server::socket_is_live(&socket));
+
+    let endpoints = if defer {
+        None
+    } else {
+        resolve_grpc_endpoints(&config, &settings, &grpc)?
+    };
+    crate::tui::run(config, endpoints).await
+}
+
+/// Resolve the gRPC endpoints to serve, from settings + CLI flags. TCP is used
+/// when `[grpc].http` or `--grpc-port` is set; its bearer token comes from
+/// `--token`, then `[grpc].token`, else a fresh one is generated + persisted.
 fn resolve_grpc_endpoints(
     config: &Config,
     settings: &crate::settings::Settings,
+    opts: &GrpcOpts,
 ) -> Result<Option<crate::grpc::server::Endpoints>> {
+    if opts.disabled {
+        return Ok(None);
+    }
     let g = &settings.grpc;
     let socket = g
         .enabled
         .then(|| settings.grpc_socket_path(&config.session_path));
-    let tcp = if g.http {
-        let host: std::net::IpAddr = g
-            .host
-            .parse()
-            .with_context(|| format!("invalid [grpc] host {:?} in settings", g.host))?;
-        Some(std::net::SocketAddr::new(host, g.port))
-    } else {
-        None
+    // `--grpc-port` overrides the configured port and implies HTTP.
+    let port = opts.port.or_else(|| g.http.then_some(g.port));
+    let tcp = match port {
+        Some(p) => {
+            let host: std::net::IpAddr = g
+                .host
+                .parse()
+                .with_context(|| format!("invalid [grpc] host {:?} in settings", g.host))?;
+            Some(std::net::SocketAddr::new(host, p))
+        }
+        None => None,
     };
     if socket.is_none() && tcp.is_none() {
         return Ok(None);
     }
-    let token = match (&tcp, &g.token) {
-        (None, _) => None,
-        (Some(_), Some(t)) => Some(t.clone()),
-        (Some(_), None) => {
-            let t = crate::grpc::server::generate_token()?;
-            let mut s = settings.clone();
-            s.grpc.token = Some(t.clone());
-            s.save(&config.session_path);
-            Some(t)
-        }
+    let token = if tcp.is_none() {
+        None
+    } else if let Some(t) = opts.token.clone().or_else(|| g.token.clone()) {
+        Some(t)
+    } else {
+        let t = crate::grpc::server::generate_token()?;
+        let mut s = settings.clone();
+        s.grpc.token = Some(t.clone());
+        s.save(&config.session_path);
+        Some(t)
     };
     Ok(Some(crate::grpc::server::Endpoints { socket, tcp, token }))
 }

@@ -25,6 +25,7 @@ use tokio::sync::mpsc;
 use crate::appview::{AppView, StationInfo};
 use crate::atproto::Atproto;
 use crate::config::Config;
+use crate::grpc::{GrpcCmd, GrpcState};
 use crate::player::{Player, State as PlayState};
 use crate::radio::RadioBrowser;
 use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
@@ -69,7 +70,10 @@ pub fn status_glyph(state: PlayState) -> &'static str {
     }
 }
 
-pub async fn run(config: Config) -> Result<()> {
+pub async fn run(
+    config: Config,
+    grpc_endpoints: Option<crate::grpc::server::Endpoints>,
+) -> Result<()> {
     let atproto = Atproto::new(config.session_path.clone());
     let profile = atproto.profile();
     let logged_in = profile.is_some();
@@ -159,6 +163,28 @@ pub async fn run(config: Config) -> Result<()> {
     };
     app.self_device_id = Some(device_id);
 
+    // gRPC control API: serve this instance so another atradio (or grpcurl) can
+    // drive it. Commands come in over an mpsc — applied on this thread, since
+    // the player is !Send — and state goes out over a watch the loop refreshes.
+    let (grpc_state_tx, grpc_state_rx) = tokio::sync::watch::channel(GrpcState::default());
+    let mut grpc_cmd_rx = if let Some(eps) = grpc_endpoints {
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<GrpcCmd>();
+        match crate::grpc::server::spawn(eps, cmd_tx, grpc_state_rx) {
+            Ok(bound) => {
+                if let Some(p) = &bound.socket {
+                    app.toast.set(format!("gRPC control on {}", p.display()));
+                }
+            }
+            Err(e) => app.toast.set(format!("gRPC control off: {e}")),
+        }
+        cmd_rx
+    } else {
+        // Born-closed (another instance serves, or disabled): the arm never fires.
+        let (_tx, cmd_rx) = mpsc::unbounded_channel::<GrpcCmd>();
+        cmd_rx
+    };
+    let mut grpc_version: u64 = 0;
+
     // Set up the terminal.
     let mut term = setup_terminal()?;
 
@@ -185,13 +211,21 @@ pub async fn run(config: Config) -> Result<()> {
         let _ = mpris_np_tx.send(np.clone());
         app.volume = player.volume();
         app.muted = player.is_muted();
-        // Broadcast this device's playback to the Connect hub.
-        let _ = local_state_tx.send(WireState {
+        // Broadcast this device's playback to the Connect hub and the gRPC
+        // watch channel (built once, shared by both).
+        let wire = WireState {
             playing: matches!(np.state, PlayState::Playing),
             station: app.current.as_ref().map(station_to_lite),
             title: np.line(),
             volume: player.volume(),
             muted: player.is_muted(),
+        };
+        let _ = local_state_tx.send(wire.clone());
+        grpc_version += 1;
+        let _ = grpc_state_tx.send(GrpcState {
+            wire,
+            audio: app.dsp.clone(),
+            version: grpc_version,
         });
         if let Err(e) = term.draw(|f| ui::draw(f, &app, &np)) {
             break Err(e.into());
@@ -235,6 +269,10 @@ pub async fn run(config: Config) -> Result<()> {
             // atradio Connect: a peer is controlling this device.
             Some(cmd) = remote_cmd_rx.recv() => {
                 apply_remote_cmd(cmd, &mut app, &player, &browser, &atproto, &appview, &tx);
+            }
+            // gRPC control API: another atradio (or grpcurl) is driving this one.
+            Some(cmd) = grpc_cmd_rx.recv() => {
+                apply_grpc_cmd(cmd, &mut app, &player, &browser, &atproto, &appview, &tx);
             }
             // atradio Connect: roster / presence / status updates.
             Some(evt) = remote_evt_rx.recv() => {
@@ -703,6 +741,44 @@ fn apply_remote_cmd(
             // Being told to play a station means this device becomes active.
             app.remote_target = None;
             start_playing(app, browser, atproto, appview, tx, lite_to_station(s));
+        }
+    }
+}
+
+/// Apply a command from the gRPC control API. Transport/load reuse the Connect
+/// path; DSP + favorite mirror the local key handlers.
+#[allow(clippy::too_many_arguments)]
+fn apply_grpc_cmd(
+    cmd: GrpcCmd,
+    app: &mut App,
+    player: &Arc<Player>,
+    browser: &RadioBrowser,
+    atproto: &Arc<Atproto>,
+    appview: &AppView,
+    tx: &mpsc::UnboundedSender<Msg>,
+) {
+    match cmd {
+        GrpcCmd::Remote(rc) => apply_remote_cmd(rc, app, player, browser, atproto, appview, tx),
+        GrpcCmd::SetAudio(a) => {
+            app.dsp = a;
+            player.apply_dsp(&app.dsp);
+        }
+        GrpcCmd::AdjustDspRow { row, dir } => {
+            if dsp_rows::adjust(&mut app.dsp, row, dir) {
+                player.apply_dsp(&app.dsp);
+            }
+        }
+        GrpcCmd::Favorite(s, reply) => {
+            if !atproto.is_logged_in() {
+                let _ = reply.send(Err("not signed in".to_string()));
+                return;
+            }
+            let station = lite_to_station(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
         }
     }
 }
