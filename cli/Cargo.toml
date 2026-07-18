@@ -81,7 +81,5 @@ default = ["fm_atradio"]
 # Gates the code generated from packages/lexicons/lexicons/atradio.
 fm_atradio = []
 
-[profile.release]
-opt-level = 3
-lto = "thin"
-strip = true
+# NOTE: profile settings moved to the workspace root Cargo.toml — Cargo ignores
+# `[profile.*]` on non-root workspace members.

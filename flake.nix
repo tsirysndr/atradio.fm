@@ -1,5 +1,5 @@
 {
-  description = "atradio.fm — the CLI/TUI lives in ./cli (the default package)";
+  description = "atradio.fm — Cargo workspace (cli/ + crates/); the CLI is the default package";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -11,9 +11,12 @@
     };
   };
 
-  # The root default package IS the CLI. We build it directly from the ./cli
-  # source (sharing cli/package.nix with cli/flake.nix) rather than importing
-  # the sub-flake — a `path:./cli` input can't be locked inside a git repo.
+  # The root default package IS the CLI, built from the whole Cargo workspace
+  # (repo root) so it resolves against the workspace Cargo.lock + the root
+  # `[profile.release]`, and so it keeps working once the CLI depends on the
+  # in-workspace `atradio-sdk` crate. We share cli/package.nix with cli/flake.nix
+  # rather than importing the sub-flake — a `path:.` input can't be locked
+  # inside a git repo.
   outputs = { self, nixpkgs, crane, flake-utils, advisory-db, ... }:
     # x86_64-darwin is no longer supported on FlakeHub — build the other three.
     flake-utils.lib.eachSystem [
@@ -28,11 +31,13 @@
         atradio = import ./cli/package.nix {
           inherit craneLib pkgs advisory-db;
           inherit (pkgs) lib;
-          # crane's default filter keeps only Rust/Cargo files; also keep the
-          # systemd unit + rc.d scripts the binary embeds via include_str!, and
-          # the gRPC .proto sources + committed descriptor.bin (tonic-build).
+          # The whole workspace is the source (root Cargo.toml + Cargo.lock +
+          # cli/ + crates/). crane's default filter keeps only Rust/Cargo files;
+          # also keep the systemd unit + rc.d scripts the binary embeds via
+          # include_str!, and the gRPC .proto sources + committed descriptor.bin
+          # (tonic-build). `--bin atradio` (in package.nix) selects just the CLI.
           src = pkgs.lib.cleanSourceWith {
-            src = ./cli;
+            src = ./.;
             filter = path: type:
               (craneLib.filterCargoSources path type)
               || (pkgs.lib.hasSuffix ".service" path)

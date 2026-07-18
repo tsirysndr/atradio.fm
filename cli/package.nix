@@ -1,10 +1,17 @@
 # Shared crane build for the atradio CLI, imported by BOTH:
-#   - cli/flake.nix   (standalone: `cd cli && nix build`),  src = ./.
-#   - the root flake  (default package),                    src = ./cli
+#   - the root flake  (default package),                    src = ./.   (workspace)
+#   - cli/flake.nix   (standalone: `cd cli && nix build`),  src = ./.   (just cli/)
 #
-# Kept as a plain importable file (not a flake input) so neither flake needs a
-# `path:` input — relative path inputs can't be locked inside a git repo and
-# break `nix build` in CI ("unlocked input").
+# Either way the build selects the CLI with `--bin atradio` (see cargoExtraArgs),
+# so a workspace src that also contains crates/atradio-sdk still builds only the
+# binary. Kept as a plain importable file (not a flake input) so neither flake
+# needs a `path:` input — relative path inputs can't be locked inside a git repo
+# and break `nix build` in CI ("unlocked input").
+#
+# NOTE: the standalone cli/flake.nix copies only ./cli, so it works while the CLI
+# is self-contained. Once the CLI takes a path dependency on the in-workspace
+# atradio-sdk crate, the SDK sources won't be in that sandbox — build from the
+# repo root (the root flake) instead.
 { craneLib, pkgs, lib, src, advisory-db }:
 
 let

@@ -1,0 +1,41 @@
+[package]
+name = "atradio-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Official Rust SDK for atradio.fm — a social internet radio platform on the AT Protocol"
+license = "MIT OR Apache-2.0"
+authors = ["Tsiry Sandratraina <tsiry.sndr@rocksky.app>"]
+repository = "https://github.com/tsirysndr/atradio.fm"
+keywords = ["atproto", "atradio", "radio", "bluesky", "sdk"]
+categories = ["api-bindings"]
+
+[dependencies]
+# atproto client stack (identity, sessions, XRPC, OAuth) — same major as the CLI.
+jacquard = { version = "0.12", default-features = false, features = [
+    "api",
+    "dns",
+    "derive",
+    "cache",
+    "loopback",
+] }
+jacquard-common = "0.12"
+
+# async runtime primitives (the auth mutex) + HTTP for the read-only AppView client.
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures = "0.3"
+thiserror = "2"
+chrono = { version = "0.4", features = ["clock"] }
+smol_str = { version = "0.3", features = ["serde"] }
+
+[features]
+default = ["oauth", "dns", "appview"]
+# Browser + loopback OAuth login (jacquard oauth/loopback already pulled above).
+oauth = []
+# DNS-based handle resolution.
+dns = []
+# The unauthenticated public-read AppView client (usable without any session).
+appview = []
