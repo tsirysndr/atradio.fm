@@ -230,11 +230,17 @@ pub async fn run(
         let np = if let Some(remote) = &app.grpc_remote {
             let (wire, audio, err) = remote.snapshot();
             let lists = remote.lists();
+            let (connect_devices, connect_target, connect_online) = remote.connect();
             // (borrow of `remote` ends here — now free to mutate `app`)
             app.current = wire.station.clone().map(lite_to_station);
             app.volume = wire.volume;
             app.muted = wire.muted;
             app.dsp = audio;
+            // Mirror the controlled account's Connect roster so the device picker
+            // (`d`) shows and drives the *remote's* devices.
+            app.remote_devices = connect_devices;
+            app.remote_target = connect_target;
+            app.connect_online = connect_online;
             // The account-specific lists mirror the controlled instance; the
             // global tabs (Trending/Popular/Recent) stay local — identical anyway.
             app.favorites = lists.favorites.into_iter().map(lite_to_station).collect();
@@ -269,6 +275,11 @@ pub async fn run(
                 wire,
                 audio: app.dsp.clone(),
                 version: grpc_version,
+                // Expose our Connect roster so a gRPC controller can forward the
+                // device picker to us.
+                connect_devices: app.remote_devices.clone(),
+                connect_target: app.remote_target.clone(),
+                connect_online: app.connect_online,
             });
             np
         };
@@ -544,10 +555,9 @@ fn handle_event(
             }
         }
         KeyCode::Char('d') => {
-            if app.grpc_remote.is_some() {
-                app.toast
-                    .set("Already controlling a remote over gRPC (--connect).");
-            } else if app.logged_in {
+            // In remote mode the roster comes from the controlled (signed-in)
+            // instance, so a logged-out controller can still open the picker.
+            if app.grpc_remote.is_some() || app.logged_in {
                 app.device_sel = 0;
                 app.overlay = Overlay::Devices;
             } else {
@@ -895,6 +905,17 @@ fn apply_grpc_cmd(
                 let _ = reply.send(r);
             });
         }
+        GrpcCmd::SetConnectTarget(target) => match target {
+            None => {
+                // Take control back to this instance; stop the device we drove.
+                if let (Some(prev), Some(ctrl)) =
+                    (app.remote_target.take(), app.remote_control.clone())
+                {
+                    ctrl.command(prev, RemoteCmd::Stop);
+                }
+            }
+            Some(id) => app.remote_target = Some(id),
+        },
         GrpcCmd::Comment(s, text, reply) => {
             if !atproto.is_logged_in() {
                 let _ = reply.send(Err("not signed in".to_string()));
@@ -967,6 +988,25 @@ fn handle_devices_keys(code: KeyCode, app: &mut App) {
             }
         }
         KeyCode::Enter => {
+            // In gRPC remote mode the roster belongs to the controlled instance,
+            // so forward the selection to it (its own state stream echoes back).
+            if app.grpc_remote.is_some() {
+                let (target, msg) = if app.device_sel == 0 {
+                    (None, "Playing on the remote".to_string())
+                } else if let Some(dev) = app.other_devices().get(app.device_sel - 1) {
+                    (Some(dev.id.clone()), format!("Remote → {}", dev.name))
+                } else {
+                    (None, String::new())
+                };
+                if !msg.is_empty() {
+                    if let Some(r) = &app.grpc_remote {
+                        r.set_connect_target(target);
+                    }
+                    app.toast.set(msg);
+                }
+                app.overlay = Overlay::None;
+                return;
+            }
             if app.device_sel == 0 {
                 // "This device" — take back control.
                 if let (Some(prev), Some(ctrl)) =

@@ -268,6 +268,16 @@ impl AtradioControl for Service {
             _ => Err(Status::unavailable("comment timed out")),
         }
     }
+
+    async fn set_connect_target(
+        &self,
+        request: Request<pb::SetConnectTargetRequest>,
+    ) -> Result<Response<pb::State>, Status> {
+        let id = request.into_inner().device_id;
+        let target = (!id.is_empty()).then_some(id);
+        self.send(GrpcCmd::SetConnectTarget(target));
+        Ok(Response::new(self.snapshot()))
+    }
 }
 
 /// Claim the unix socket path. A live socket is a hard error (the caller should

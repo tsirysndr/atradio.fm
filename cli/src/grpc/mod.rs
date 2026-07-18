@@ -9,7 +9,7 @@ pub mod client;
 pub mod server;
 
 use crate::player::dsp::AudioSettings;
-use crate::remote::{RemoteCmd, StationLite, WireState};
+use crate::remote::{Device, RemoteCmd, StationLite, WireState};
 use api::v1 as pb;
 
 #[path = ""]
@@ -53,6 +53,9 @@ pub enum GrpcCmd {
         String,
         tokio::sync::oneshot::Sender<Result<String, String>>,
     ),
+    /// atradio Connect: control which account device plays (the forwarded
+    /// picker). `None` = take control back to this instance.
+    SetConnectTarget(Option<String>),
 }
 
 /// Which of the controlled account's lists to browse (mirrors `pb::StationSource`).
@@ -70,6 +73,10 @@ pub struct GrpcState {
     pub audio: AudioSettings,
     /// Bumped on every push so watchers can cheaply detect edits.
     pub version: u64,
+    /// atradio Connect roster + who's controlled (for the forwarded picker).
+    pub connect_devices: Vec<Device>,
+    pub connect_target: Option<String>,
+    pub connect_online: bool,
 }
 
 // ---- wire conversions ------------------------------------------------------
@@ -134,6 +141,31 @@ pub(crate) fn pb_to_station(p: &pb::Station) -> StationLite {
     }
 }
 
+pub(crate) fn device_to_pb(d: &Device) -> pb::ConnectDevice {
+    pb::ConnectDevice {
+        id: d.id.clone(),
+        name: d.name.clone(),
+        platform: d.platform.clone(),
+        is_self: d.is_self,
+        playing: d.state.playing,
+        station: d.state.station.as_ref().map(station_to_pb),
+    }
+}
+
+pub(crate) fn pb_to_device(p: &pb::ConnectDevice) -> Device {
+    Device {
+        id: p.id.clone(),
+        name: p.name.clone(),
+        platform: p.platform.clone(),
+        is_self: p.is_self,
+        state: WireState {
+            playing: p.playing,
+            station: p.station.as_ref().map(pb_to_station),
+            ..Default::default()
+        },
+    }
+}
+
 pub(crate) fn state_to_pb(s: &GrpcState) -> pb::State {
     let playback = if s.wire.playing {
         pb::PlaybackState::Playing
@@ -150,6 +182,9 @@ pub(crate) fn state_to_pb(s: &GrpcState) -> pb::State {
         muted: s.wire.muted,
         audio: Some(audio_to_pb(&s.audio)),
         version: s.version,
+        connect_devices: s.connect_devices.iter().map(device_to_pb).collect(),
+        connect_target: s.connect_target.clone().unwrap_or_default(),
+        connect_online: s.connect_online,
     }
 }
 
@@ -214,5 +249,8 @@ pub(crate) fn pb_to_state(p: &pb::State) -> GrpcState {
         },
         audio: p.audio.as_ref().map(pb_to_audio).unwrap_or_default(),
         version: p.version,
+        connect_devices: p.connect_devices.iter().map(pb_to_device).collect(),
+        connect_target: (!p.connect_target.is_empty()).then(|| p.connect_target.clone()),
+        connect_online: p.connect_online,
     }
 }

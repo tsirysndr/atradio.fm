@@ -380,6 +380,12 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
     println!("Control it from the web app or another client. Press Ctrl-C to stop.");
 
     let mut current: Option<StationLite> = None;
+    // atradio Connect roster, tracked so the gRPC control API can expose it (the
+    // forwarded device picker) and drive which account device plays.
+    let connect_ctrl = remote.control.clone();
+    let mut connect_devices: Vec<crate::remote::Device> = Vec::new();
+    let mut connect_target: Option<String> = None;
+    let mut connect_online = false;
     let mut ticker = tokio::time::interval(Duration::from_millis(500));
     loop {
         tokio::select! {
@@ -388,11 +394,24 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
                 handle_remote_cmd(cmd, &player, &atproto, &mut current).await;
             }
             Some(cmd) = grpc_cmd_rx.recv() => {
-                apply_grpc_cmd(cmd, &player, &mut dsp, &atproto, &appview, &mut current).await;
+                apply_grpc_cmd(
+                    cmd, &player, &mut dsp, &atproto, &appview, &mut current,
+                    &mut connect_target, &connect_ctrl,
+                ).await;
             }
             Some(evt) = remote.evt_rx.recv() => match evt {
                 RemoteEvent::Status(online) => {
+                    connect_online = online;
                     println!("{}", if online { "● connected" } else { "○ disconnected — retrying" });
+                }
+                RemoteEvent::Devices(devices) => {
+                    // Drop a target that left the roster.
+                    if let Some(t) = &connect_target {
+                        if !devices.iter().any(|d| &d.id == t && !d.is_self) {
+                            connect_target = None;
+                        }
+                    }
+                    connect_devices = devices;
                 }
                 RemoteEvent::Presence { cleanup, .. } => {
                     if cleanup {
@@ -424,6 +443,9 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
                     wire,
                     audio: dsp.clone(),
                     version: grpc_version,
+                    connect_devices: connect_devices.clone(),
+                    connect_target: connect_target.clone(),
+                    connect_online,
                 });
             }
         }
@@ -496,6 +518,7 @@ async fn handle_remote_cmd(
 }
 
 /// Apply a gRPC command on the loop thread.
+#[allow(clippy::too_many_arguments)]
 async fn apply_grpc_cmd(
     cmd: crate::grpc::GrpcCmd,
     player: &crate::player::Player,
@@ -503,6 +526,8 @@ async fn apply_grpc_cmd(
     atproto: &std::sync::Arc<Atproto>,
     appview: &AppView,
     current: &mut Option<crate::remote::StationLite>,
+    connect_target: &mut Option<String>,
+    connect_ctrl: &crate::remote::RemoteControl,
 ) {
     use crate::grpc::GrpcCmd;
     match cmd {
@@ -548,6 +573,15 @@ async fn apply_grpc_cmd(
                 let _ = reply.send(r);
             });
         }
+        GrpcCmd::SetConnectTarget(target) => match target {
+            // Take control back: ask the device we were driving to stop.
+            None => {
+                if let Some(prev) = connect_target.take() {
+                    connect_ctrl.command(prev, crate::remote::RemoteCmd::Stop);
+                }
+            }
+            Some(id) => *connect_target = Some(id),
+        },
     }
 }
 

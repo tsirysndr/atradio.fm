@@ -299,9 +299,11 @@ now-playing state (`WatchState`), and lists the account's stations
 - If nothing is there, it **starts the server** and plays locally.
 - If another atradio already owns the socket, a TUI **connects to it and
   controls it** instead of starting a second player — `Enter` (load station),
-  `Space`/`x`/`m`/`+`/`-`, the EQ view, `f` (favorite), and `a` (comment) all go
-  to the controlled instance (favorites/comments post from *its* account), whose
-  now-playing/volume/DSP it renders behind a `◉ Controlling remote` banner. Your
+  `Space`/`x`/`m`/`+`/`-`, the EQ view, `f` (favorite), `a` (comment), and `d`
+  (the Connect **device picker** — forwarded, so you transfer playback among the
+  controlled account's devices) all go to the controlled instance (favorites/
+  comments post from *its* account), whose now-playing/volume/DSP it renders
+  behind a `◉ Controlling remote` banner. Your
   **Favorites / Yours / Profile** tabs show the *controlled account's* lists
   (fetched over gRPC), so you can browse and play its stations; the global tabs
   (Trending/Popular/Recent) and search stay local.

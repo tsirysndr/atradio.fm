@@ -22,7 +22,7 @@ use super::api::v1 as pb;
 use super::api::v1::atradio_control_client::AtradioControlClient;
 use super::{pb_to_state, pb_to_station, station_to_pb, GrpcState, StationSource};
 use crate::player::dsp::AudioSettings;
-use crate::remote::{StationLite, WireState};
+use crate::remote::{Device, StationLite, WireState};
 
 /// Adds `authorization: Bearer <token>` to every call when a token is set
 /// (required by a remote's TCP endpoint; unix sockets need no token).
@@ -54,6 +54,11 @@ struct Mirror {
     audio: AudioSettings,
     /// Transport problem (lost stream / failed RPC), shown until it recovers.
     conn_error: Option<String>,
+    /// The controlled account's Connect roster + who it's driving (for the
+    /// forwarded device picker).
+    connect_devices: Vec<Device>,
+    connect_target: Option<String>,
+    connect_online: bool,
 }
 
 /// The controlled account's browsable lists, fetched over gRPC on demand.
@@ -73,6 +78,7 @@ enum Cmd {
     AdjustDspRow(usize, i32),
     Favorite(StationLite),
     Comment(StationLite, String),
+    SetConnectTarget(Option<String>),
     ListStations(StationSource),
 }
 
@@ -200,9 +206,13 @@ async fn dial(addr: &str) -> Result<Channel> {
 /// in flight) only the server-only now-playing title is taken, so the stale
 /// snapshot can't briefly undo the optimistic edit.
 fn apply_state(m: &mut Mirror, gs: GrpcState, settled: bool) {
+    // Roster + online are pure server info — always take them.
+    m.connect_devices = gs.connect_devices;
+    m.connect_online = gs.connect_online;
     if settled {
         m.wire = gs.wire;
         m.audio = gs.audio;
+        m.connect_target = gs.connect_target;
     } else {
         m.wire.title = gs.wire.title;
     }
@@ -319,6 +329,12 @@ async fn command_loop(
                 })
                 .await
                 .map(drop),
+            Cmd::SetConnectTarget(id) => client
+                .set_connect_target(pb::SetConnectTargetRequest {
+                    device_id: id.unwrap_or_default(),
+                })
+                .await
+                .map(drop),
             Cmd::ListStations(_) => unreachable!("handled above"),
         };
         pending.fetch_sub(1, Ordering::AcqRel);
@@ -345,6 +361,24 @@ impl GrpcRemote {
     /// Snapshot the controlled account's browsable lists.
     pub fn lists(&self) -> RemoteLists {
         self.lists.lock().unwrap().clone()
+    }
+
+    /// Snapshot the controlled account's Connect roster + current target +
+    /// online flag, for the forwarded device picker.
+    pub fn connect(&self) -> (Vec<Device>, Option<String>, bool) {
+        let m = self.mirror.lock().unwrap();
+        (
+            m.connect_devices.clone(),
+            m.connect_target.clone(),
+            m.connect_online,
+        )
+    }
+
+    /// Choose which of the controlled account's devices plays (`None` = the
+    /// controlled instance itself).
+    pub fn set_connect_target(&self, device_id: Option<String>) {
+        self.mirror.lock().unwrap().connect_target = device_id.clone();
+        self.send(Cmd::SetConnectTarget(device_id));
     }
 
     /// Refresh all three account lists from the controlled instance (async; the

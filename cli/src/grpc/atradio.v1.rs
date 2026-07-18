@@ -66,6 +66,31 @@ pub struct State {
     /// Bumped on every change so watchers can cheaply detect edits.
     #[prost(uint64, tag = "7")]
     pub version: u64,
+    /// atradio Connect roster of the controlled account (for the forwarded picker).
+    #[prost(message, repeated, tag = "8")]
+    pub connect_devices: ::prost::alloc::vec::Vec<ConnectDevice>,
+    /// The device the controlled instance is driving; empty = itself.
+    #[prost(string, tag = "9")]
+    pub connect_target: ::prost::alloc::string::String,
+    /// Whether the controlled instance's Connect link is online.
+    #[prost(bool, tag = "10")]
+    pub connect_online: bool,
+}
+/// A device in the controlled account's atradio Connect roster.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ConnectDevice {
+    #[prost(string, tag = "1")]
+    pub id: ::prost::alloc::string::String,
+    #[prost(string, tag = "2")]
+    pub name: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub platform: ::prost::alloc::string::String,
+    #[prost(bool, tag = "4")]
+    pub is_self: bool,
+    #[prost(bool, tag = "5")]
+    pub playing: bool,
+    #[prost(message, optional, tag = "6")]
+    pub station: ::core::option::Option<Station>,
 }
 #[derive(Clone, Copy, PartialEq, ::prost::Message)]
 pub struct GetStateRequest {}
@@ -139,6 +164,12 @@ pub struct CommentRequest {
 pub struct CommentResponse {
     #[prost(string, tag = "1")]
     pub uri: ::prost::alloc::string::String,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct SetConnectTargetRequest {
+    /// Empty = take control back to the controlled instance itself.
+    #[prost(string, tag = "1")]
+    pub device_id: ::prost::alloc::string::String,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
@@ -638,6 +669,32 @@ pub mod atradio_control_client {
                 .insert(GrpcMethod::new("atradio.v1.AtradioControl", "Comment"));
             self.inner.unary(req, path, codec).await
         }
+        /// atradio Connect: choose which of the controlled account's devices plays
+        /// (the forwarded device picker). Empty device id = the controlled instance
+        /// itself. The roster + current target are carried in `State`.
+        pub async fn set_connect_target(
+            &mut self,
+            request: impl tonic::IntoRequest<super::SetConnectTargetRequest>,
+        ) -> std::result::Result<tonic::Response<super::State>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/atradio.v1.AtradioControl/SetConnectTarget",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("atradio.v1.AtradioControl", "SetConnectTarget"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -736,6 +793,13 @@ pub mod atradio_control_server {
             &self,
             request: tonic::Request<super::CommentRequest>,
         ) -> std::result::Result<tonic::Response<super::CommentResponse>, tonic::Status>;
+        /// atradio Connect: choose which of the controlled account's devices plays
+        /// (the forwarded device picker). Empty device id = the controlled instance
+        /// itself. The roster + current target are carried in `State`.
+        async fn set_connect_target(
+            &self,
+            request: tonic::Request<super::SetConnectTargetRequest>,
+        ) -> std::result::Result<tonic::Response<super::State>, tonic::Status>;
     }
     /// Control a running `atradio` process (TUI or `--no-tui` daemon): drive
     /// playback, load a station, edit the Rockbox DSP/EQ chain, and favorite —
@@ -1477,6 +1541,52 @@ pub mod atradio_control_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = CommentSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/atradio.v1.AtradioControl/SetConnectTarget" => {
+                    #[allow(non_camel_case_types)]
+                    struct SetConnectTargetSvc<T: AtradioControl>(pub Arc<T>);
+                    impl<
+                        T: AtradioControl,
+                    > tonic::server::UnaryService<super::SetConnectTargetRequest>
+                    for SetConnectTargetSvc<T> {
+                        type Response = super::State;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::SetConnectTargetRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as AtradioControl>::set_connect_target(&inner, request)
+                                    .await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = SetConnectTargetSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

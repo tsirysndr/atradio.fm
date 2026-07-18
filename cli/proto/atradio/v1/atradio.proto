@@ -41,6 +41,11 @@ service AtradioControl {
 
   // Post a comment on a station from the signed-in account. Returns the URI.
   rpc Comment(CommentRequest) returns (CommentResponse) {}
+
+  // atradio Connect: choose which of the controlled account's devices plays
+  // (the forwarded device picker). Empty device id = the controlled instance
+  // itself. The roster + current target are carried in `State`.
+  rpc SetConnectTarget(SetConnectTargetRequest) returns (State) {}
 }
 
 // The minimal station exchanged over the wire (mirrors remote::StationLite).
@@ -90,6 +95,22 @@ message State {
   AudioSettings audio = 6;
   // Bumped on every change so watchers can cheaply detect edits.
   uint64 version = 7;
+  // atradio Connect roster of the controlled account (for the forwarded picker).
+  repeated ConnectDevice connect_devices = 8;
+  // The device the controlled instance is driving; empty = itself.
+  string connect_target = 9;
+  // Whether the controlled instance's Connect link is online.
+  bool connect_online = 10;
+}
+
+// A device in the controlled account's atradio Connect roster.
+message ConnectDevice {
+  string id = 1;
+  string name = 2;
+  string platform = 3;
+  bool is_self = 4;
+  bool playing = 5;
+  Station station = 6;
 }
 
 message GetStateRequest {}
@@ -153,4 +174,9 @@ message CommentRequest {
 
 message CommentResponse {
   string uri = 1;
+}
+
+message SetConnectTargetRequest {
+  // Empty = take control back to the controlled instance itself.
+  string device_id = 1;
 }

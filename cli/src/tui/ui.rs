@@ -626,8 +626,12 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
         .split(inner);
 
     // atradio Connect: when controlling a remote device, the player bar shows
-    // that device's playback instead of local audio.
-    if let Some(dev) = app.remote_target_device() {
+    // that device's playback instead of local audio. In gRPC remote-control mode
+    // the banner below takes over instead (the roster is the controlled one's).
+    if let Some(dev) = app
+        .remote_target_device()
+        .filter(|_| app.grpc_remote.is_none())
+    {
         let st = &dev.state;
         let glyph = if st.playing { "▶" } else { "⏸" };
         let name = st
