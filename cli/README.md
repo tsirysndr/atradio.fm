@@ -24,6 +24,7 @@ when signed in — favorite stations, add your own, and post comments to your PD
 - [atradio Connect (remote control)](#atradio-connect-remote-control)
 - [Run as a service (systemd, Linux only)](#run-as-a-service-systemd-linux-only)
 - [gRPC control API](#grpc-control-api)
+  - [Discovery (mDNS)](#discovery-mdns)
 - [Platform notes](#platform-notes)
 - [Lexicon bindings](#lexicon-bindings)
 
