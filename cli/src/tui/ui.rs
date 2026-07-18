@@ -303,12 +303,19 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(block, area);
 
     let rows = dsp_rows::rows(&app.dsp);
+    // Give each row a 2-line slot (content + a blank line) so the controls
+    // breathe. `visible` is how many rows fit once the gaps are counted.
+    let slot_h: u16 = 2;
     let height = inner.height as usize;
-    let start = app.dsp_row.saturating_sub(height.saturating_sub(1));
+    let visible = height.div_ceil(slot_h as usize).max(1);
+    let start = app.dsp_row.saturating_sub(visible.saturating_sub(1));
 
-    for (i, row) in rows.iter().enumerate().skip(start).take(height) {
+    for (i, row) in rows.iter().enumerate().skip(start).take(visible) {
         let is_sel = i == app.dsp_row;
-        let y = inner.y + (i - start) as u16;
+        let y = inner.y + (i - start) as u16 * slot_h;
+        if y >= inner.y + inner.height {
+            break;
+        }
         let line_area = Rect::new(inner.x, y, inner.width, 1);
 
         let label_w = 18u16.min(inner.width);
