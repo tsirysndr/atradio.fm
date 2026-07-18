@@ -29,13 +29,16 @@
           inherit craneLib pkgs advisory-db;
           inherit (pkgs) lib;
           # crane's default filter keeps only Rust/Cargo files; also keep the
-          # systemd unit + rc.d scripts the binary embeds via include_str!.
+          # systemd unit + rc.d scripts the binary embeds via include_str!, and
+          # the gRPC .proto sources + committed descriptor.bin (tonic-build).
           src = pkgs.lib.cleanSourceWith {
             src = ./cli;
             filter = path: type:
               (craneLib.filterCargoSources path type)
               || (pkgs.lib.hasSuffix ".service" path)
-              || (pkgs.lib.hasSuffix ".rc" path);
+              || (pkgs.lib.hasSuffix ".rc" path)
+              || (pkgs.lib.hasSuffix ".proto" path)
+              || (pkgs.lib.hasSuffix ".bin" path);
           };
         };
       in

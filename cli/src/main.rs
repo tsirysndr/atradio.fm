@@ -12,6 +12,8 @@ mod appview;
 mod atproto;
 mod cli;
 mod config;
+#[allow(dead_code)] // server/client wired in later phases
+mod grpc;
 #[cfg(target_os = "linux")]
 mod mpris;
 mod player;

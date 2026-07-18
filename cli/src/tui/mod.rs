@@ -740,8 +740,9 @@ fn apply_remote_event(evt: RemoteEvent, app: &mut App, atproto: &Arc<Atproto>) {
             app.connect_online = false;
             // Keep the toast short; the daemon logs the full detail to stdout.
             let brief: String = detail.chars().take(80).collect();
-            app.toast
-                .set(format!("Connect auth failed ({brief}) — press s to sign in"));
+            app.toast.set(format!(
+                "Connect auth failed ({brief}) — press s to sign in"
+            ));
         }
     }
 }

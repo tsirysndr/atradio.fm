@@ -28,7 +28,7 @@ jacquard-derive = "0.12"
 rockbox-playback = ">=0.4.1"
 
 # async runtime + HTTP (AppView reads, radio-browser search, ICY)
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "net"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -43,6 +43,16 @@ ratatui = "0.29"
 crossterm = { version = "0.28", features = ["event-stream"] }
 fuzzy-matcher = "0.3"
 
+# gRPC control API: unix socket by default, TCP/HTTP when a port is configured.
+# Versions track the hyper 1.x / tower 0.5 / h2 0.4 stack already pulled by reqwest.
+tonic = "0.13"
+tonic-reflection = "0.13"
+tonic-web = "0.13"
+prost = "0.13"
+tokio-stream = { version = "0.1", features = ["net"] }
+tower = { version = "0.5", features = ["util"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+
 # misc
 anyhow = "1"
 directories = "5"
@@ -55,6 +65,11 @@ toml = "0.8"
 # proven fin-mpris crate.
 [target.'cfg(target_os = "linux")'.dependencies]
 mpris-server = { version = "0.10", features = ["tokio"] }
+
+[build-dependencies]
+# Regenerates src/grpc/ from proto/ when protoc is available (codegen is
+# committed so plain `cargo install` works without protobuf installed).
+tonic-build = "0.13"
 
 [features]
 default = ["fm_atradio"]
