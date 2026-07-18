@@ -15,6 +15,7 @@ import gleam/http/response.{type Response}
 import gleam/httpc
 import gleam/list
 import gleam/option
+import gleam/regexp
 import gleam/result
 import gleam/string
 import logging
@@ -51,7 +52,7 @@ pub fn handle(req: Request(Connection)) -> Response(ResponseData) {
   case query_url(req) {
     Error(_) -> bad_request()
     Ok(url) -> {
-      let target = resolve_target(url)
+      let target = url |> rewrite_legacy_tunein |> resolve_target
       case gun_open(target, upstream_headers(req)) {
         Error(_) -> {
           logging.log(logging.Warning, "stream: upstream open failed: " <> target)
@@ -140,6 +141,22 @@ fn copy_forward_headers(
 
 /// `.pls`/`.m3u` unwrap to the real stream (finite body → httpc). `.m3u8` is
 /// never unwrapped (the client plays HLS directly).
+/// Re-point a legacy `<host>/api/tunein/…` URL (baked into old favorites, back
+/// when the proxy lived on the AppView) straight at the real TuneIn origin.
+/// Same result as routing through this proxy's own `/api/tunein`, minus a
+/// self-request hop — and it self-heals stale links without the API redirect.
+fn rewrite_legacy_tunein(url: String) -> String {
+  case
+    regexp.compile(
+      "^https?://[^/]+/api/tunein",
+      regexp.Options(case_insensitive: True, multi_line: False),
+    )
+  {
+    Ok(re) -> regexp.replace(re, url, "https://opml.radiotime.com")
+    Error(_) -> url
+  }
+}
+
 fn resolve_target(url: String) -> String {
   case playlist.is_unwrappable(url) {
     True ->
