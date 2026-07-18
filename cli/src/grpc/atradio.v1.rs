@@ -115,6 +115,19 @@ pub struct FavoriteResponse {
     #[prost(string, tag = "1")]
     pub uri: ::prost::alloc::string::String,
 }
+#[derive(Clone, Copy, PartialEq, ::prost::Message)]
+pub struct ListStationsRequest {
+    #[prost(enumeration = "StationSource", tag = "1")]
+    pub source: i32,
+    /// Max results; 0 lets the server pick a sensible default.
+    #[prost(uint32, tag = "2")]
+    pub limit: u32,
+}
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct StationList {
+    #[prost(message, repeated, tag = "1")]
+    pub stations: ::prost::alloc::vec::Vec<Station>,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
 #[repr(i32)]
 pub enum PlaybackState {
@@ -140,6 +153,38 @@ impl PlaybackState {
             "PLAYBACK_STATE_STOPPED" => Some(Self::Stopped),
             "PLAYBACK_STATE_PLAYING" => Some(Self::Playing),
             "PLAYBACK_STATE_PAUSED" => Some(Self::Paused),
+            _ => None,
+        }
+    }
+}
+/// Which of the account's lists to browse.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
+#[repr(i32)]
+pub enum StationSource {
+    Favorites = 0,
+    /// The account's own added stations ("Yours").
+    Stations = 1,
+    /// The account's recently-played.
+    Recent = 2,
+}
+impl StationSource {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+        match self {
+            Self::Favorites => "STATION_SOURCE_FAVORITES",
+            Self::Stations => "STATION_SOURCE_STATIONS",
+            Self::Recent => "STATION_SOURCE_RECENT",
+        }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+        match value {
+            "STATION_SOURCE_FAVORITES" => Some(Self::Favorites),
+            "STATION_SOURCE_STATIONS" => Some(Self::Stations),
+            "STATION_SOURCE_RECENT" => Some(Self::Recent),
             _ => None,
         }
     }
@@ -532,6 +577,30 @@ pub mod atradio_control_client {
                 .insert(GrpcMethod::new("atradio.v1.AtradioControl", "Favorite"));
             self.inner.unary(req, path, codec).await
         }
+        /// Browse the controlled instance's account lists (favorites / its own
+        /// stations / recently-played), so a controller can play them remotely.
+        /// Empty when the controlled instance isn't signed in.
+        pub async fn list_stations(
+            &mut self,
+            request: impl tonic::IntoRequest<super::ListStationsRequest>,
+        ) -> std::result::Result<tonic::Response<super::StationList>, tonic::Status> {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic::codec::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/atradio.v1.AtradioControl/ListStations",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(GrpcMethod::new("atradio.v1.AtradioControl", "ListStations"));
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -618,6 +687,13 @@ pub mod atradio_control_server {
             tonic::Response<super::FavoriteResponse>,
             tonic::Status,
         >;
+        /// Browse the controlled instance's account lists (favorites / its own
+        /// stations / recently-played), so a controller can play them remotely.
+        /// Empty when the controlled instance isn't signed in.
+        async fn list_stations(
+            &self,
+            request: tonic::Request<super::ListStationsRequest>,
+        ) -> std::result::Result<tonic::Response<super::StationList>, tonic::Status>;
     }
     /// Control a running `atradio` process (TUI or `--no-tui` daemon): drive
     /// playback, load a station, edit the Rockbox DSP/EQ chain, and favorite —
@@ -1269,6 +1345,51 @@ pub mod atradio_control_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = FavoriteSvc(inner);
+                        let codec = tonic::codec::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/atradio.v1.AtradioControl/ListStations" => {
+                    #[allow(non_camel_case_types)]
+                    struct ListStationsSvc<T: AtradioControl>(pub Arc<T>);
+                    impl<
+                        T: AtradioControl,
+                    > tonic::server::UnaryService<super::ListStationsRequest>
+                    for ListStationsSvc<T> {
+                        type Response = super::StationList;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::ListStationsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as AtradioControl>::list_stations(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = ListStationsSvc(inner);
                         let codec = tonic::codec::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

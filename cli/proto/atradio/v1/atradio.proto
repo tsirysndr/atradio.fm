@@ -33,6 +33,11 @@ service AtradioControl {
 
   // Favorite a station on the signed-in account. Returns the record URI.
   rpc Favorite(FavoriteRequest) returns (FavoriteResponse) {}
+
+  // Browse the controlled instance's account lists (favorites / its own
+  // stations / recently-played), so a controller can play them remotely.
+  // Empty when the controlled instance isn't signed in.
+  rpc ListStations(ListStationsRequest) returns (StationList) {}
 }
 
 // The minimal station exchanged over the wire (mirrors remote::StationLite).
@@ -117,4 +122,23 @@ message FavoriteRequest {
 
 message FavoriteResponse {
   string uri = 1;
+}
+
+// Which of the account's lists to browse.
+enum StationSource {
+  STATION_SOURCE_FAVORITES = 0;
+  // The account's own added stations ("Yours").
+  STATION_SOURCE_STATIONS = 1;
+  // The account's recently-played.
+  STATION_SOURCE_RECENT = 2;
+}
+
+message ListStationsRequest {
+  StationSource source = 1;
+  // Max results; 0 lets the server pick a sensible default.
+  uint32 limit = 2;
+}
+
+message StationList {
+  repeated Station stations = 1;
 }

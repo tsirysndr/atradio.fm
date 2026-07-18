@@ -328,6 +328,7 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
     }
 
     let settings = crate::settings::Settings::load(&config.session_path);
+    let appview = AppView::new(&config.appview_url);
     // !Send engine shared on a single thread — see the note in `cmd_play`.
     #[allow(clippy::arc_with_non_send_sync)]
     let player = Arc::new(crate::player::Player::new()?);
@@ -387,7 +388,7 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
                 handle_remote_cmd(cmd, &player, &atproto, &mut current).await;
             }
             Some(cmd) = grpc_cmd_rx.recv() => {
-                apply_grpc_cmd(cmd, &player, &mut dsp, &atproto, &mut current).await;
+                apply_grpc_cmd(cmd, &player, &mut dsp, &atproto, &appview, &mut current).await;
             }
             Some(evt) = remote.evt_rx.recv() => match evt {
                 RemoteEvent::Status(online) => {
@@ -500,6 +501,7 @@ async fn apply_grpc_cmd(
     player: &crate::player::Player,
     dsp: &mut crate::player::dsp::AudioSettings,
     atproto: &std::sync::Arc<Atproto>,
+    appview: &AppView,
     current: &mut Option<crate::remote::StationLite>,
 ) {
     use crate::grpc::GrpcCmd;
@@ -519,6 +521,22 @@ async fn apply_grpc_cmd(
             let at = atproto.clone();
             tokio::spawn(async move {
                 let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::ListStations {
+            source,
+            limit,
+            reply,
+        } => {
+            // Not signed in → no account lists; reply empty rather than error.
+            let Some(actor) = atproto.actor() else {
+                let _ = reply.send(Ok(Vec::new()));
+                return;
+            };
+            let av = appview.clone();
+            tokio::spawn(async move {
+                let r = crate::grpc::fetch_account_list(&av, &actor, source, limit).await;
                 let _ = reply.send(r);
             });
         }

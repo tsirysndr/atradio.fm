@@ -170,7 +170,8 @@ pub async fn run(
     // gRPC remote-control mode: this TUI drives another instance. Transport /
     // load / DSP / favorite are routed to it; navigation stays local.
     app.grpc_remote = grpc_remote;
-    if app.grpc_remote.is_some() {
+    if let Some(r) = &app.grpc_remote {
+        r.request_lists(); // populate Favorites / Yours / Profile from the remote
         app.toast
             .set("Controlling a remote atradio — Enter sends the station there");
     }
@@ -207,24 +208,42 @@ pub async fn run(
     spawn_load_popular(&appview, &tx);
     spawn_load_recent_global(&appview, &tx);
     if let Some(actor) = atproto.actor() {
-        spawn_load_favorites(&appview, &tx, actor.clone());
-        spawn_load_stations(&appview, &tx, actor.clone());
-        spawn_load_profile_recent(&appview, &tx, actor.clone());
+        // In remote-control mode the account lists come from the controlled
+        // instance (see the render loop); only the local notifications stay local.
+        if app.grpc_remote.is_none() {
+            spawn_load_favorites(&appview, &tx, actor.clone());
+            spawn_load_stations(&appview, &tx, actor.clone());
+            spawn_load_profile_recent(&appview, &tx, actor.clone());
+        }
         spawn_load_notifications(&appview, &tx, actor);
     }
 
     let mut events = EventStream::new();
     let mut ticker = tokio::time::interval(Duration::from_millis(250));
+    // In remote-control mode, re-pull the controlled account's lists periodically
+    // so remotely-added favorites / stations show up without a reconnect.
+    let mut list_refresh: u32 = 0;
 
     let res = loop {
         // Render. In remote-control mode the now-playing, volume, and DSP come
         // from the controlled instance's mirror; otherwise from the local engine.
         let np = if let Some(remote) = &app.grpc_remote {
             let (wire, audio, err) = remote.snapshot();
+            let lists = remote.lists();
+            // (borrow of `remote` ends here — now free to mutate `app`)
             app.current = wire.station.clone().map(lite_to_station);
             app.volume = wire.volume;
             app.muted = wire.muted;
             app.dsp = audio;
+            // The account-specific lists mirror the controlled instance; the
+            // global tabs (Trending/Popular/Recent) stay local — identical anyway.
+            app.favorites = lists.favorites.into_iter().map(lite_to_station).collect();
+            app.stations = lists.stations.into_iter().map(lite_to_station).collect();
+            app.profile_recent = lists.recent.into_iter().map(lite_to_station).collect();
+            app.clamp_selection();
+            if app.profile_recent_selected >= app.profile_recent.len() {
+                app.profile_recent_selected = app.profile_recent.len().saturating_sub(1);
+            }
             if let Some(e) = err {
                 app.toast.set(e);
             }
@@ -312,6 +331,14 @@ pub async fn run(
                     let q = app.search_query.clone();
                     if !q.trim().is_empty() {
                         spawn_search(&browser, &tx, q);
+                    }
+                }
+                // Refresh the remote's account lists every ~3s.
+                if let Some(r) = &app.grpc_remote {
+                    list_refresh += 1;
+                    if list_refresh >= 12 {
+                        list_refresh = 0;
+                        r.request_lists();
                     }
                 }
             }
@@ -839,6 +866,21 @@ fn apply_grpc_cmd(
             let at = atproto.clone();
             tokio::spawn(async move {
                 let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::ListStations {
+            source,
+            limit,
+            reply,
+        } => {
+            let Some(actor) = atproto.actor() else {
+                let _ = reply.send(Ok(Vec::new()));
+                return;
+            };
+            let av = appview.clone();
+            tokio::spawn(async move {
+                let r = crate::grpc::fetch_account_list(&av, &actor, source, limit).await;
                 let _ = reply.send(r);
             });
         }

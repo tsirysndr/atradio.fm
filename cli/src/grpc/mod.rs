@@ -40,6 +40,21 @@ pub enum GrpcCmd {
         StationLite,
         tokio::sync::oneshot::Sender<Result<String, String>>,
     ),
+    /// Fetch one of the account's lists (favorites / stations / recent); the
+    /// stations (or an error) come back over the reply channel.
+    ListStations {
+        source: StationSource,
+        limit: u32,
+        reply: tokio::sync::oneshot::Sender<Result<Vec<StationLite>, String>>,
+    },
+}
+
+/// Which of the controlled account's lists to browse (mirrors `pb::StationSource`).
+#[derive(Clone, Copy)]
+pub enum StationSource {
+    Favorites,
+    Stations,
+    Recent,
 }
 
 /// Playback + DSP snapshot the loop pushes to the gRPC watch channel.
@@ -129,6 +144,53 @@ pub(crate) fn state_to_pb(s: &GrpcState) -> pb::State {
         muted: s.wire.muted,
         audio: Some(audio_to_pb(&s.audio)),
         version: s.version,
+    }
+}
+
+/// Fetch one of the account's lists from the AppView and flatten it to the wire
+/// `StationLite` shape. `actor` is the signed-in DID/handle; `limit` 0 means a
+/// sensible default. Shared by the daemon and TUI `ListStations` handlers.
+pub(crate) async fn fetch_account_list(
+    appview: &crate::appview::AppView,
+    actor: &str,
+    source: StationSource,
+    limit: u32,
+) -> Result<Vec<StationLite>, String> {
+    let limit = if limit == 0 { 100 } else { limit };
+    let stations: Vec<crate::appview::StationInfo> = match source {
+        StationSource::Favorites => appview
+            .favorites(actor, limit)
+            .await
+            .map_err(|e| e.to_string())?
+            .items
+            .into_iter()
+            .map(|v| v.station)
+            .collect(),
+        StationSource::Stations => appview
+            .stations(actor, limit)
+            .await
+            .map_err(|e| e.to_string())?
+            .items
+            .into_iter()
+            .map(|v| v.station)
+            .collect(),
+        StationSource::Recent => appview
+            .recently_played(actor, limit)
+            .await
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .map(|p| p.station)
+            .collect(),
+    };
+    Ok(stations.iter().map(station_info_to_lite).collect())
+}
+
+fn station_info_to_lite(s: &crate::appview::StationInfo) -> StationLite {
+    StationLite {
+        id: s.station_id.clone(),
+        name: s.name.clone(),
+        url: s.stream_url.clone(),
+        favicon: s.logo.clone(),
     }
 }
 

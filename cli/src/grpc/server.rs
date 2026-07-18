@@ -20,7 +20,10 @@ use tonic::{Request, Response, Status};
 use super::api::v1 as pb;
 use super::api::v1::atradio_control_server::{AtradioControl, AtradioControlServer};
 use super::api::FILE_DESCRIPTOR_SET;
-use super::{audio_to_pb, pb_to_audio, pb_to_station, state_to_pb, GrpcCmd, GrpcState};
+use super::{
+    audio_to_pb, pb_to_audio, pb_to_station, state_to_pb, station_to_pb, GrpcCmd, GrpcState,
+    StationSource,
+};
 use crate::remote::RemoteCmd;
 
 /// Where to serve the control API, after CLI/config resolution. `token` guards
@@ -217,6 +220,32 @@ impl AtradioControl for Service {
             Ok(Ok(Ok(uri))) => Ok(Response::new(pb::FavoriteResponse { uri })),
             Ok(Ok(Err(e))) => Err(Status::internal(e)),
             _ => Err(Status::unavailable("favorite timed out")),
+        }
+    }
+
+    async fn list_stations(
+        &self,
+        request: Request<pb::ListStationsRequest>,
+    ) -> Result<Response<pb::StationList>, Status> {
+        let req = request.into_inner();
+        let source = match pb::StationSource::try_from(req.source) {
+            Ok(pb::StationSource::Favorites) => StationSource::Favorites,
+            Ok(pb::StationSource::Stations) => StationSource::Stations,
+            Ok(pb::StationSource::Recent) => StationSource::Recent,
+            Err(_) => return Err(Status::invalid_argument("unknown station source")),
+        };
+        let (tx, rx) = oneshot::channel();
+        self.send(GrpcCmd::ListStations {
+            source,
+            limit: req.limit,
+            reply: tx,
+        });
+        match tokio::time::timeout(Duration::from_secs(15), rx).await {
+            Ok(Ok(Ok(stations))) => Ok(Response::new(pb::StationList {
+                stations: stations.iter().map(station_to_pb).collect(),
+            })),
+            Ok(Ok(Err(e))) => Err(Status::internal(e)),
+            _ => Err(Status::unavailable("list timed out")),
         }
     }
 }

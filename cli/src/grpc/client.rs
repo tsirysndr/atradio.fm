@@ -20,7 +20,7 @@ use tonic::transport::{Channel, Endpoint, Uri};
 
 use super::api::v1 as pb;
 use super::api::v1::atradio_control_client::AtradioControlClient;
-use super::{pb_to_state, station_to_pb, GrpcState};
+use super::{pb_to_state, pb_to_station, station_to_pb, GrpcState, StationSource};
 use crate::player::dsp::AudioSettings;
 use crate::remote::{StationLite, WireState};
 
@@ -56,6 +56,14 @@ struct Mirror {
     conn_error: Option<String>,
 }
 
+/// The controlled account's browsable lists, fetched over gRPC on demand.
+#[derive(Default, Clone)]
+pub struct RemoteLists {
+    pub favorites: Vec<StationLite>,
+    pub stations: Vec<StationLite>,
+    pub recent: Vec<StationLite>,
+}
+
 enum Cmd {
     PlayPause,
     ToggleMute,
@@ -63,10 +71,12 @@ enum Cmd {
     LoadStation(StationLite),
     AdjustDspRow(usize, i32),
     Favorite(StationLite),
+    ListStations(StationSource),
 }
 
 pub struct GrpcRemote {
     mirror: Arc<Mutex<Mirror>>,
+    lists: Arc<Mutex<RemoteLists>>,
     cmds: mpsc::UnboundedSender<Cmd>,
     /// Commands sent but not yet acknowledged; while nonzero, watch updates skip
     /// the controllable fields so a stale snapshot can't undo an optimistic edit.
@@ -118,6 +128,7 @@ pub fn connect(addr: &str, token: Option<String>) -> Result<GrpcRemote> {
     apply_state(&mut mirror, pb_to_state(&initial), true);
     let mirror = Arc::new(Mutex::new(mirror));
 
+    let lists = Arc::new(Mutex::new(RemoteLists::default()));
     let pending = Arc::new(AtomicUsize::new(0));
     let (tx, rx) = mpsc::unbounded_channel();
 
@@ -130,11 +141,13 @@ pub fn connect(addr: &str, token: Option<String>) -> Result<GrpcRemote> {
         client,
         rx,
         Arc::clone(&mirror),
+        Arc::clone(&lists),
         Arc::clone(&pending),
     ));
 
     Ok(GrpcRemote {
         mirror,
+        lists,
         cmds: tx,
         pending,
         rt: Some(rt),
@@ -229,9 +242,47 @@ async fn command_loop(
     mut client: Client,
     mut rx: mpsc::UnboundedReceiver<Cmd>,
     mirror: Arc<Mutex<Mirror>>,
+    lists: Arc<Mutex<RemoteLists>>,
     pending: Arc<AtomicUsize>,
 ) {
     while let Some(cmd) = rx.recv().await {
+        // List fetches are read-only — they don't participate in the optimistic
+        // `pending` count that guards state edits.
+        if let Cmd::ListStations(source) = &cmd {
+            let source = *source;
+            let pb_source = match source {
+                StationSource::Favorites => pb::StationSource::Favorites,
+                StationSource::Stations => pb::StationSource::Stations,
+                StationSource::Recent => pb::StationSource::Recent,
+            };
+            match client
+                .list_stations(pb::ListStationsRequest {
+                    source: pb_source as i32,
+                    limit: 0,
+                })
+                .await
+            {
+                Ok(resp) => {
+                    let fetched: Vec<StationLite> = resp
+                        .into_inner()
+                        .stations
+                        .iter()
+                        .map(pb_to_station)
+                        .collect();
+                    let mut l = lists.lock().unwrap();
+                    match source {
+                        StationSource::Favorites => l.favorites = fetched,
+                        StationSource::Stations => l.stations = fetched,
+                        StationSource::Recent => l.recent = fetched,
+                    }
+                }
+                Err(status) => {
+                    mirror.lock().unwrap().conn_error = Some(format!("list failed: {status}"));
+                }
+            }
+            continue;
+        }
+
         let result = match cmd {
             Cmd::PlayPause => client.play_pause(pb::PlayPauseRequest {}).await.map(drop),
             Cmd::ToggleMute => client.toggle_mute(pb::ToggleMuteRequest {}).await.map(drop),
@@ -258,6 +309,7 @@ async fn command_loop(
                 })
                 .await
                 .map(drop),
+            Cmd::ListStations(_) => unreachable!("handled above"),
         };
         pending.fetch_sub(1, Ordering::AcqRel);
         if let Err(status) = result {
@@ -278,6 +330,23 @@ impl GrpcRemote {
     pub fn snapshot(&self) -> (WireState, AudioSettings, Option<String>) {
         let m = self.mirror.lock().unwrap();
         (m.wire.clone(), m.audio.clone(), m.conn_error.clone())
+    }
+
+    /// Snapshot the controlled account's browsable lists.
+    pub fn lists(&self) -> RemoteLists {
+        self.lists.lock().unwrap().clone()
+    }
+
+    /// Refresh all three account lists from the controlled instance (async; the
+    /// results land in [`Self::lists`] when they arrive).
+    pub fn request_lists(&self) {
+        for source in [
+            StationSource::Favorites,
+            StationSource::Stations,
+            StationSource::Recent,
+        ] {
+            let _ = self.cmds.send(Cmd::ListStations(source));
+        }
     }
 
     pub fn play_pause(&self) {
