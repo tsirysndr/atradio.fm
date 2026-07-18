@@ -24,6 +24,10 @@ pub struct GrpcSettings {
     pub port: u16,
     /// TCP bind address, used only when `http = true`.
     pub host: String,
+    /// Require a bearer token on the TCP endpoint (on by default). Set to
+    /// `false` to serve TCP with no auth — only safe on a trusted, loopback /
+    /// firewalled network, since the transport is plaintext HTTP/2.
+    pub auth: bool,
     /// Bearer token required on the TCP endpoint; auto-generated and written
     /// back here on first use. The unix socket never requires it.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -38,6 +42,7 @@ impl Default for GrpcSettings {
             http: false,
             port: 7799,
             host: "127.0.0.1".to_string(),
+            auth: true,
             token: None,
         }
     }

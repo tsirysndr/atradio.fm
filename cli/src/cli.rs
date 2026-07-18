@@ -51,6 +51,12 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub no_grpc: bool,
 
+    /// Serve the TCP gRPC endpoint with no bearer token (overrides [grpc].auth).
+    /// Only safe on a trusted, loopback / firewalled network — the transport is
+    /// plaintext HTTP/2.
+    #[arg(long, global = true)]
+    pub no_grpc_auth: bool,
+
     /// Bearer token for a TCP gRPC endpoint (overrides [grpc].token). Used both
     /// when serving `--grpc-port` and when connecting with `--connect host:port`.
     #[arg(long, value_name = "TOKEN", global = true)]
@@ -148,6 +154,8 @@ pub struct GrpcOpts {
     pub port: Option<u16>,
     /// `--no-grpc`: don't serve or connect.
     pub disabled: bool,
+    /// `--no-grpc-auth`: serve the TCP endpoint without a bearer token.
+    pub no_auth: bool,
     /// `--token`: bearer token for a TCP endpoint (serve or connect).
     pub token: Option<String>,
 }
@@ -159,6 +167,7 @@ pub async fn run(cli: Cli) -> Result<()> {
         connect: cli.connect,
         port: cli.grpc_port,
         disabled: cli.no_grpc,
+        no_auth: cli.no_grpc_auth,
         token: cli.token,
     };
 
@@ -349,7 +358,13 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
                 println!("◈ gRPC control API on {}", p.display());
             }
             if let Some(a) = &bound.tcp {
-                println!("◈ gRPC control API on tcp {a} (token required)");
+                if bound.token.is_some() {
+                    println!("◈ gRPC control API on tcp {a} (token required)");
+                } else {
+                    println!(
+                        "◈ gRPC control API on tcp {a} \x1b[33m(no auth — trust the network!)\x1b[0m"
+                    );
+                }
             }
         }
         None => {
@@ -655,7 +670,10 @@ fn resolve_grpc_endpoints(
     if socket.is_none() && tcp.is_none() {
         return Ok(None);
     }
-    let token = if tcp.is_none() {
+    // Auth applies to TCP only. Off (`[grpc].auth = false` / `--no-grpc-auth`)
+    // means no token — the endpoint accepts any client, so guard the network.
+    let auth = g.auth && !opts.no_auth;
+    let token = if tcp.is_none() || !auth {
         None
     } else if let Some(t) = opts.token.clone().or_else(|| g.token.clone()) {
         Some(t)
