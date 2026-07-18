@@ -374,10 +374,10 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
 }
 
 /// Width of the fixed rectangle cursor (in cells) that slides along a track.
-const SLIDER_CURSOR_W: u16 = 5;
-/// The cursor glyph: a flatter, reduced-height rectangle (vs. the full-height
-/// `█`) that stays vertically centered on the track line.
-const SLIDER_CURSOR: &str = "▬";
+const SLIDER_CURSOR_W: u16 = 4;
+/// The cursor glyph: a mid-height square block (taller than the flat `▬`, not
+/// as tall as the full-height `█`) that stays vertically centered on the track.
+const SLIDER_CURSOR: &str = "■";
 
 /// A horizontal slider: a track line with a fixed-size rectangle cursor at the
 /// `fill` position (0.0 = far left, 0.5 = centered, 1.0 = far right). A faint
