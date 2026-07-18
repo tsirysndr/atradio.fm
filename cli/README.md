@@ -174,7 +174,7 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 | Key             | Action                                                   |
 | --------------- | -------------------------------------------------------- |
 | `↑`/`↓` `j`/`k` | move selection                                           |
-| `←`/`→` `Tab`   | switch home tab                                          |
+| `←`/`→` `Tab`   | switch home tab · adjust the DSP value (in the EQ view)   |
 | `1` … `5`       | tabs: Trending / Popular / Recent / Favorites / Yours    |
 | `Enter`         | play the selected station                                |
 | `Space`         | play / pause · `x` stop · `m` mute · `+`/`-` volume (DSP) |

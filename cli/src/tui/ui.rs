@@ -642,7 +642,7 @@ fn draw_help(f: &mut Frame, area: Rect) {
 
     let keys = [
         ("↑/↓ j/k", "move selection"),
-        ("←/→ Tab", "switch home tab"),
+        ("←/→ Tab", "switch home tab · adjust DSP value (in EQ view)"),
         (
             "1 … 5",
             "tabs: Trending / Popular / Recent / Favorites / Yours",

@@ -587,12 +587,22 @@ fn handle_event(
         KeyCode::Up | KeyCode::Char('k') => move_up(app),
         KeyCode::Down | KeyCode::Char('j') => move_down(app),
         KeyCode::Left => {
-            if app.view == View::Home {
+            if app.view == View::Dsp {
+                adjust_or_volume(app, player, -1); // decrease the focused control
+            } else if app.view == View::Home {
                 app.home_tab = app.home_tab.prev();
                 app.selected = 0;
             }
         }
-        KeyCode::Right | KeyCode::Tab => {
+        KeyCode::Right => {
+            if app.view == View::Dsp {
+                adjust_or_volume(app, player, 1); // increase the focused control
+            } else if app.view == View::Home {
+                app.home_tab = app.home_tab.next();
+                app.selected = 0;
+            }
+        }
+        KeyCode::Tab => {
             if app.view == View::Home {
                 app.home_tab = app.home_tab.next();
                 app.selected = 0;
