@@ -3,6 +3,7 @@ import cors from "cors";
 import { rateLimit } from "express-rate-limit";
 import { env } from "./env";
 import { xrpcRouter } from "./xrpc";
+import { proxyRouter } from "./proxy";
 import { liveRouter } from "./live";
 
 /** Per-IP rate limit for the read API. Fixed window, in-memory (per node —
@@ -57,8 +58,9 @@ export function createApp(): Express {
   // Real-time per-station comment + reaction stream (SSE): /live/:stationId
   app.use("/live", liveRouter);
 
-  // The media proxies (/api/stream, /api/tunein, /api/image, /api/icy) now live
-  // in the dedicated apps/media-proxy service.
+  // The media proxies moved to apps/media-proxy; redirect any lingering
+  // /api/* requests (e.g. stale favorite stream URLs) to the new host.
+  app.use("/api", proxyRouter);
 
   return app;
 }
