@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["cli", "crates/atradio-sdk"]
+
+# Release profile lives at the workspace root (Cargo ignores profiles set on
+# non-root members). These are the settings the `atradio` binary shipped with
+# before the workspace existed.
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
