@@ -5,6 +5,7 @@
 //! The tonic/prost-generated code + descriptor are committed (see `build.rs`)
 //! so plain `cargo install atradio` builds without `protoc` installed.
 
+pub mod client;
 pub mod server;
 
 use crate::player::dsp::AudioSettings;
@@ -128,5 +129,22 @@ pub(crate) fn state_to_pb(s: &GrpcState) -> pb::State {
         muted: s.wire.muted,
         audio: Some(audio_to_pb(&s.audio)),
         version: s.version,
+    }
+}
+
+/// Inverse of [`state_to_pb`]: a wire `State` back into the local snapshot the
+/// client mirror renders. `playing` is true only for the PLAYING state.
+pub(crate) fn pb_to_state(p: &pb::State) -> GrpcState {
+    let playing = p.playback == pb::PlaybackState::Playing as i32;
+    GrpcState {
+        wire: WireState {
+            playing,
+            station: p.station.as_ref().map(pb_to_station),
+            title: (!p.title.is_empty()).then(|| p.title.clone()),
+            volume: p.volume,
+            muted: p.muted,
+        },
+        audio: p.audio.as_ref().map(pb_to_audio).unwrap_or_default(),
+        version: p.version,
     }
 }

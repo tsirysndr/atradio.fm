@@ -218,6 +218,12 @@ pub struct App {
     /// Selection index within the device-picker overlay.
     pub device_sel: usize,
 
+    // ---- gRPC remote control ----
+    /// When set, this TUI is driving another atradio over its gRPC control API:
+    /// transport/load/DSP/favorite go to the remote, and now-playing/volume/DSP
+    /// are rendered from its mirror. Navigation/search stay local.
+    pub grpc_remote: Option<crate::grpc::client::GrpcRemote>,
+
     // ---- DSP ----
     pub dsp: AudioSettings,
     pub dsp_row: usize,
@@ -275,6 +281,7 @@ impl App {
             self_device_id: None,
             connect_online: false,
             device_sel: 0,
+            grpc_remote: None,
             dsp: AudioSettings::default(),
             dsp_row: 0,
             logged_in,

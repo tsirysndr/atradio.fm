@@ -521,26 +521,43 @@ async fn apply_grpc_cmd(
 }
 
 /// Interactive TUI, with gRPC startup negotiation: if another atradio already
-/// owns the control socket (or `--connect` was given), we don't start a second
-/// server — a later step connects to it. Otherwise we serve the control API so
-/// other instances / `grpcurl` can drive this one.
+/// owns the control socket (or `--connect` was given), control it over gRPC
+/// instead of playing locally. Otherwise serve the control API so other
+/// instances / `grpcurl` can drive this one.
 async fn cmd_tui(config: Config, grpc: GrpcOpts) -> Result<()> {
     let settings = crate::settings::Settings::load(&config.session_path);
     let socket = settings.grpc_socket_path(&config.session_path);
 
-    // Defer to an existing instance rather than binding a live socket. (The
-    // client that controls it lands in the next step; for now we run locally.)
-    let defer = grpc.connect.is_some()
-        || (!grpc.disabled
+    // Which instance (if any) to control: an explicit `--connect ADDR`, or an
+    // already-live local socket (another atradio owns it). `--connect` with no
+    // value, and an auto-detected socket, both target the default unix socket.
+    let connect_addr = match &grpc.connect {
+        Some(addr) if !addr.trim().is_empty() => Some(addr.clone()),
+        Some(_) => Some(format!("unix:{}", socket.display())),
+        None if !grpc.disabled
             && settings.grpc.enabled
-            && crate::grpc::server::socket_is_live(&socket));
-
-    let endpoints = if defer {
-        None
-    } else {
-        resolve_grpc_endpoints(&config, &settings, &grpc)?
+            && crate::grpc::server::socket_is_live(&socket) =>
+        {
+            Some(format!("unix:{}", socket.display()))
+        }
+        None => None,
     };
-    crate::tui::run(config, endpoints).await
+
+    if let Some(addr) = connect_addr {
+        // The client owns a runtime and dials synchronously, which would panic
+        // inside this async context — build it on a blocking thread.
+        let token = grpc.token.clone();
+        let dial_addr = addr.clone();
+        let remote =
+            tokio::task::spawn_blocking(move || crate::grpc::client::connect(&dial_addr, token))
+                .await
+                .context("gRPC connect task failed")?
+                .with_context(|| format!("could not control the atradio at {addr}"))?;
+        return crate::tui::run(config, None, Some(remote)).await;
+    }
+
+    let endpoints = resolve_grpc_endpoints(&config, &settings, &grpc)?;
+    crate::tui::run(config, endpoints, None).await
 }
 
 /// Resolve the gRPC endpoints to serve, from settings + CLI flags. TCP is used
