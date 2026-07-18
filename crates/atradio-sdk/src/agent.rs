@@ -11,13 +11,21 @@ use std::sync::Arc;
 use jacquard::client::credential_session::{
     CredentialLoginOptions, CredentialResumeResult, CredentialSession,
 };
-use jacquard::client::{Agent, FileAuthStore};
+use jacquard::client::{Agent, AgentSessionExt, FileAuthStore};
 use jacquard::common::session::SessionHint;
 use jacquard::identity::JacquardResolver;
+use jacquard::types::string::{Datetime, UriValue};
+use jacquard_common::types::recordkey::{RecordKey, Rkey};
 
 use crate::appview::{AppView, StationInfo};
 use crate::auth::{atradio_scopes, fetch_profile, Profile};
 use crate::error::{auth_err, Result, SdkError};
+use crate::fm_atradio::actor::status::Status as ActorStatus;
+use crate::fm_atradio::audio::settings::{Settings as AudioSettingsRecord, SettingsRecord};
+use crate::fm_atradio::comment::Comment;
+use crate::fm_atradio::favorite::Favorite;
+use crate::fm_atradio::station::Station as StationRecord;
+use crate::fm_atradio::StationInfo as GenStation;
 
 /// The handle resolver backing the agent.
 type Resolver = JacquardResolver<reqwest::Client>;
@@ -283,7 +291,11 @@ impl AtradioAgent {
         let actor = self.actor();
         let hint = SessionHint::from_optional_input(actor.as_deref());
         let opts = AuthorizeOptions::default().with_scopes(atradio_scopes()?);
-        match oauth.resume_or_start_auth(&hint, opts).await.map_err(auth_err)? {
+        match oauth
+            .resume_or_start_auth(&hint, opts)
+            .await
+            .map_err(auth_err)?
+        {
             OAuthResumeOrLogin::Resumed(session) => Ok(session),
             _ => Err(SdkError::SessionExpired),
         }
@@ -325,51 +337,198 @@ impl AtradioAgent {
     }
 }
 
-/// Record-write convenience verbs. These are stubbed until the generated
-/// `fm.atradio.*` lexicon bindings land in [`crate::lexicons`] during the CLI
-/// migration — building the records requires those types. Signatures are the
-/// intended final surface (see `docs/sdk-design.md`).
-#[allow(unused_variables)]
+/// Low-level record writes. Both app-password (`CredentialSession`) and OAuth
+/// (`OAuthSession`) implement `AgentSession`, so these work on either — we branch
+/// on the persisted method and resume the right one, holding [`Self::auth_lock`]
+/// across each op so refresh-token rotations stay strictly ordered.
+impl AtradioAgent {
+    /// Create a record on the user's PDS, resuming whichever session exists.
+    async fn create<R>(&self, record: R, what: &'static str) -> Result<String>
+    where
+        R: jacquard_common::types::collection::Collection + serde::Serialize,
+    {
+        let _guard = self.auth_lock.lock().await;
+        let out = if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .create_record(record, None)
+                .await
+                .map_err(|e| SdkError::Auth(format!("{what}: {e:?}")))?
+        } else {
+            self.credential_agent()
+                .await?
+                .create_record(record, None)
+                .await
+                .map_err(|e| SdkError::Auth(format!("{what}: {e:?}")))?
+        };
+        Ok(out.uri.to_string())
+    }
+
+    /// Put (upsert) a record at `rkey`, resuming whichever session exists.
+    async fn put<R>(&self, rkey: RecordKey<Rkey>, record: R, what: &'static str) -> Result<()>
+    where
+        R: jacquard_common::types::collection::Collection + serde::Serialize,
+    {
+        let _guard = self.auth_lock.lock().await;
+        if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .put_record(rkey, record)
+                .await
+                .map_err(|e| SdkError::Auth(format!("{what}: {e:?}")))?;
+        } else {
+            self.credential_agent()
+                .await?
+                .put_record(rkey, record)
+                .await
+                .map_err(|e| SdkError::Auth(format!("{what}: {e:?}")))?;
+        }
+        Ok(())
+    }
+}
+
+/// Record-write convenience verbs — the SDK's high-level surface, mirroring
+/// `@atproto/api`'s `post()` / `like()`.
 impl AtradioAgent {
     /// Favorite a station (`fm.atradio.favorite`). Returns the created record URI.
     pub async fn favorite(&self, station: &StationInfo) -> Result<String> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+        let record = Favorite::new()
+            .station(gen_station(station))
+            .created_at(Datetime::now())
+            .build();
+        self.create(record, "create favorite").await
     }
 
     /// Post a comment on a station (`fm.atradio.comment`). Returns the URI.
     pub async fn comment(&self, station: &StationInfo, text: &str) -> Result<String> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+        let record = Comment::new()
+            .station(gen_station(station))
+            .text(text.to_string())
+            .created_at(Datetime::now())
+            .build();
+        self.create(record, "create comment").await
     }
 
     /// Create a custom station (`fm.atradio.station`). Returns the URI.
     pub async fn create_station(&self, draft: &StationDraft) -> Result<String> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+        let record = StationRecord::new()
+            .name(draft.name.clone())
+            .stream_url(
+                parse_uri(&draft.stream_url)
+                    .unwrap_or_else(|| UriValue::Any(draft.stream_url.clone().into())),
+            )
+            .maybe_genre(draft.genre.clone().map(Into::into))
+            .maybe_homepage(draft.homepage.as_deref().and_then(parse_uri))
+            .maybe_logo(draft.logo.as_deref().and_then(parse_uri))
+            .created_at(Datetime::now())
+            .build();
+        self.create(record, "create station").await
     }
 
     /// Update the actor's play-status singleton (`fm.atradio.actor.status`, rkey
     /// `self`) so they appear in the recently-played / listener-count feeds.
     pub async fn set_play_status(&self, station: &StationInfo) -> Result<()> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+        let record = ActorStatus::new()
+            .station(gen_station(station))
+            .played_at(Datetime::now())
+            .build();
+        let rkey = self_rkey()?;
+        self.put(rkey, record, "update play status").await
     }
 
-    /// Delete the actor's play-status singleton.
+    /// Delete the actor's play-status singleton (rkey `self`).
     pub async fn delete_play_status(&self) -> Result<()> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+        let _guard = self.auth_lock.lock().await;
+        let rkey = self_rkey()?;
+        if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .delete_record::<ActorStatus>(rkey)
+                .await
+                .map_err(|e| SdkError::Auth(format!("delete play status: {e:?}")))?;
+        } else {
+            self.credential_agent()
+                .await?
+                .delete_record::<ActorStatus>(rkey)
+                .await
+                .map_err(|e| SdkError::Auth(format!("delete play status: {e:?}")))?;
+        }
+        Ok(())
     }
 
     /// Fetch the synced audio-settings singleton (`fm.atradio.audio.settings`,
-    /// rkey `self`). Returns `None` when the user has no record yet.
-    pub async fn get_audio_settings(&self) -> Result<Option<AudioSettings>> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+    /// rkey `self`) as its raw lexicon record. Returns `None` when the user has
+    /// no record yet (first run on this account). The DSP mapping is a consumer
+    /// concern, so the SDK deals in the record, not a decoded settings struct.
+    pub async fn get_audio_settings(&self) -> Result<Option<AudioSettingsRecord>> {
+        let _guard = self.auth_lock.lock().await;
+        let Some(did) = self.profile().map(|p| p.did) else {
+            return Ok(None);
+        };
+        let uri = format!("at://{did}/fm.atradio.audio.settings/self");
+        let record_uri = AudioSettingsRecord::uri(smol_str::SmolStr::new(&uri))
+            .map_err(|e| SdkError::Auth(format!("audio settings uri: {e}")))?;
+        let fetched = if self.is_oauth() {
+            let session = self.resume_oauth().await?;
+            Agent::from(session)
+                .fetch_record::<SettingsRecord, _>(&record_uri)
+                .await
+        } else {
+            self.credential_agent()
+                .await?
+                .fetch_record::<SettingsRecord, _>(&record_uri)
+                .await
+        };
+        match fetched {
+            Ok(out) => Ok(Some(out.value)),
+            Err(e) => {
+                // A missing singleton is the normal first-run case, not an error.
+                let msg = format!("{e:?}");
+                if msg.contains("RecordNotFound") || msg.contains("not found") {
+                    Ok(None)
+                } else {
+                    Err(SdkError::Auth(format!("fetch audio settings: {msg}")))
+                }
+            }
+        }
     }
 
-    /// Upsert the audio-settings singleton from runtime DSP state.
-    pub async fn put_audio_settings(&self, settings: &AudioSettings) -> Result<()> {
-        todo!("write verbs land with the lexicons module (see docs/sdk-design.md)")
+    /// Upsert the audio-settings singleton (rkey `self`) from a lexicon record,
+    /// so the EQ + DSP chain follows the account to other devices.
+    pub async fn put_audio_settings(&self, record: AudioSettingsRecord) -> Result<()> {
+        let rkey = self_rkey()?;
+        self.put(rkey, record, "update audio settings").await
     }
 }
 
-/// Placeholder for the synced DSP/EQ state. The concrete shape moves into the
-/// SDK (from the CLI's `player::dsp::AudioSettings`) during migration.
-#[derive(Clone, Debug, Default)]
-pub struct AudioSettings;
+/// The `self` record key used by the singleton records (play status, audio).
+fn self_rkey() -> Result<RecordKey<Rkey>> {
+    "self"
+        .parse()
+        .map_err(|e| SdkError::Auth(format!("rkey: {e}")))
+}
+
+/// Convert the wire [`StationInfo`] into the generated (lexicon) `StationInfo`.
+fn gen_station(s: &StationInfo) -> GenStation {
+    GenStation::new()
+        .station_id(s.station_id.clone())
+        .name(s.name.clone())
+        .stream_url(
+            parse_uri(&s.stream_url).unwrap_or_else(|| UriValue::Any(s.stream_url.clone().into())),
+        )
+        .source(s.source.clone())
+        .maybe_description(s.description.clone().map(Into::into))
+        .maybe_genre(s.genre.clone().map(Into::into))
+        .maybe_homepage(s.homepage.as_deref().and_then(parse_uri))
+        .maybe_logo(s.logo.as_deref().and_then(parse_uri))
+        .maybe_country(s.country.clone().map(Into::into))
+        .maybe_language(s.language.clone().map(Into::into))
+        .maybe_codec(s.codec.clone().map(Into::into))
+        .bitrate(s.bitrate.map(|b| b as i64))
+        .build()
+}
+
+/// Parse a URL string into a lexicon `UriValue`, dropping anything invalid.
+fn parse_uri(s: &str) -> Option<UriValue> {
+    UriValue::new_owned(s).ok()
+}

@@ -390,11 +390,13 @@ type), never anything else on the network.
 
 ## Lexicon bindings
 
-The typed `fm.atradio.*` records/queries in `src/fm_atradio/` and
-`src/builder_types.rs` are **generated** from the lexicon JSON in
-`packages/lexicons/lexicons/atradio` via jacquard's codegen. Regenerate with:
+The typed `fm.atradio.*` records/queries now live in the **`atradio-sdk`** crate
+(`crates/atradio-sdk/src/fm_atradio/` + `builder_types.rs`), along with the auth
+and AppView-read clients the CLI consumes. They are **generated** from the
+lexicon JSON in `packages/lexicons/lexicons/atradio` via jacquard's codegen.
+Regenerate with:
 
 ```bash
 cargo install jacquard-lexgen   # provides `jacquard-codegen`
-bash scripts/gen-lexicons.sh
+bash crates/atradio-sdk/scripts/gen-lexicons.sh
 ```

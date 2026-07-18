@@ -25,7 +25,11 @@ pub struct Profile {
 impl Profile {
     /// `"Display Name (@handle)"` when a display name is known, else `"@handle"`.
     pub fn label(&self) -> String {
-        match self.display_name.as_deref().filter(|d| !d.trim().is_empty()) {
+        match self
+            .display_name
+            .as_deref()
+            .filter(|d| !d.trim().is_empty())
+        {
             Some(name) => format!("{name} (@{})", self.handle),
             None => format!("@{}", self.handle),
         }

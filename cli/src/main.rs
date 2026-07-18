@@ -1,11 +1,8 @@
 extern crate alloc;
 
-// --- generated from packages/lexicons/lexicons/atradio (see scripts/gen-lexicons.sh) ---
-#[allow(unused_imports, dead_code, clippy::all)]
-pub mod builder_types;
-#[cfg(feature = "fm_atradio")]
-#[allow(unused_imports, dead_code, clippy::all)]
-pub mod fm_atradio;
+// The generated fm.atradio.* lexicon bindings now live in the atradio-sdk crate;
+// re-export them so the existing `crate::fm_atradio::…` paths keep resolving.
+pub use atradio_sdk::fm_atradio;
 
 // --- hand-written app modules ---
 mod appview;
