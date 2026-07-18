@@ -415,6 +415,38 @@ fn slider(fill: f32, track_w: u16, selected: bool) -> Paragraph<'static> {
     Paragraph::new(Line::from(spans))
 }
 
+/// A compact "when" for a comment: relative for recent posts (`now`, `5m`,
+/// `2h`, `3d`), then an absolute date (`Jul 18`, or `Jul 18, 2025` across years).
+/// `created_at` is an RFC 3339 timestamp; returns `None` if it can't be parsed.
+fn relative_time(created_at: &str) -> Option<String> {
+    use chrono::{DateTime, Utc};
+    let dt = DateTime::parse_from_rfc3339(created_at)
+        .ok()?
+        .with_timezone(&Utc);
+    let now = Utc::now();
+    let secs = now.signed_duration_since(dt).num_seconds();
+    if secs < 60 {
+        return Some("now".into()); // also covers small future skew (secs < 0)
+    }
+    let mins = secs / 60;
+    if mins < 60 {
+        return Some(format!("{mins}m"));
+    }
+    let hours = mins / 60;
+    if hours < 24 {
+        return Some(format!("{hours}h"));
+    }
+    let days = hours / 24;
+    if days < 7 {
+        return Some(format!("{days}d"));
+    }
+    if dt.format("%Y").to_string() == now.format("%Y").to_string() {
+        Some(dt.format("%b %-d").to_string())
+    } else {
+        Some(dt.format("%b %-d, %Y").to_string())
+    }
+}
+
 fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
     let title = app
         .current
@@ -454,6 +486,13 @@ fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
                 .fg(theme::CYAN)
                 .add_modifier(Modifier::BOLD),
         )];
+        // When it was posted, dimmed after the author.
+        if let Some(when) = c.created_at.as_deref().and_then(relative_time) {
+            spans.push(Span::styled(
+                format!("· {when}  "),
+                Style::default().fg(theme::MUTED),
+            ));
+        }
         let text = c.text.trim();
         if !text.is_empty() {
             spans.push(Span::styled(c.text.clone(), Style::default().fg(theme::FG)));
