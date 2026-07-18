@@ -23,7 +23,7 @@ function platformIcon(platform: Platform) {
   return IconDeviceMobile;
 }
 
-function DeviceRow({
+export function DeviceRow({
   device,
   active,
   onSelect,

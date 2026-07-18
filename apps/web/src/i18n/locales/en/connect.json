@@ -14,5 +14,8 @@
   "pause": "Pause",
   "stop": "Stop",
   "remoteVolume": "Remote volume",
-  "playHere": "Play here"
+  "playHere": "Play here",
+  "statusOnline": "Connected — pick a device to play on.",
+  "statusOffline": "Offline — reconnecting to your devices…",
+  "signedOut": "Sign in to control playback across your devices."
 }

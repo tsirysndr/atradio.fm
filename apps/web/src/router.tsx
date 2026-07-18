@@ -7,6 +7,7 @@ import { Layout } from "@/components/Layout";
 import { SearchPage } from "@/routes/SearchPage";
 import { BrowsePage } from "@/routes/BrowsePage";
 import { ProfilePage } from "@/routes/ProfilePage";
+import { ConnectPage } from "@/routes/ConnectPage";
 import { NotificationsPage } from "@/routes/NotificationsPage";
 import { OAuthCallback } from "@/routes/OAuthCallback";
 
@@ -41,7 +42,14 @@ const actorProfileRoute = createRoute({
   component: ProfilePage,
 });
 
-/** Full-screen notifications view (used by the mobile bell). */
+/** Full-screen "atradio Connect" device picker (used by the mobile tab bar). */
+const connectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/connect",
+  component: ConnectPage,
+});
+
+/** Full-screen notifications view (used by the mobile bell / tab bar). */
 const notificationsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/notifications",
@@ -59,6 +67,7 @@ const routeTree = rootRoute.addChildren([
   browseRoute,
   profileRoute,
   actorProfileRoute,
+  connectRoute,
   notificationsRoute,
   oauthCallbackRoute,
 ]);

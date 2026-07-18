@@ -713,7 +713,7 @@ export function Player() {
       <audio ref={silentRef} src={SILENT_AUDIO_DATA_URI} loop preload="auto" />
 
       <div
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-50 px-3 pb-3 sm:px-4 sm:pb-4 transition-transform duration-300 ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(5rem_+_env(safe-area-inset-bottom))] sm:z-50 sm:px-4 sm:pb-4 transition-transform duration-300 ${
           station && !remoteActive
             ? "translate-y-0"
             : "translate-y-[calc(100%+1.5rem)]"
@@ -798,7 +798,7 @@ export function Player() {
                 isIconOnly
                 size="sm"
                 variant="tertiary"
-                className="rounded-full"
+                className="hidden rounded-full sm:inline-flex"
                 aria-label={t("aria.stop")}
                 isDisabled={!station}
                 onPress={handleStop}
@@ -807,8 +807,13 @@ export function Player() {
               </Button>
             </div>
 
-            {/* Reactions — smiley opens an animated emoji picker, real time */}
-            {station && <StationReactions station={station} variant="mini" />}
+            {/* Reactions — smiley opens an animated emoji picker, real time.
+                Hidden on the compact mobile mini-player. */}
+            {station && (
+              <span className="hidden sm:inline-flex">
+                <StationReactions station={station} variant="mini" />
+              </span>
+            )}
 
             {/* Favorite + comments + equalizer + volume */}
             <div className="flex items-center gap-2">
@@ -834,7 +839,7 @@ export function Player() {
                   isIconOnly
                   size="sm"
                   variant="tertiary"
-                  className="rounded-full"
+                  className="hidden rounded-full sm:inline-flex"
                   aria-label={t("aria.comments")}
                   onPress={() => openComments(station)}
                 >

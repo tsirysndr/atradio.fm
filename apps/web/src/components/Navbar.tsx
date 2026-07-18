@@ -118,13 +118,23 @@ export function Navbar() {
             <span className="sm:hidden">{t("add", { ns: "common" })}</span>
           </Button>
 
-          {isLoggedIn && <DevicePicker />}
-          {isLoggedIn && <NotificationBell />}
+          {/* Connect / notifications / profile move to the mobile bottom tab
+              bar (as full-screen routes); on desktop they stay here. */}
+          {isLoggedIn && (
+            <div className="hidden sm:block">
+              <DevicePicker />
+            </div>
+          )}
+          {isLoggedIn && (
+            <div className="hidden sm:block">
+              <NotificationBell />
+            </div>
+          )}
 
           {isLoggedIn ? (
             <Link
               to="/profile"
-              className="ml-1 flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-synth-panel"
+              className="ml-1 hidden h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-synth-panel sm:flex"
               title={t("yourProfile")}
             >
               {profile?.avatar ? (
@@ -141,7 +151,7 @@ export function Navbar() {
             <Button
               size="sm"
               variant="tertiary"
-              className="ml-1 gap-1.5 rounded-full !bg-white/5"
+              className="ml-1 hidden gap-1.5 rounded-full !bg-white/5 sm:inline-flex"
               onPress={() => openLogin(true)}
             >
               <IconLogin2 size={16} />

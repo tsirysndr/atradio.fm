@@ -37,7 +37,7 @@ export function ConnectBanner() {
   const station = state.station;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-synth-cyan/30 bg-synth-panel/95 backdrop-blur-xl">
+    <div className="fixed inset-x-0 bottom-[calc(4rem_+_env(safe-area-inset-bottom))] z-50 border-t border-synth-cyan/30 bg-synth-panel/95 backdrop-blur-xl sm:bottom-0">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6">
         {station ? (
           <StationLogo

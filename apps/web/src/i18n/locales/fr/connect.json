@@ -14,5 +14,8 @@
   "pause": "Pause",
   "stop": "Arrêter",
   "remoteVolume": "Volume distant",
-  "playHere": "Lire ici"
+  "playHere": "Lire ici",
+  "statusOnline": "Connecté — choisissez un appareil pour la lecture.",
+  "statusOffline": "Hors ligne — reconnexion à vos appareils…",
+  "signedOut": "Connectez-vous pour contrôler la lecture sur vos appareils."
 }

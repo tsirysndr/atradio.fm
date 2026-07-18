@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { IconKeyboard } from "@tabler/icons-react";
 import { currentStationAtom } from "@/atoms/player";
 import { Navbar } from "./Navbar";
+import { BottomNav } from "./BottomNav";
 import { Footer } from "./Footer";
 import { PermissionBanner } from "./PermissionBanner";
 import { Player } from "./Player";
@@ -38,21 +39,29 @@ export function Layout() {
       </main>
 
       <Footer />
-      {station ? <div className="pb-24" aria-hidden="true" /> : null}
+      {/* Reserve space for the fixed player bar and the mobile bottom tab bar.
+          Mobile always needs room for the tab bar; the player sits above it. */}
+      <div
+        aria-hidden="true"
+        className={station ? "pb-44 sm:pb-24" : "pb-20 sm:pb-0"}
+      />
 
+      {/* Keyboard shortcuts — desktop only (no keyboard on mobile, and the
+          bottom tab bar owns that corner). */}
       <button
         type="button"
         aria-label={t("shortcutsButton")}
         title={t("shortcutsButtonTitle")}
         onClick={() => openShortcuts(true)}
-        className={`fixed right-4 z-30 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-synth-panel/80 text-foreground/60 backdrop-blur transition-all hover:border-synth-cyan/60 hover:text-synth-cyan sm:right-6 ${
-          station ? "bottom-28 sm:bottom-28" : "bottom-6 sm:bottom-6"
+        className={`fixed right-6 z-30 hidden h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-synth-panel/80 text-foreground/60 backdrop-blur transition-all hover:border-synth-cyan/60 hover:text-synth-cyan sm:flex ${
+          station ? "bottom-28" : "bottom-6"
         }`}
       >
         <IconKeyboard size={18} />
       </button>
 
       <Player />
+      <BottomNav />
       <ConnectBanner />
       <PlayerReactionRain />
       <AddStationModal />

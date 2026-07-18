@@ -6,5 +6,12 @@
   "onTangled": "atradio.fm no Tangled",
   "cli": "CLI",
   "getCli": "Obter a CLI",
-  "changeLanguage": "Mudar idioma"
+  "changeLanguage": "Mudar idioma",
+  "tabs": {
+    "aria": "Principal",
+    "home": "Início",
+    "connect": "Conectar",
+    "notifications": "Alertas",
+    "profile": "Perfil"
+  }
 }
