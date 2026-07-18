@@ -89,6 +89,16 @@ pub enum Command {
         limit: u32,
     },
 
+    /// Discover other atradio instances advertising on the local network (mDNS).
+    ///
+    /// Lists each peer's name, address, version, and whether it needs a token —
+    /// then control one with `atradio --connect <name>`.
+    Discover {
+        /// How long to listen for responses, in seconds.
+        #[arg(short, long, default_value_t = 3)]
+        timeout: u64,
+    },
+
     /// Sign in so you can favorite and comment.
     ///
     /// Defaults to an app-password login (set ATPROTO_APP_PASSWORD), which stays
@@ -182,6 +192,7 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Search { query, limit } => cmd_search(query.join(" "), limit).await,
         Command::Play { target } => cmd_play(target.join(" "), config).await,
         Command::Trending { limit } => cmd_trending(limit, &config).await,
+        Command::Discover { timeout } => cmd_discover(timeout).await,
         Command::Login { identifier, oauth } => cmd_login(identifier, oauth, &config).await,
         Command::Logout => cmd_logout(&config),
         Command::Whoami => cmd_whoami(&config),
@@ -194,6 +205,42 @@ pub async fn run(cli: Cli) -> Result<()> {
             ServiceAction::Uninstall => service_impl::uninstall(),
         },
     }
+}
+
+/// Browse the LAN for advertising atradio instances and print them.
+async fn cmd_discover(timeout: u64) -> Result<()> {
+    let secs = timeout.clamp(1, 30);
+    println!("Discovering atradio instances (mDNS, {secs}s)…");
+    // Discovery runs its own daemon thread and blocks — keep it off the runtime.
+    let peers = tokio::task::spawn_blocking(move || {
+        crate::mdns::discover(std::time::Duration::from_secs(secs))
+    })
+    .await
+    .context("mDNS discovery task failed")??;
+
+    if peers.is_empty() {
+        println!(
+            "No atradio instances found. (They must have `[mdns].enabled = true` and serve TCP.)"
+        );
+        return Ok(());
+    }
+    for p in &peers {
+        let addr = p.addr().unwrap_or_else(|| "?".to_string());
+        let ver = p.version.as_deref().unwrap_or("?");
+        let auth = if p.auth { "token" } else { "open" };
+        println!("  ● {}", p.instance);
+        println!("      {addr}   v{ver}   {auth}");
+    }
+    println!(
+        "\nControl one with `atradio --connect \"{}\"`{}.",
+        peers[0].instance,
+        if peers[0].auth {
+            " --token <TOKEN>"
+        } else {
+            ""
+        }
+    );
+    Ok(())
 }
 
 async fn cmd_search(query: String, limit: u32) -> Result<()> {
@@ -351,27 +398,18 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
         tokio::sync::mpsc::unbounded_channel::<crate::grpc::GrpcCmd>();
     let (grpc_state_tx, grpc_state_rx) =
         tokio::sync::watch::channel(crate::grpc::GrpcState::default());
-    match resolve_grpc_endpoints(&config, &settings, &grpc)? {
+    let bound = match resolve_grpc_endpoints(&config, &settings, &grpc)? {
         Some(eps) => {
             let bound = crate::grpc::server::spawn(eps, grpc_cmd_tx, grpc_state_rx)?;
-            if let Some(p) = &bound.socket {
-                println!("◈ gRPC control API on {}", p.display());
-            }
-            if let Some(a) = &bound.tcp {
-                if bound.token.is_some() {
-                    println!("◈ gRPC control API on tcp {a} (token required)");
-                } else {
-                    println!(
-                        "◈ gRPC control API on tcp {a} \x1b[33m(no auth — trust the network!)\x1b[0m"
-                    );
-                }
-            }
+            announce_grpc(&bound);
+            Some(bound)
         }
         None => {
             drop(grpc_cmd_tx);
             drop(grpc_state_rx);
+            None
         }
-    }
+    };
     let mut grpc_version: u64 = 0;
 
     let device_id = crate::remote::load_or_create_device_id(&config.session_path);
@@ -380,6 +418,14 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
         .clone()
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(crate::remote::default_device_name);
+
+    // Advertise over mDNS (held for the process lifetime; dropping unregisters).
+    let _mdns = bound.as_ref().and_then(|b| {
+        maybe_broadcast_mdns(&settings, b, &device_name).map(|(guard, instance)| {
+            println!("◈ advertising “{instance}” over mDNS (_atradio._tcp)");
+            guard
+        })
+    });
     let (state_tx, state_rx) = tokio::sync::watch::channel(WireState::default());
     let mut remote = crate::remote::spawn(
         RemoteConfig {
@@ -608,25 +654,33 @@ async fn cmd_tui(config: Config, grpc: GrpcOpts) -> Result<()> {
     let settings = crate::settings::Settings::load(&config.session_path);
     let socket = settings.grpc_socket_path(&config.session_path);
 
-    // Which instance (if any) to control: an explicit `--connect ADDR`, or an
-    // already-live local socket (another atradio owns it). `--connect` with no
-    // value, and an auto-detected socket, both target the default unix socket.
-    let connect_addr = match &grpc.connect {
-        Some(addr) if !addr.trim().is_empty() => Some(addr.clone()),
-        Some(_) => Some(format!("unix:{}", socket.display())),
-        None if !grpc.disabled
-            && settings.grpc.enabled
-            && crate::grpc::server::socket_is_live(&socket) =>
-        {
-            Some(format!("unix:{}", socket.display()))
+    let socket_live =
+        !grpc.disabled && settings.grpc.enabled && crate::grpc::server::socket_is_live(&socket);
+
+    // Which instance (if any) to control:
+    //  --connect <literal>   a `unix:`/path/`host:port`/`http://` address
+    //  --connect <name>      an mDNS instance name → resolved on the LAN
+    //  --connect (no value)  the local socket if live, else auto-pick a LAN peer
+    //  (no flag)             auto-detect a live local socket, else serve locally
+    let token = grpc.token.clone();
+    let connect_addr: Option<String> = match &grpc.connect {
+        Some(addr) if !addr.trim().is_empty() => {
+            let a = addr.trim();
+            if a.contains(':') || a.contains('/') {
+                Some(a.to_string()) // literal address
+            } else {
+                Some(resolve_mdns(a, &token).await?) // instance name
+            }
         }
+        Some(_) if socket_live => Some(format!("unix:{}", socket.display())),
+        Some(_) => Some(autopick_mdns(&token).await?),
+        None if socket_live => Some(format!("unix:{}", socket.display())),
         None => None,
     };
 
     if let Some(addr) = connect_addr {
         // The client owns a runtime and dials synchronously, which would panic
         // inside this async context — build it on a blocking thread.
-        let token = grpc.token.clone();
         let dial_addr = addr.clone();
         let remote =
             tokio::task::spawn_blocking(move || crate::grpc::client::connect(&dial_addr, token))
@@ -638,6 +692,105 @@ async fn cmd_tui(config: Config, grpc: GrpcOpts) -> Result<()> {
 
     let endpoints = resolve_grpc_endpoints(&config, &settings, &grpc)?;
     crate::tui::run(config, endpoints, None).await
+}
+
+/// Browse the LAN (blocking, off-runtime) for advertising atradio peers.
+async fn discover_peers() -> Result<Vec<crate::mdns::Peer>> {
+    tokio::task::spawn_blocking(|| crate::mdns::discover(std::time::Duration::from_secs(3)))
+        .await
+        .context("mDNS discovery task failed")?
+}
+
+/// Warn if a discovered peer needs a token but none was supplied.
+fn warn_if_auth_missing(peer: &crate::mdns::Peer, token: &Option<String>) {
+    if peer.auth && token.is_none() {
+        eprintln!(
+            "note: “{}” requires a token — pass `--token <TOKEN>` (from its [grpc].token)",
+            peer.instance
+        );
+    }
+}
+
+/// Resolve an mDNS instance name to a dial-ready `host:port`.
+async fn resolve_mdns(name: &str, token: &Option<String>) -> Result<String> {
+    let want = name.to_lowercase();
+    let peer = discover_peers()
+        .await?
+        .into_iter()
+        .find(|p| p.instance.to_lowercase() == want)
+        .with_context(|| format!("no atradio named “{name}” found on the network"))?;
+    warn_if_auth_missing(&peer, token);
+    peer.addr()
+        .with_context(|| format!("“{name}” advertised no reachable address"))
+}
+
+/// `--connect` with no address and no local socket: pick the sole LAN peer, or
+/// error listing the choices.
+async fn autopick_mdns(token: &Option<String>) -> Result<String> {
+    let mut peers = discover_peers().await?;
+    match peers.len() {
+        0 => anyhow::bail!(
+            "no atradio instances found on the network — start one with \
+             `[mdns].enabled = true` + TCP, or pass an explicit `--connect host:port`"
+        ),
+        1 => {
+            let peer = peers.remove(0);
+            println!("Connecting to “{}”…", peer.instance);
+            warn_if_auth_missing(&peer, token);
+            peer.addr()
+                .with_context(|| format!("“{}” advertised no reachable address", peer.instance))
+        }
+        _ => {
+            let names: Vec<String> = peers.iter().map(|p| p.instance.clone()).collect();
+            anyhow::bail!(
+                "several atradio instances found ({}). Pick one with \
+                 `atradio --connect \"<name>\"`.",
+                names.join(", ")
+            )
+        }
+    }
+}
+
+/// Print which gRPC endpoints came up (socket + optional TCP w/ auth status).
+fn announce_grpc(bound: &crate::grpc::server::Endpoints) {
+    if let Some(p) = &bound.socket {
+        println!("◈ gRPC control API on {}", p.display());
+    }
+    if let Some(a) = &bound.tcp {
+        if bound.token.is_some() {
+            println!("◈ gRPC control API on tcp {a} (token required)");
+        } else {
+            println!("◈ gRPC control API on tcp {a} \x1b[33m(no auth — trust the network!)\x1b[0m");
+        }
+    }
+}
+
+/// Advertise the serving TCP endpoint over mDNS when `[mdns].enabled`. Returns
+/// the live guard plus the advertised instance name; `None` when disabled, no
+/// TCP, or on error (logged, non-fatal). The instance name defaults to the
+/// device name. Callers surface the name (daemon prints, TUI toasts).
+pub(crate) fn maybe_broadcast_mdns(
+    settings: &crate::settings::Settings,
+    bound: &crate::grpc::server::Endpoints,
+    device_name: &str,
+) -> Option<(crate::mdns::Broadcast, String)> {
+    if !settings.mdns.enabled {
+        return None;
+    }
+    let tcp = bound.tcp?; // mDNS advertises a network endpoint; a socket isn't one
+    let instance = settings
+        .mdns
+        .instance
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| device_name.to_string());
+    match crate::mdns::broadcast(&instance, tcp.port(), bound.token.is_some()) {
+        Ok(b) => Some((b, instance)),
+        Err(e) => {
+            eprintln!("mDNS advertising off: {e:#}");
+            None
+        }
+    }
 }
 
 /// Resolve the gRPC endpoints to serve, from settings + CLI flags. TCP is used

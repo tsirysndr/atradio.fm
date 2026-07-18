@@ -133,6 +133,7 @@ Building compiles the vendored Rockbox codecs, so a C toolchain is required
 atradio                       # interactive TUI (default)
 atradio --no-tui              # headless Connect device (remote-controllable)
 atradio --connect             # control another running atradio over its gRPC API
+atradio discover              # find atradio instances on the LAN (mDNS)
 atradio search lofi           # search radio-browser, print results
 atradio play "jazz"           # headless: play the top hit for a query…
 atradio play https://…/stream #   …or a stream URL directly
@@ -351,6 +352,35 @@ To serve TCP with **no token**, set `auth = false` (or pass `--no-grpc-auth`).
 Only do this on a trusted, loopback / firewalled network — the transport is
 plaintext HTTP/2, so an unauthenticated endpoint on a reachable interface lets
 anyone drive your player.
+
+### Discovery (mDNS)
+
+An instance serving the control API over **TCP** can advertise itself on the LAN
+over **mDNS / DNS-SD** (`_atradio._tcp.local.`), so peers find it without knowing
+an IP. Enable it under `[mdns]`:
+
+```toml
+[mdns]
+enabled  = true        # advertise when serving TCP (default false)
+# instance = "Living Room"   # advertised name (defaults to device_name)
+```
+
+Only real **LAN** addresses are advertised — docker, VM, and tunnel/VPN
+interfaces (`docker0`, `br-*`, `vboxnet*`, `vmnet*`, `utun*`, `tailscale0`, …)
+are filtered out, so a peer never gets an unreachable IP.
+
+Discovery works from any instance (it doesn't need to advertise):
+
+```bash
+atradio discover                 # list atradio instances on the network
+#   ● Living Room
+#       192.168.1.20:7799   v0.4.0   token
+atradio --connect "Living Room" --token …   # resolve the name via mDNS
+atradio --connect                # no local server + one LAN peer → auto-connect
+```
+
+`discover` only ever surfaces atradio services (it browses that one service
+type), never anything else on the network.
 
 ## Platform notes
 
