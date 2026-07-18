@@ -338,6 +338,7 @@ enabled = true      # serve the control API (default true; --no-grpc overrides)
 http    = false     # also serve gRPC over TCP (default false)
 host    = "127.0.0.1"
 port    = 7799      # TCP port (also settable with --grpc-port)
+auth    = true      # require a token on TCP (default true; --no-grpc-auth off)
 # token = "…"       # bearer token required on the TCP endpoint; auto-generated
                     # on first use and written back here
 ```
@@ -345,6 +346,11 @@ port    = 7799      # TCP port (also settable with --grpc-port)
 The Unix socket is guarded by file permissions; the **TCP endpoint requires a
 bearer token** (`--token`, or `[grpc].token` — one is generated and persisted on
 first use). Pass the same token with `--connect host:port --token …`.
+
+To serve TCP with **no token**, set `auth = false` (or pass `--no-grpc-auth`).
+Only do this on a trusted, loopback / firewalled network — the transport is
+plaintext HTTP/2, so an unauthenticated endpoint on a reachable interface lets
+anyone drive your player.
 
 ## Platform notes
 
