@@ -1,5 +1,5 @@
 Name:           atradio
-Version:        0.3.0
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        A TUI radio player on the AT Protocol
 
