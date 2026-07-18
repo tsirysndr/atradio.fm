@@ -66,11 +66,13 @@ pub struct RemoteLists {
 
 enum Cmd {
     PlayPause,
+    Stop,
     ToggleMute,
     SetVolume(f32),
     LoadStation(StationLite),
     AdjustDspRow(usize, i32),
     Favorite(StationLite),
+    Comment(StationLite, String),
     ListStations(StationSource),
 }
 
@@ -285,6 +287,7 @@ async fn command_loop(
 
         let result = match cmd {
             Cmd::PlayPause => client.play_pause(pb::PlayPauseRequest {}).await.map(drop),
+            Cmd::Stop => client.stop(pb::StopRequest {}).await.map(drop),
             Cmd::ToggleMute => client.toggle_mute(pb::ToggleMuteRequest {}).await.map(drop),
             Cmd::SetVolume(v) => client
                 .set_volume(pb::SetVolumeRequest { volume: v })
@@ -306,6 +309,13 @@ async fn command_loop(
             Cmd::Favorite(s) => client
                 .favorite(pb::FavoriteRequest {
                     station: Some(station_to_pb(&s)),
+                })
+                .await
+                .map(drop),
+            Cmd::Comment(s, text) => client
+                .comment(pb::CommentRequest {
+                    station: Some(station_to_pb(&s)),
+                    text,
                 })
                 .await
                 .map(drop),
@@ -357,6 +367,15 @@ impl GrpcRemote {
         self.send(Cmd::PlayPause);
     }
 
+    pub fn stop(&self) {
+        {
+            let mut m = self.mirror.lock().unwrap();
+            m.wire.playing = false;
+            m.wire.station = None;
+        }
+        self.send(Cmd::Stop);
+    }
+
     pub fn toggle_mute(&self) {
         {
             let mut m = self.mirror.lock().unwrap();
@@ -399,5 +418,9 @@ impl GrpcRemote {
 
     pub fn favorite(&self, station: StationLite) {
         self.send(Cmd::Favorite(station));
+    }
+
+    pub fn comment(&self, station: StationLite, text: String) {
+        self.send(Cmd::Comment(station, text));
     }
 }

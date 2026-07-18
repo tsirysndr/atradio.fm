@@ -248,6 +248,26 @@ impl AtradioControl for Service {
             _ => Err(Status::unavailable("list timed out")),
         }
     }
+
+    async fn comment(
+        &self,
+        request: Request<pb::CommentRequest>,
+    ) -> Result<Response<pb::CommentResponse>, Status> {
+        let req = request.into_inner();
+        let station = req
+            .station
+            .ok_or_else(|| Status::invalid_argument("station is required"))?;
+        if req.text.trim().is_empty() {
+            return Err(Status::invalid_argument("comment text is required"));
+        }
+        let (tx, rx) = oneshot::channel();
+        self.send(GrpcCmd::Comment(pb_to_station(&station), req.text, tx));
+        match tokio::time::timeout(Duration::from_secs(15), rx).await {
+            Ok(Ok(Ok(uri))) => Ok(Response::new(pb::CommentResponse { uri })),
+            Ok(Ok(Err(e))) => Err(Status::internal(e)),
+            _ => Err(Status::unavailable("comment timed out")),
+        }
+    }
 }
 
 /// Claim the unix socket path. A live socket is a hard error (the caller should

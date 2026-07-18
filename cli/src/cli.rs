@@ -540,6 +540,14 @@ async fn apply_grpc_cmd(
                 let _ = reply.send(r);
             });
         }
+        GrpcCmd::Comment(s, text, reply) => {
+            let station = lite_to_info(&s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.comment(&station, &text).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
     }
 }
 

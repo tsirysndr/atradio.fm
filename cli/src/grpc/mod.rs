@@ -47,6 +47,12 @@ pub enum GrpcCmd {
         limit: u32,
         reply: tokio::sync::oneshot::Sender<Result<Vec<StationLite>, String>>,
     },
+    /// Comment on a station; the created record URI (or an error) comes back.
+    Comment(
+        StationLite,
+        String,
+        tokio::sync::oneshot::Sender<Result<String, String>>,
+    ),
 }
 
 /// Which of the controlled account's lists to browse (mirrors `pb::StationSource`).

@@ -567,8 +567,10 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
+        ("x", "stop"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
         ("m", "mute"),
+        ("d", "Connect: pick a device to control"),
         ("/", "fuzzy station search"),
         ("f", "favorite the selected/current station"),
         ("A", "add a custom station (when signed in)"),
@@ -594,6 +596,15 @@ fn draw_help(f: &mut Frame, area: Rect) {
             Span::styled(d, Style::default().fg(theme::FG)),
         ]));
     }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Remote control (--connect): the keys above drive the controlled",
+        Style::default().fg(theme::MUTED),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  instance; Favorites / Yours / Profile show its lists.",
+        Style::default().fg(theme::MUTED),
+    )));
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -653,6 +664,55 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
                 Span::styled(volume_bar(vol), Style::default().fg(theme::TEAL)),
                 Span::styled(
                     format!(" {vol}%   ·  d: switch device"),
+                    Style::default().fg(theme::MUTED),
+                ),
+            ])),
+            rows[2],
+        );
+        return;
+    }
+
+    // gRPC remote-control: the player bar reflects the controlled instance (its
+    // now-playing / volume are already mirrored into `np` / `app`). A persistent
+    // banner shows we're driving a remote and the health of the connection.
+    if app.grpc_remote.is_some() {
+        let (label, color) = match &app.grpc_conn_error {
+            None => ("Controlling remote", theme::ORANGE),
+            Some(_) => ("Remote — reconnecting…", theme::DANGER),
+        };
+        let name = app
+            .current
+            .as_ref()
+            .map(|s| s.name.clone())
+            .unwrap_or_else(|| "—".into());
+        let glyph = crate::tui::status_glyph(np.state);
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("◉ ", Style::default().fg(color)),
+                Span::styled(
+                    format!("{label}  "),
+                    Style::default().fg(color).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(format!("{glyph} "), Style::default().fg(theme::GREEN)),
+                Span::styled(truncate(&name, 36), Style::default().fg(theme::FG)),
+            ])),
+            rows[0],
+        );
+        let title = np.line().unwrap_or_else(|| "—".into());
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("♪ ", Style::default().fg(theme::CYAN)),
+                Span::styled(truncate(&title, 48), Style::default().fg(theme::CYAN)),
+            ])),
+            rows[1],
+        );
+        let vol = app.volume_pct();
+        f.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("vol ", Style::default().fg(theme::MUTED)),
+                Span::styled(volume_bar(vol), Style::default().fg(theme::TEAL)),
+                Span::styled(
+                    format!(" {vol}%   ·  Enter: play on remote  ·  x: stop"),
                     Style::default().fg(theme::MUTED),
                 ),
             ])),

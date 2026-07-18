@@ -175,7 +175,7 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 | `←`/`→` `Tab`   | switch home tab                                          |
 | `1` … `5`       | tabs: Trending / Popular / Recent / Favorites / Yours    |
 | `Enter`         | play the selected station                                |
-| `Space`         | play / pause · `m` mute · `+`/`-` volume (or adjust DSP) |
+| `Space`         | play / pause · `x` stop · `m` mute · `+`/`-` volume (DSP) |
 | `/`             | fuzzy station search                                     |
 | `f`             | favorite the selected/current station                   |
 | `A`             | add a custom station (when signed in)                    |
@@ -299,11 +299,12 @@ now-playing state (`WatchState`), and lists the account's stations
 - If nothing is there, it **starts the server** and plays locally.
 - If another atradio already owns the socket, a TUI **connects to it and
   controls it** instead of starting a second player — `Enter` (load station),
-  `Space`/`m`/`+`/`-`, and the EQ view are sent to the controlled instance,
-  whose now-playing/volume/DSP it renders. Your **Favorites / Yours / Profile**
-  tabs show the *controlled account's* lists (fetched over gRPC), so you can
-  browse and play its stations; the global tabs (Trending/Popular/Recent) and
-  search stay local.
+  `Space`/`x`/`m`/`+`/`-`, the EQ view, `f` (favorite), and `a` (comment) all go
+  to the controlled instance (favorites/comments post from *its* account), whose
+  now-playing/volume/DSP it renders behind a `◉ Controlling remote` banner. Your
+  **Favorites / Yours / Profile** tabs show the *controlled account's* lists
+  (fetched over gRPC), so you can browse and play its stations; the global tabs
+  (Trending/Popular/Recent) and search stay local.
 - `atradio --no-tui` **always** serves and **errors on conflict** (a socket is
   already live → exit non-zero).
 

@@ -244,9 +244,9 @@ pub async fn run(
             if app.profile_recent_selected >= app.profile_recent.len() {
                 app.profile_recent_selected = app.profile_recent.len().saturating_sub(1);
             }
-            if let Some(e) = err {
-                app.toast.set(e);
-            }
+            // Surface connection health as a persistent banner (see the player
+            // bar) rather than re-setting a toast every frame.
+            app.grpc_conn_error = err;
             synth_now_playing(&wire)
         } else {
             let np = player.now_playing();
@@ -535,8 +535,19 @@ fn handle_event(
                 player.toggle_mute();
             }
         }
+        KeyCode::Char('x') => {
+            if let Some(r) = &app.grpc_remote {
+                r.stop();
+            } else if !route_remote(app, RemoteCmd::Stop) {
+                player.stop();
+                app.current = None;
+            }
+        }
         KeyCode::Char('d') => {
-            if app.logged_in {
+            if app.grpc_remote.is_some() {
+                app.toast
+                    .set("Already controlling a remote over gRPC (--connect).");
+            } else if app.logged_in {
                 app.device_sel = 0;
                 app.overlay = Overlay::Devices;
             } else {
@@ -884,6 +895,18 @@ fn apply_grpc_cmd(
                 let _ = reply.send(r);
             });
         }
+        GrpcCmd::Comment(s, text, reply) => {
+            if !atproto.is_logged_in() {
+                let _ = reply.send(Err("not signed in".to_string()));
+                return;
+            }
+            let station = lite_to_station(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.comment(&station, &text).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
     }
 }
 
@@ -1190,6 +1213,15 @@ fn handle_compose_keys(
                 return;
             }
             let Some(station) = station else { return };
+            // gRPC remote-control: the controlled instance comments with its own
+            // account (the local session may be logged out or a different user).
+            if app.grpc_remote.is_some() {
+                if let Some(r) = &app.grpc_remote {
+                    r.comment(station_to_lite(&station), text);
+                }
+                app.toast.set("💬 Comment → remote");
+                return;
+            }
             if !atproto.is_logged_in() {
                 app.toast.set("Sign in first: run `atradio login`.");
                 return;

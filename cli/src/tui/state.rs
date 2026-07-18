@@ -223,6 +223,9 @@ pub struct App {
     /// transport/load/DSP/favorite go to the remote, and now-playing/volume/DSP
     /// are rendered from its mirror. Navigation/search stay local.
     pub grpc_remote: Option<crate::grpc::client::GrpcRemote>,
+    /// Latest connection error from the controlled instance (lost stream / RPC),
+    /// shown as a persistent banner while set; `None` when the link is healthy.
+    pub grpc_conn_error: Option<String>,
 
     // ---- DSP ----
     pub dsp: AudioSettings,
@@ -282,6 +285,7 @@ impl App {
             connect_online: false,
             device_sel: 0,
             grpc_remote: None,
+            grpc_conn_error: None,
             dsp: AudioSettings::default(),
             dsp_row: 0,
             logged_in,

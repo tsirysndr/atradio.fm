@@ -38,6 +38,9 @@ service AtradioControl {
   // stations / recently-played), so a controller can play them remotely.
   // Empty when the controlled instance isn't signed in.
   rpc ListStations(ListStationsRequest) returns (StationList) {}
+
+  // Post a comment on a station from the signed-in account. Returns the URI.
+  rpc Comment(CommentRequest) returns (CommentResponse) {}
 }
 
 // The minimal station exchanged over the wire (mirrors remote::StationLite).
@@ -141,4 +144,13 @@ message ListStationsRequest {
 
 message StationList {
   repeated Station stations = 1;
+}
+
+message CommentRequest {
+  Station station = 1;
+  string text = 2;
+}
+
+message CommentResponse {
+  string uri = 1;
 }
