@@ -267,11 +267,10 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
     let height = inner.height as usize;
     let start = app.dsp_row.saturating_sub(height.saturating_sub(1));
 
-    let mut y = inner.y;
     for (i, row) in rows.iter().enumerate().skip(start).take(height) {
         let is_sel = i == app.dsp_row;
+        let y = inner.y + (i - start) as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);
-        y += 1;
 
         let label_w = 18u16.min(inner.width);
         let label_style = if is_sel {

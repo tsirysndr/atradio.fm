@@ -134,26 +134,26 @@ impl Settings {
 
     /// Build the runtime [`AudioSettings`] from the persisted values.
     pub fn audio(&self) -> AudioSettings {
-        let mut a = AudioSettings::default();
-        a.eq_enabled = self.eq_enabled;
-        for (i, slot) in a.eq_gains.iter_mut().enumerate() {
-            if let Some(g) = self.eq_gains.get(i) {
-                *slot = *g;
-            }
+        let mut eq_gains = AudioSettings::default().eq_gains;
+        for (slot, g) in eq_gains.iter_mut().zip(&self.eq_gains) {
+            *slot = *g;
         }
-        a.bass = self.bass;
-        a.treble = self.treble;
-        a.crossfeed_mode = str_to_crossfeed(&self.crossfeed_mode);
-        a.crossfeed_direct = self.crossfeed_direct;
-        a.pbe = self.pbe;
-        a.pbe_precut = self.pbe_precut;
-        a.surround_delay = self.surround_delay;
-        a.surround_balance = self.surround_balance;
-        a.comp_threshold = self.comp_threshold;
-        a.comp_ratio = self.comp_ratio;
-        a.channel_mode = str_to_channel(&self.channel_mode);
-        a.stereo_width = self.stereo_width;
-        a
+        AudioSettings {
+            eq_enabled: self.eq_enabled,
+            eq_gains,
+            bass: self.bass,
+            treble: self.treble,
+            crossfeed_mode: str_to_crossfeed(&self.crossfeed_mode),
+            crossfeed_direct: self.crossfeed_direct,
+            pbe: self.pbe,
+            pbe_precut: self.pbe_precut,
+            surround_delay: self.surround_delay,
+            surround_balance: self.surround_balance,
+            comp_threshold: self.comp_threshold,
+            comp_ratio: self.comp_ratio,
+            channel_mode: str_to_channel(&self.channel_mode),
+            stereo_width: self.stereo_width,
+        }
     }
 
     /// Capture the current runtime DSP + volume back into the persisted shape.

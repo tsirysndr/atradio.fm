@@ -245,6 +245,9 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
         s.stream_url
     };
 
+    // The engine owns a cpal stream (!Send); it's shared on one thread only, so
+    // the Arc-not-Send/Sync lint doesn't apply.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = std::sync::Arc::new(crate::player::Player::new()?);
 
     // MPRIS (Linux): snapshots out over a watch channel, transport commands
@@ -325,6 +328,8 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
     }
 
     let settings = crate::settings::Settings::load(&config.session_path);
+    // !Send engine shared on a single thread — see the note in `cmd_play`.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = Arc::new(crate::player::Player::new()?);
     let mut dsp = settings.audio();
     player.set_volume(settings.volume);

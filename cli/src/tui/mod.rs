@@ -81,6 +81,9 @@ pub async fn run(
     let handle = profile.as_ref().map(|p| p.handle.clone());
     let display_name = profile.as_ref().and_then(|p| p.display_name.clone());
 
+    // The engine owns a cpal stream (!Send); it's shared on this thread only, so
+    // the Arc-not-Send/Sync lint doesn't apply.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = Arc::new(Player::new()?);
 
     // MPRIS (Linux): the engine handle is !Send, so the D-Bus tasks talk to
@@ -608,11 +611,9 @@ fn play_selected(
         return;
     }
     // Controlling a Connect device: send the station there instead of playing it.
-    if app.remote_active() {
-        if route_remote(app, RemoteCmd::LoadStation(station_to_lite(&station))) {
-            app.toast.set(format!("▶ {} → remote", station.name));
-            return;
-        }
+    if app.remote_active() && route_remote(app, RemoteCmd::LoadStation(station_to_lite(&station))) {
+        app.toast.set(format!("▶ {} → remote", station.name));
+        return;
     }
     start_playing(app, browser, atproto, appview, tx, station);
 }
