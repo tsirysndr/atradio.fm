@@ -290,16 +290,20 @@ Every atradio also exposes a small **gRPC control API** — `AtradioControl`
 or have **one instance control another** on the same machine. Unlike
 [Connect](#atradio-connect-remote-control) (account-wide, over the hub, needs a
 session), this is a **local** channel and needs **no sign-in**: it drives
-playback, `LoadStation`, the EQ/DSP chain, and `Favorite`, and streams
-now-playing state (`WatchState`).
+playback, `LoadStation`, the EQ/DSP chain, and `Favorite`, streams
+now-playing state (`WatchState`), and lists the account's stations
+(`ListStations` — favorites / own / recently-played).
 
 **One instance controls another.** On startup atradio probes the socket:
 
 - If nothing is there, it **starts the server** and plays locally.
 - If another atradio already owns the socket, a TUI **connects to it and
-  controls it** instead of starting a second player — the browser stays local,
-  but `Enter` (load station), `Space`/`m`/`+`/`-`, and the EQ view are sent to
-  the controlled instance, whose now-playing/volume/DSP it renders.
+  controls it** instead of starting a second player — `Enter` (load station),
+  `Space`/`m`/`+`/`-`, and the EQ view are sent to the controlled instance,
+  whose now-playing/volume/DSP it renders. Your **Favorites / Yours / Profile**
+  tabs show the *controlled account's* lists (fetched over gRPC), so you can
+  browse and play its stations; the global tabs (Trending/Popular/Recent) and
+  search stay local.
 - `atradio --no-tui` **always** serves and **errors on conflict** (a socket is
   already live → exit non-zero).
 
