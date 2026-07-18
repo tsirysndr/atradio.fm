@@ -47,7 +47,6 @@ fuzzy-matcher = "0.3"
 # Versions track the hyper 1.x / tower 0.5 / h2 0.4 stack already pulled by reqwest.
 tonic = "0.13"
 tonic-reflection = "0.13"
-tonic-web = "0.13"
 prost = "0.13"
 tokio-stream = { version = "0.1", features = ["net"] }
 tower = { version = "0.5", features = ["util"] }

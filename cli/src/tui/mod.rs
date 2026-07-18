@@ -1,6 +1,6 @@
 //! The interactive terminal UI: an async render/event loop over ratatui.
 
-mod dsp_rows;
+pub(crate) mod dsp_rows;
 mod state;
 mod ui;
 

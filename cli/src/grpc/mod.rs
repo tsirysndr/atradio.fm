@@ -5,6 +5,12 @@
 //! The tonic/prost-generated code + descriptor are committed (see `build.rs`)
 //! so plain `cargo install atradio` builds without `protoc` installed.
 
+pub mod server;
+
+use crate::player::dsp::AudioSettings;
+use crate::remote::{RemoteCmd, StationLite, WireState};
+use api::v1 as pb;
+
 #[path = ""]
 pub mod api {
     /// Encoded FileDescriptorSet for gRPC server reflection (grpcurl etc.).
@@ -16,4 +22,111 @@ pub mod api {
     #[rustfmt::skip]
     #[path = "atradio.v1.rs"]
     pub mod v1;
+}
+
+/// A command forwarded from the gRPC service to the owning loop thread (which
+/// owns the `!Send` player). Transport + load reuse the Connect `RemoteCmd`.
+pub enum GrpcCmd {
+    Remote(RemoteCmd),
+    SetAudio(AudioSettings),
+    AdjustDspRow {
+        row: usize,
+        dir: i32,
+    },
+    /// Favorite a station; the created record URI (or an error) comes back over
+    /// the reply channel so the RPC can return it.
+    Favorite(
+        StationLite,
+        tokio::sync::oneshot::Sender<Result<String, String>>,
+    ),
+}
+
+/// Playback + DSP snapshot the loop pushes to the gRPC watch channel.
+#[derive(Clone, Default)]
+pub struct GrpcState {
+    pub wire: WireState,
+    pub audio: AudioSettings,
+    /// Bumped on every push so watchers can cheaply detect edits.
+    pub version: u64,
+}
+
+// ---- wire conversions ------------------------------------------------------
+
+pub(crate) fn audio_to_pb(a: &AudioSettings) -> pb::AudioSettings {
+    pb::AudioSettings {
+        eq_enabled: a.eq_enabled,
+        eq_gains: a.eq_gains.iter().map(|g| g.round() as i32).collect(),
+        bass: a.bass,
+        treble: a.treble,
+        crossfeed_mode: crate::settings::crossfeed_to_str(a.crossfeed_mode).to_string(),
+        crossfeed_direct_tenths: (a.crossfeed_direct * 10.0).round() as i32,
+        pbe: a.pbe,
+        pbe_precut: a.pbe_precut,
+        surround_delay: a.surround_delay,
+        surround_balance: a.surround_balance,
+        comp_threshold: a.comp_threshold,
+        comp_ratio: a.comp_ratio,
+        channel_mode: crate::settings::channel_to_str(a.channel_mode).to_string(),
+        stereo_width: a.stereo_width,
+    }
+}
+
+pub(crate) fn pb_to_audio(p: &pb::AudioSettings) -> AudioSettings {
+    let mut eq_gains = AudioSettings::default().eq_gains;
+    for (slot, g) in eq_gains.iter_mut().zip(&p.eq_gains) {
+        *slot = *g as f32;
+    }
+    AudioSettings {
+        eq_enabled: p.eq_enabled,
+        eq_gains,
+        bass: p.bass,
+        treble: p.treble,
+        crossfeed_mode: crate::settings::str_to_crossfeed(&p.crossfeed_mode),
+        crossfeed_direct: p.crossfeed_direct_tenths as f32 / 10.0,
+        pbe: p.pbe,
+        pbe_precut: p.pbe_precut,
+        surround_delay: p.surround_delay,
+        surround_balance: p.surround_balance,
+        comp_threshold: p.comp_threshold,
+        comp_ratio: p.comp_ratio,
+        channel_mode: crate::settings::str_to_channel(&p.channel_mode),
+        stereo_width: p.stereo_width,
+    }
+}
+
+pub(crate) fn station_to_pb(s: &StationLite) -> pb::Station {
+    pb::Station {
+        id: s.id.clone(),
+        name: s.name.clone(),
+        url: s.url.clone(),
+        favicon: s.favicon.clone().unwrap_or_default(),
+    }
+}
+
+pub(crate) fn pb_to_station(p: &pb::Station) -> StationLite {
+    StationLite {
+        id: p.id.clone(),
+        name: p.name.clone(),
+        url: p.url.clone(),
+        favicon: (!p.favicon.is_empty()).then(|| p.favicon.clone()),
+    }
+}
+
+pub(crate) fn state_to_pb(s: &GrpcState) -> pb::State {
+    let playback = if s.wire.playing {
+        pb::PlaybackState::Playing
+    } else if s.wire.station.is_some() {
+        pb::PlaybackState::Paused
+    } else {
+        pb::PlaybackState::Stopped
+    };
+    pb::State {
+        playback: playback.into(),
+        station: s.wire.station.as_ref().map(station_to_pb),
+        title: s.wire.title.clone().unwrap_or_default(),
+        volume: s.wire.volume,
+        muted: s.wire.muted,
+        audio: Some(audio_to_pb(&s.audio)),
+        version: s.version,
+    }
 }

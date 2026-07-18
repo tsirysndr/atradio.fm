@@ -1,6 +1,6 @@
 //! Command-line surface. With no subcommand, the interactive TUI launches.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 use crate::appview::AppView;
@@ -261,9 +261,8 @@ async fn cmd_daemon(config: Config) -> Result<()> {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use crate::appview::StationInfo;
     use crate::player::State as PlayState;
-    use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
+    use crate::remote::{RemoteConfig, RemoteEvent, StationLite, WireState};
 
     let atproto = Arc::new(Atproto::new(config.session_path.clone()));
     if !atproto.is_logged_in() {
@@ -282,8 +281,32 @@ async fn cmd_daemon(config: Config) -> Result<()> {
 
     let settings = crate::settings::Settings::load(&config.session_path);
     let player = Arc::new(crate::player::Player::new()?);
+    let mut dsp = settings.audio();
     player.set_volume(settings.volume);
-    player.apply_dsp(&settings.audio());
+    player.apply_dsp(&dsp);
+
+    // gRPC control API. Bind BEFORE Connect so a socket conflict fails fast
+    // (another atradio already owns it → exit with an error).
+    let (grpc_cmd_tx, mut grpc_cmd_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::grpc::GrpcCmd>();
+    let (grpc_state_tx, grpc_state_rx) =
+        tokio::sync::watch::channel(crate::grpc::GrpcState::default());
+    match resolve_grpc_endpoints(&config, &settings)? {
+        Some(eps) => {
+            let bound = crate::grpc::server::spawn(eps, grpc_cmd_tx, grpc_state_rx)?;
+            if let Some(p) = &bound.socket {
+                println!("◈ gRPC control API on {}", p.display());
+            }
+            if let Some(a) = &bound.tcp {
+                println!("◈ gRPC control API on tcp {a} (token required)");
+            }
+        }
+        None => {
+            drop(grpc_cmd_tx);
+            drop(grpc_state_rx);
+        }
+    }
+    let mut grpc_version: u64 = 0;
 
     let device_id = crate::remote::load_or_create_device_id(&config.session_path);
     let device_name = settings
@@ -310,42 +333,12 @@ async fn cmd_daemon(config: Config) -> Result<()> {
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => break,
-            Some(cmd) = remote.cmd_rx.recv() => match cmd {
-                RemoteCmd::Play => player.play(),
-                RemoteCmd::Pause => player.pause(),
-                RemoteCmd::PlayPause => player.toggle(),
-                RemoteCmd::Stop => { player.stop(); current = None; }
-                RemoteCmd::SetVolume(v) => player.set_volume(v),
-                RemoteCmd::ToggleMute => player.toggle_mute(),
-                RemoteCmd::LoadStation(s) => {
-                    let source = if s.id.starts_with("tunein:") {
-                        "tunein"
-                    } else if s.id.starts_with("custom:") {
-                        "custom"
-                    } else {
-                        "radio-browser"
-                    };
-                    // Unwrap playlists into a direct stream before playing.
-                    let resolved = crate::radio::resolve_stream(&s.url, source).await;
-                    if resolved.is_hls {
-                        println!("▶ {} — HLS not supported, skipping", s.name);
-                        continue;
-                    }
-                    player.play_url(&resolved.url);
-                    println!("▶ {}", s.name);
-                    let station = StationInfo {
-                        station_id: s.id.clone(),
-                        name: s.name.clone(),
-                        stream_url: s.url.clone(),
-                        source: source.to_string(),
-                        logo: s.favicon.clone(),
-                        ..Default::default()
-                    };
-                    current = Some(s);
-                    let at = atproto.clone();
-                    tokio::spawn(async move { let _ = at.set_play_status(&station).await; });
-                }
-            },
+            Some(cmd) = remote.cmd_rx.recv() => {
+                handle_remote_cmd(cmd, &player, &atproto, &mut current).await;
+            }
+            Some(cmd) = grpc_cmd_rx.recv() => {
+                apply_grpc_cmd(cmd, &player, &mut dsp, &atproto, &mut current).await;
+            }
             Some(evt) = remote.evt_rx.recv() => match evt {
                 RemoteEvent::Status(online) => {
                     println!("{}", if online { "● connected" } else { "○ disconnected — retrying" });
@@ -367,12 +360,19 @@ async fn cmd_daemon(config: Config) -> Result<()> {
             },
             _ = ticker.tick() => {
                 let np = player.now_playing();
-                let _ = state_tx.send(WireState {
+                let wire = WireState {
                     playing: matches!(np.state, PlayState::Playing),
                     station: current.clone(),
                     title: np.line(),
                     volume: player.volume(),
                     muted: player.is_muted(),
+                };
+                let _ = state_tx.send(wire.clone());
+                grpc_version += 1;
+                let _ = grpc_state_tx.send(crate::grpc::GrpcState {
+                    wire,
+                    audio: dsp.clone(),
+                    version: grpc_version,
                 });
             }
         }
@@ -380,6 +380,135 @@ async fn cmd_daemon(config: Config) -> Result<()> {
 
     println!("\nStopping atradio Connect device.");
     Ok(())
+}
+
+/// Decode the atradio station-id prefix into an AppView `source`.
+fn source_of(id: &str) -> &'static str {
+    if id.starts_with("tunein:") {
+        "tunein"
+    } else if id.starts_with("custom:") {
+        "custom"
+    } else {
+        "radio-browser"
+    }
+}
+
+/// Build the AppView `StationInfo` for a wire `StationLite` (play-status /
+/// favorite records).
+fn lite_to_info(s: &crate::remote::StationLite) -> crate::appview::StationInfo {
+    crate::appview::StationInfo {
+        station_id: s.id.clone(),
+        name: s.name.clone(),
+        stream_url: s.url.clone(),
+        source: source_of(&s.id).to_string(),
+        logo: s.favicon.clone(),
+        ..Default::default()
+    }
+}
+
+/// Apply a transport/load command to the local player (shared by the Connect
+/// and gRPC daemon arms). Runs on the loop thread — the player is `!Send`.
+async fn handle_remote_cmd(
+    cmd: crate::remote::RemoteCmd,
+    player: &crate::player::Player,
+    atproto: &std::sync::Arc<Atproto>,
+    current: &mut Option<crate::remote::StationLite>,
+) {
+    use crate::remote::RemoteCmd;
+    match cmd {
+        RemoteCmd::Play => player.play(),
+        RemoteCmd::Pause => player.pause(),
+        RemoteCmd::PlayPause => player.toggle(),
+        RemoteCmd::Stop => {
+            player.stop();
+            *current = None;
+        }
+        RemoteCmd::SetVolume(v) => player.set_volume(v),
+        RemoteCmd::ToggleMute => player.toggle_mute(),
+        RemoteCmd::LoadStation(s) => {
+            // Unwrap playlists into a direct stream before playing.
+            let resolved = crate::radio::resolve_stream(&s.url, source_of(&s.id)).await;
+            if resolved.is_hls {
+                println!("▶ {} — HLS not supported, skipping", s.name);
+                return;
+            }
+            player.play_url(&resolved.url);
+            println!("▶ {}", s.name);
+            let station = lite_to_info(&s);
+            *current = Some(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let _ = at.set_play_status(&station).await;
+            });
+        }
+    }
+}
+
+/// Apply a gRPC command on the loop thread.
+async fn apply_grpc_cmd(
+    cmd: crate::grpc::GrpcCmd,
+    player: &crate::player::Player,
+    dsp: &mut crate::player::dsp::AudioSettings,
+    atproto: &std::sync::Arc<Atproto>,
+    current: &mut Option<crate::remote::StationLite>,
+) {
+    use crate::grpc::GrpcCmd;
+    match cmd {
+        GrpcCmd::Remote(rc) => handle_remote_cmd(rc, player, atproto, current).await,
+        GrpcCmd::SetAudio(a) => {
+            *dsp = a;
+            player.apply_dsp(dsp);
+        }
+        GrpcCmd::AdjustDspRow { row, dir } => {
+            if crate::tui::dsp_rows::adjust(dsp, row, dir) {
+                player.apply_dsp(dsp);
+            }
+        }
+        GrpcCmd::Favorite(s, reply) => {
+            let station = lite_to_info(&s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+    }
+}
+
+/// Resolve the gRPC endpoints from settings (CLI flag overrides land later).
+/// Generates + persists the TCP bearer token on first use.
+fn resolve_grpc_endpoints(
+    config: &Config,
+    settings: &crate::settings::Settings,
+) -> Result<Option<crate::grpc::server::Endpoints>> {
+    let g = &settings.grpc;
+    let socket = g
+        .enabled
+        .then(|| settings.grpc_socket_path(&config.session_path));
+    let tcp = if g.http {
+        let host: std::net::IpAddr = g
+            .host
+            .parse()
+            .with_context(|| format!("invalid [grpc] host {:?} in settings", g.host))?;
+        Some(std::net::SocketAddr::new(host, g.port))
+    } else {
+        None
+    };
+    if socket.is_none() && tcp.is_none() {
+        return Ok(None);
+    }
+    let token = match (&tcp, &g.token) {
+        (None, _) => None,
+        (Some(_), Some(t)) => Some(t.clone()),
+        (Some(_), None) => {
+            let t = crate::grpc::server::generate_token()?;
+            let mut s = settings.clone();
+            s.grpc.token = Some(t.clone());
+            s.save(&config.session_path);
+            Some(t)
+        }
+    };
+    Ok(Some(crate::grpc::server::Endpoints { socket, tcp, token }))
 }
 
 async fn cmd_login(identifier: Option<String>, oauth: bool, config: &Config) -> Result<()> {
