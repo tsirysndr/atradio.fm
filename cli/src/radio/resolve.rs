@@ -24,6 +24,36 @@ pub fn is_hls_url(url: &str) -> bool {
     path.to_lowercase().ends_with(".m3u8")
 }
 
+/// Re-point a legacy `<host>/api/tunein/…` URL (baked into old favorites back
+/// when the TuneIn proxy lived on the AppView) straight at the real TuneIn
+/// origin. Mirrors the media-proxy's `rewrite_legacy_tunein` (regex
+/// `^https?://[^/]+/api/tunein` → `https://opml.radiotime.com`) so stale links
+/// self-heal — that AppView endpoint is gone now and 404s.
+fn rewrite_legacy_tunein(url: &str) -> String {
+    let lower = url.to_lowercase();
+    let scheme_len = if lower.starts_with("https://") {
+        8
+    } else if lower.starts_with("http://") {
+        7
+    } else {
+        return url.to_string();
+    };
+    // Host runs from after the scheme to the next `/`; the path follows.
+    let Some(slash) = lower[scheme_len..].find('/') else {
+        return url.to_string();
+    };
+    let path_start = scheme_len + slash;
+    const MARKER: &str = "/api/tunein";
+    if lower[path_start..].starts_with(MARKER) {
+        // Keep the original suffix (case/query intact) after the marker.
+        return format!(
+            "https://opml.radiotime.com{}",
+            &url[path_start + MARKER.len()..]
+        );
+    }
+    url.to_string()
+}
+
 /// Does this URL point at a playlist we must unwrap (rather than a direct
 /// stream)? `source == "tunein"` proxies always do; otherwise go by extension /
 /// the TuneIn `Tune.ashx` marker.
@@ -108,7 +138,8 @@ pub async fn resolve_stream(url: &str, source: &str) -> Resolved {
         }
     };
 
-    let mut current = url.to_string();
+    // Self-heal legacy AppView-proxied TuneIn links before resolving.
+    let mut current = rewrite_legacy_tunein(url);
     for i in 0..2 {
         if is_hls_url(&current) {
             break;
@@ -168,6 +199,31 @@ mod tests {
         assert_eq!(
             first_url_from_playlist(body).as_deref(),
             Some("http://cdn/stream.mp3")
+        );
+    }
+
+    #[test]
+    fn rewrites_legacy_tunein() {
+        // The exact broken favorite from the field.
+        assert_eq!(
+            rewrite_legacy_tunein(
+                "https://api.atradio.fm/api/tunein/Tune.ashx?id=s221580&formats=mp3,aac"
+            ),
+            "https://opml.radiotime.com/Tune.ashx?id=s221580&formats=mp3,aac"
+        );
+        // Any host / scheme, case-insensitive.
+        assert_eq!(
+            rewrite_legacy_tunein("http://media.atradio.fm/API/TuneIn/Search.ashx?query=x"),
+            "https://opml.radiotime.com/Search.ashx?query=x"
+        );
+        // Non-tunein URLs are left untouched.
+        assert_eq!(
+            rewrite_legacy_tunein("https://cdn.example/stream.mp3"),
+            "https://cdn.example/stream.mp3"
+        );
+        assert_eq!(
+            rewrite_legacy_tunein("http://api.atradio.fm/api/stream?url=x"),
+            "http://api.atradio.fm/api/stream?url=x"
         );
     }
 
