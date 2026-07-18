@@ -13,6 +13,7 @@ mod atproto;
 mod cli;
 mod config;
 mod grpc;
+mod mdns;
 #[cfg(target_os = "linux")]
 mod mpris;
 mod player;

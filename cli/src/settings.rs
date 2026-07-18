@@ -48,6 +48,21 @@ impl Default for GrpcSettings {
     }
 }
 
+/// mDNS / DNS-SD advertising for the gRPC control API (`[mdns]` in
+/// settings.toml). Discovery (`atradio discover`, `--connect <name>`) works
+/// regardless of these — they only govern whether *this* instance advertises.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MdnsSettings {
+    /// Advertise this instance over mDNS as `_atradio._tcp.local.` when it's
+    /// serving the control API over TCP (`[grpc].http = true`). Off by default.
+    pub enabled: bool,
+    /// Advertised instance name; unset = the Connect `device_name` (or a
+    /// hostname-based default).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub instance: Option<String>,
+}
+
 /// Serializable mirror of [`AudioSettings`] plus player prefs. Enums are stored
 /// as lowercase strings to keep the file human-editable.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -63,6 +78,10 @@ pub struct Settings {
     /// gRPC control API (`[grpc]` section).
     #[serde(default)]
     pub grpc: GrpcSettings,
+
+    /// mDNS advertising (`[mdns]` section).
+    #[serde(default)]
+    pub mdns: MdnsSettings,
 
     pub eq_enabled: bool,
     pub eq_gains: Vec<f32>,
@@ -87,6 +106,7 @@ impl Default for Settings {
             volume: 0.8,
             device_name: None,
             grpc: GrpcSettings::default(),
+            mdns: MdnsSettings::default(),
             eq_enabled: d.eq_enabled,
             eq_gains: d.eq_gains.to_vec(),
             bass: d.bass,

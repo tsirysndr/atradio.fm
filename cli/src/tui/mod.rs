@@ -151,7 +151,7 @@ pub async fn run(
             RemoteConfig {
                 base_url: config.appview_url.clone(),
                 device_id: device_id.clone(),
-                device_name,
+                device_name: device_name.clone(),
                 atproto: atproto.clone(),
             },
             local_state_rx,
@@ -180,12 +180,20 @@ pub async fn run(
     // drive it. Commands come in over an mpsc — applied on this thread, since
     // the player is !Send — and state goes out over a watch the loop refreshes.
     let (grpc_state_tx, grpc_state_rx) = tokio::sync::watch::channel(GrpcState::default());
+    // Holds the mDNS advertisement alive for the TUI's lifetime (if any).
+    let mut _mdns = None;
     let mut grpc_cmd_rx = if let Some(eps) = grpc_endpoints {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<GrpcCmd>();
         match crate::grpc::server::spawn(eps, cmd_tx, grpc_state_rx) {
             Ok(bound) => {
                 if let Some(p) = &bound.socket {
                     app.toast.set(format!("gRPC control on {}", p.display()));
+                }
+                if let Some((guard, instance)) =
+                    crate::cli::maybe_broadcast_mdns(&settings, &bound, &device_name)
+                {
+                    app.toast.set(format!("advertising “{instance}” over mDNS"));
+                    _mdns = Some(guard);
                 }
             }
             Err(e) => app.toast.set(format!("gRPC control off: {e}")),
