@@ -527,17 +527,26 @@ fn handle_event(
             }
         }
         KeyCode::Char('c') => {
-            app.view = View::Comments;
-            if let Some(s) = app.current.clone() {
-                spawn_load_comments(appview, tx, s.station_id);
+            // Comments for the highlighted station (or whatever's playing) — no
+            // need to be playing it.
+            if let Some(station) = comment_target(app) {
+                app.view = View::Comments;
+                app.comments.clear();
+                app.comments_selected = 0;
+                app.comments_station = Some(station.clone());
+                spawn_load_comments(appview, tx, station.station_id);
+            } else {
+                app.toast
+                    .set("Select or play a station first to see comments.");
             }
         }
         KeyCode::Char('a') => {
-            if app.current.is_some() {
+            if let Some(station) = comment_target(app) {
+                app.comments_station = Some(station);
                 app.overlay = Overlay::Compose;
                 app.compose_text.clear();
             } else {
-                app.toast.set("Play a station first to comment.");
+                app.toast.set("Select or play a station first to comment.");
             }
         }
         KeyCode::Char(' ') => {
@@ -1176,6 +1185,19 @@ fn handle_signin_keys(code: KeyCode, app: &mut App) {
     }
 }
 
+/// The station to view / post comments for: the one highlighted in the active
+/// list (a Home tab or the Profile), the station already open in the comments
+/// view, else whatever's currently playing. Lets you comment on a browsed
+/// station without playing it — and on the playing one from any view.
+fn comment_target(app: &App) -> Option<StationInfo> {
+    match app.view {
+        View::Comments => app.comments_station.clone(),
+        View::Profile => app.profile_recent.get(app.profile_recent_selected).cloned(),
+        _ => app.selected_station().cloned(),
+    }
+    .or_else(|| app.current.clone())
+}
+
 fn favorite_selected(app: &mut App, atproto: &Arc<Atproto>, tx: &mpsc::UnboundedSender<Msg>) {
     let station = app
         .selected_station()
@@ -1264,7 +1286,9 @@ fn handle_compose_keys(
         }
         KeyCode::Enter => {
             let text = app.compose_text.trim().to_string();
-            let station = app.current.clone();
+            // Post to the station the composer was opened for (selected or
+            // playing), falling back to whatever's playing.
+            let station = app.comments_station.clone().or_else(|| app.current.clone());
             app.overlay = Overlay::None;
             app.compose_text.clear();
             if text.is_empty() {
