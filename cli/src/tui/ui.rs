@@ -374,17 +374,20 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
 }
 
 /// Width of the fixed rectangle cursor (in cells) that slides along a track.
-const SLIDER_CURSOR_W: u16 = 3;
+const SLIDER_CURSOR_W: u16 = 5;
+/// The cursor glyph: a flatter, reduced-height rectangle (vs. the full-height
+/// `█`) that stays vertically centered on the track line.
+const SLIDER_CURSOR: &str = "▬";
 
 /// A horizontal slider: a track line with a fixed-size rectangle cursor at the
 /// `fill` position (0.0 = far left, 0.5 = centered, 1.0 = far right). A faint
 /// tick marks the track midpoint (the flat/zero reference for EQ bands).
 fn slider(fill: f32, track_w: u16, selected: bool) -> Paragraph<'static> {
-    // Too narrow to draw a meaningful track: just show the cursor block.
+    // Too narrow to draw a meaningful track: just show the cursor.
     if track_w < SLIDER_CURSOR_W + 2 {
         let color = if selected { theme::TEAL } else { theme::INDIGO };
         return Paragraph::new(Span::styled(
-            "█".repeat(track_w as usize),
+            SLIDER_CURSOR.repeat(track_w as usize),
             Style::default().fg(color),
         ));
     }
@@ -398,7 +401,7 @@ fn slider(fill: f32, track_w: u16, selected: bool) -> Paragraph<'static> {
     for x in 0..track_w {
         if x >= pos && x < pos + SLIDER_CURSOR_W {
             spans.push(Span::styled(
-                "█",
+                SLIDER_CURSOR,
                 Style::default()
                     .fg(cursor_color)
                     .add_modifier(Modifier::BOLD),
@@ -1227,13 +1230,15 @@ mod slider_tests {
 
     #[test]
     fn slider_cursor_is_fixed_width_and_positioned() {
-        let w = 20;
-        // A fixed 3-wide cursor at every value: min → far left, max → far right,
+        let w = 24;
+        let cur = SLIDER_CURSOR;
+        let cw = SLIDER_CURSOR_W as usize;
+        // A fixed-width cursor at every value: min → far left, max → far right,
         // flat/center (0.5) → straddling the midpoint tick.
-        assert!(row(0.0, w).starts_with("███"));
-        assert!(row(1.0, w).ends_with("███"));
+        assert!(row(0.0, w).starts_with(&cur.repeat(cw)));
+        assert!(row(1.0, w).ends_with(&cur.repeat(cw)));
         for f in [0.0, 0.25, 0.5, 0.75, 1.0] {
-            assert_eq!(row(f, w).matches('█').count(), 3, "fill {f}");
+            assert_eq!(row(f, w).matches(cur).count(), cw, "fill {f}");
         }
         // The track carries a single center tick (unless the cursor covers it).
         assert!(row(0.0, w).contains('┼'));
