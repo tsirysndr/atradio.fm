@@ -1,9 +1,8 @@
-// The AppView client mirrors the full public XRPC surface; not every endpoint
-// is wired into the TUI yet, so allow the unused ones to stand as API.
-#![allow(dead_code)]
+//! The public atradio.fm AppView client now lives in the SDK
+//! ([`atradio_sdk::appview`]). This module re-exports it so the existing
+//! `crate::appview::*` paths keep resolving.
 
-pub mod client;
-pub mod models;
+#![allow(unused_imports)]
 
-pub use client::AppView;
-pub use models::*;
+pub use atradio_sdk::appview::*;
+pub use atradio_sdk::AppView;

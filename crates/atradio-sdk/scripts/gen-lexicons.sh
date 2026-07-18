@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Regenerate the Rust bindings in src/{builder_types.rs,fm_atradio*} from the
-# atradio lexicon JSON. Requires the jacquard codegen binary:
+# Regenerate the Rust bindings in src/{builder_types.rs,fm_atradio*} of the
+# atradio-sdk crate from the atradio lexicon JSON. Requires the jacquard codegen
+# binary:
 #   cargo install jacquard-lexgen        # provides `jacquard-codegen`
 set -euo pipefail
-here="$(cd "$(dirname "$0")/.." && pwd)"
-lexicons="$here/../packages/lexicons/lexicons/atradio"
+here="$(cd "$(dirname "$0")/.." && pwd)"                  # crates/atradio-sdk
+lexicons="$here/../../packages/lexicons/lexicons/atradio" # repo-root/packages/...
 out="$(mktemp -d)"
 jacquard-codegen -i "$lexicons" -o "$out"
 cp "$out/builder_types.rs" "$here/src/builder_types.rs"

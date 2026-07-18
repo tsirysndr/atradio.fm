@@ -13,6 +13,10 @@ name = "atradio"
 path = "src/main.rs"
 
 [dependencies]
+# The atradio.fm SDK: auth, writes, the AppView read client, and the generated
+# fm.atradio.* lexicon bindings all live here now.
+atradio-sdk = { version = "0.1", path = "../crates/atradio-sdk" }
+
 jacquard = { version = "0.12", default-features = false, features = [
     "api",
     "dns",
@@ -21,8 +25,6 @@ jacquard = { version = "0.12", default-features = false, features = [
     "loopback",
 ] }
 jacquard-common = "0.12"
-jacquard-lexicon = "0.12"
-jacquard-derive = "0.12"
 
 # audio engine + DSP (GPL-2.0)
 rockbox-playback = ">=0.4.1"
@@ -76,10 +78,8 @@ mpris-server = { version = "0.10", features = ["tokio"] }
 # committed so plain `cargo install` works without protobuf installed).
 tonic-build = "0.13"
 
-[features]
-default = ["fm_atradio"]
-# Gates the code generated from packages/lexicons/lexicons/atradio.
-fm_atradio = []
-
+# NOTE: the fm.atradio.* lexicon bindings moved to the atradio-sdk crate, so the
+# old `fm_atradio` feature gate is gone.
+#
 # NOTE: profile settings moved to the workspace root Cargo.toml — Cargo ignores
 # `[profile.*]` on non-root workspace members.

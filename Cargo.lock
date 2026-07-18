@@ -288,6 +288,7 @@ name = "atradio"
 version = "0.5.1"
 dependencies = [
  "anyhow",
+ "atradio-sdk",
  "chrono",
  "clap",
  "crossterm",
@@ -298,8 +299,6 @@ dependencies = [
  "if-addrs 0.15.0",
  "jacquard",
  "jacquard-common",
- "jacquard-derive",
- "jacquard-lexicon",
  "mdns-sd",
  "mpris-server",
  "prost",
@@ -327,6 +326,8 @@ dependencies = [
  "futures",
  "jacquard",
  "jacquard-common",
+ "jacquard-derive",
+ "jacquard-lexicon",
  "reqwest",
  "serde",
  "serde_json",
