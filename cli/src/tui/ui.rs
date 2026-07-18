@@ -4,7 +4,7 @@
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
 use super::dsp_rows;
@@ -339,19 +339,13 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
         );
         match row.fill {
             Some(fill) => {
-                let bar_w = rest.width.saturating_sub(9);
-                let bar_area = Rect::new(rest.x, rest.y, bar_w, 1);
-                let g = Gauge::default()
-                    .gauge_style(Style::default().fg(if is_sel {
-                        theme::TEAL
-                    } else {
-                        theme::INDIGO
-                    }))
-                    .ratio(fill as f64)
-                    .label("");
-                f.render_widget(g, bar_area);
-                let val_area =
-                    Rect::new(rest.x + bar_w, rest.y, rest.width.saturating_sub(bar_w), 1);
+                // A slider track with a fixed-size rectangle cursor at the value
+                // position (flat/center = fill 0.5, so EQ bands center when flat).
+                let val_w = 9u16.min(rest.width);
+                let track_w = rest.width.saturating_sub(val_w);
+                let track_area = Rect::new(rest.x, rest.y, track_w, 1);
+                f.render_widget(slider(fill, track_w, is_sel), track_area);
+                let val_area = Rect::new(rest.x + track_w, rest.y, val_w, 1);
                 f.render_widget(
                     Paragraph::new(Span::styled(
                         format!(" {}", row.value),
@@ -370,6 +364,45 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
             }
         }
     }
+}
+
+/// Width of the fixed rectangle cursor (in cells) that slides along a track.
+const SLIDER_CURSOR_W: u16 = 3;
+
+/// A horizontal slider: a track line with a fixed-size rectangle cursor at the
+/// `fill` position (0.0 = far left, 0.5 = centered, 1.0 = far right). A faint
+/// tick marks the track midpoint (the flat/zero reference for EQ bands).
+fn slider(fill: f32, track_w: u16, selected: bool) -> Paragraph<'static> {
+    // Too narrow to draw a meaningful track: just show the cursor block.
+    if track_w < SLIDER_CURSOR_W + 2 {
+        let color = if selected { theme::TEAL } else { theme::INDIGO };
+        return Paragraph::new(Span::styled(
+            "█".repeat(track_w as usize),
+            Style::default().fg(color),
+        ));
+    }
+    let span = track_w - SLIDER_CURSOR_W;
+    let pos = ((fill.clamp(0.0, 1.0) * span as f32).round() as u16).min(span);
+    let mid = track_w / 2;
+    let cursor_color = if selected { theme::TEAL } else { theme::INDIGO };
+    let track_style = Style::default().fg(theme::BORDER);
+
+    let mut spans: Vec<Span<'static>> = Vec::with_capacity(track_w as usize);
+    for x in 0..track_w {
+        if x >= pos && x < pos + SLIDER_CURSOR_W {
+            spans.push(Span::styled(
+                "█",
+                Style::default()
+                    .fg(cursor_color)
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else if x == mid {
+            spans.push(Span::styled("┼", track_style));
+        } else {
+            spans.push(Span::styled("─", track_style));
+        }
+    }
+    Paragraph::new(Line::from(spans))
 }
 
 fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
@@ -1169,5 +1202,33 @@ fn truncate(s: &str, max: usize) -> String {
         let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
         out.push('…');
         out
+    }
+}
+
+#[cfg(test)]
+mod slider_tests {
+    use super::*;
+    use ratatui::buffer::Buffer;
+    use ratatui::widgets::Widget;
+
+    fn row(fill: f32, w: u16) -> String {
+        let area = Rect::new(0, 0, w, 1);
+        let mut buf = Buffer::empty(area);
+        slider(fill, w, true).render(area, &mut buf);
+        (0..w).map(|x| buf[(x, 0)].symbol().to_string()).collect()
+    }
+
+    #[test]
+    fn slider_cursor_is_fixed_width_and_positioned() {
+        let w = 20;
+        // A fixed 3-wide cursor at every value: min → far left, max → far right,
+        // flat/center (0.5) → straddling the midpoint tick.
+        assert!(row(0.0, w).starts_with("███"));
+        assert!(row(1.0, w).ends_with("███"));
+        for f in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            assert_eq!(row(f, w).matches('█').count(), 3, "fill {f}");
+        }
+        // The track carries a single center tick (unless the cursor covers it).
+        assert!(row(0.0, w).contains('┼'));
     }
 }
