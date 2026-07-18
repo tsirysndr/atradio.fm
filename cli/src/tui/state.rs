@@ -196,6 +196,10 @@ pub struct App {
     // ---- comments / notifications ----
     pub comments: Vec<CommentView>,
     pub comments_selected: usize,
+    /// The station whose comments are being viewed / composed — the one
+    /// highlighted in a list, or the currently-playing one. Decouples the
+    /// comments view from playback.
+    pub comments_station: Option<StationInfo>,
     pub notifications: Vec<NotificationView>,
     pub unread: u32,
 
@@ -273,6 +277,7 @@ impl App {
             add_form: AddStationForm::default(),
             comments: Vec::new(),
             comments_selected: 0,
+            comments_station: None,
             notifications: Vec::new(),
             unread: 0,
             current: None,

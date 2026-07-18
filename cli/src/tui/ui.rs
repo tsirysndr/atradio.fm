@@ -449,7 +449,7 @@ fn relative_time(created_at: &str) -> Option<String> {
 
 fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
     let title = app
-        .current
+        .comments_station
         .as_ref()
         .map(|s| format!("Comments · {}", s.name))
         .unwrap_or_else(|| "Comments".into());
@@ -457,9 +457,9 @@ fn draw_comments(f: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    if app.current.is_none() {
+    if app.comments_station.is_none() {
         f.render_widget(
-            Paragraph::new("Play a station first, then press c to see its comments.")
+            Paragraph::new("Select or play a station, then press c to see its comments.")
                 .style(Style::default().fg(theme::MUTED)),
             inner,
         );
@@ -695,8 +695,8 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ("/", "fuzzy station search"),
         ("f", "favorite the selected/current station"),
         ("A", "add a custom station (when signed in)"),
-        ("c", "comments for the current station"),
-        ("a", "add a comment"),
+        ("c", "comments for the selected/playing station"),
+        ("a", "add a comment (to the selected/playing station)"),
         ("n", "notifications"),
         ("e", "equalizer & DSP settings"),
         ("p", "your profile"),
@@ -962,7 +962,7 @@ fn draw_compose(f: &mut Frame, area: Rect, app: &App) {
     let popup = centered(area, 60, 30);
     f.render_widget(Clear, popup);
     let title = app
-        .current
+        .comments_station
         .as_ref()
         .map(|s| format!("Comment on {}", s.name))
         .unwrap_or_else(|| "Comment".into());

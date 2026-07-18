@@ -181,7 +181,7 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 | `/`             | fuzzy station search                                     |
 | `f`             | favorite the selected/current station                   |
 | `A`             | add a custom station (when signed in)                    |
-| `c` / `a`       | comments / add a comment                                 |
+| `c` / `a`       | comments / add a comment (selected or playing station)   |
 | `d`             | Connect: pick a device to play/control (see below)       |
 | `n`             | notifications                                            |
 | `p`             | your profile (with playable recently-played)             |
