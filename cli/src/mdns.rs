@@ -7,13 +7,17 @@
 //!
 //! `ServiceDaemon` runs its own background thread and is `Send + Sync`, so this
 //! never touches the `!Send` player: broadcasting just holds a guard alive.
+//!
+//! mdns-sd is pinned to 0.13.x — 0.14+ pulls `socket-pktinfo`, whose unix path
+//! needs Linux/macOS-only `IP_PKTINFO` and won't build on FreeBSD/NetBSD. 0.13
+//! is pure-socket, so mDNS works on every supported platform.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
-use mdns_sd::{ResolvedService, ServiceDaemon, ServiceEvent, ServiceInfo};
+use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 
 /// Interface name fragments that indicate a virtual / container / VM / tunnel
 /// NIC whose address is not a real LAN address. Matched case-insensitively as a
@@ -62,8 +66,7 @@ fn lan_addresses() -> Vec<IpAddr> {
         })
         .map(|i| i.ip())
         .collect();
-    // IPv4 first (more broadly reachable on a typical LAN).
-    addrs.sort_by_key(IpAddr::is_ipv6);
+    addrs.sort_by_key(IpAddr::is_ipv6); // IPv4 first
     addrs.dedup();
     addrs
 }
@@ -198,18 +201,15 @@ fn instance_name(fullname: &str) -> String {
         .to_string()
 }
 
-fn peer_from(info: &ResolvedService) -> Peer {
+fn peer_from(info: &ServiceInfo) -> Peer {
     // IPv4 first so the dialed address is the most broadly reachable.
-    let mut addrs: Vec<IpAddr> = info.addresses.iter().map(|s| s.to_ip_addr()).collect();
+    let mut addrs: Vec<IpAddr> = info.get_addresses().iter().copied().collect();
     addrs.sort_by_key(|ip| ip.is_ipv6());
     Peer {
-        instance: instance_name(&info.fullname),
+        instance: instance_name(info.get_fullname()),
         addrs,
-        port: info.port,
-        version: info
-            .txt_properties
-            .get_property_val_str("version")
-            .map(|s| s.to_string()),
-        auth: info.txt_properties.get_property_val_str("auth") == Some("required"),
+        port: info.get_port(),
+        version: info.get_property_val_str("version").map(|s| s.to_string()),
+        auth: info.get_property_val_str("auth") == Some("required"),
     }
 }
