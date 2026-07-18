@@ -218,6 +218,15 @@ pub struct App {
     /// Selection index within the device-picker overlay.
     pub device_sel: usize,
 
+    // ---- gRPC remote control ----
+    /// When set, this TUI is driving another atradio over its gRPC control API:
+    /// transport/load/DSP/favorite go to the remote, and now-playing/volume/DSP
+    /// are rendered from its mirror. Navigation/search stay local.
+    pub grpc_remote: Option<crate::grpc::client::GrpcRemote>,
+    /// Latest connection error from the controlled instance (lost stream / RPC),
+    /// shown as a persistent banner while set; `None` when the link is healthy.
+    pub grpc_conn_error: Option<String>,
+
     // ---- DSP ----
     pub dsp: AudioSettings,
     pub dsp_row: usize,
@@ -275,6 +284,8 @@ impl App {
             self_device_id: None,
             connect_online: false,
             device_sel: 0,
+            grpc_remote: None,
+            grpc_conn_error: None,
             dsp: AudioSettings::default(),
             dsp_row: 0,
             logged_in,
@@ -337,7 +348,7 @@ impl App {
                     .map(|score| (score, s))
             })
             .collect();
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|(score, _)| std::cmp::Reverse(*score));
         scored
     }
 

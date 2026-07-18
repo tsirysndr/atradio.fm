@@ -23,6 +23,7 @@ when signed in — favorite stations, add your own, and post comments to your PD
 - [Equalizer & DSP](#equalizer--dsp)
 - [atradio Connect (remote control)](#atradio-connect-remote-control)
 - [Run as a service (systemd, Linux only)](#run-as-a-service-systemd-linux-only)
+- [gRPC control API](#grpc-control-api)
 - [Platform notes](#platform-notes)
 - [Lexicon bindings](#lexicon-bindings)
 
@@ -131,6 +132,7 @@ Building compiles the vendored Rockbox codecs, so a C toolchain is required
 ```bash
 atradio                       # interactive TUI (default)
 atradio --no-tui              # headless Connect device (remote-controllable)
+atradio --connect             # control another running atradio over its gRPC API
 atradio search lofi           # search radio-browser, print results
 atradio play "jazz"           # headless: play the top hit for a query…
 atradio play https://…/stream #   …or a stream URL directly
@@ -173,7 +175,7 @@ The session + a small profile cache are stored under `~/.config/atradio/`
 | `←`/`→` `Tab`   | switch home tab                                          |
 | `1` … `5`       | tabs: Trending / Popular / Recent / Favorites / Yours    |
 | `Enter`         | play the selected station                                |
-| `Space`         | play / pause · `m` mute · `+`/`-` volume (or adjust DSP) |
+| `Space`         | play / pause · `x` stop · `m` mute · `+`/`-` volume (DSP) |
 | `/`             | fuzzy station search                                     |
 | `f`             | favorite the selected/current station                   |
 | `A`             | add a custom station (when signed in)                    |
@@ -280,6 +282,69 @@ journalctl --user -u atradio -f
 
 The `service` subcommand is **Linux-only** — it is compiled out entirely on
 macOS, FreeBSD, NetBSD, and other platforms, where systemd isn't available.
+
+## gRPC control API
+
+Every atradio also exposes a small **gRPC control API** — `AtradioControl`
+(package `atradio.v1`) — over a **Unix socket** by default, so you can script it
+or have **one instance control another** on the same machine. Unlike
+[Connect](#atradio-connect-remote-control) (account-wide, over the hub, needs a
+session), this is a **local** channel and needs **no sign-in**: it drives
+playback, `LoadStation`, the EQ/DSP chain, and `Favorite`, streams
+now-playing state (`WatchState`), and lists the account's stations
+(`ListStations` — favorites / own / recently-played).
+
+**One instance controls another.** On startup atradio probes the socket:
+
+- If nothing is there, it **starts the server** and plays locally.
+- If another atradio already owns the socket, a TUI **connects to it and
+  controls it** instead of starting a second player — `Enter` (load station),
+  `Space`/`x`/`m`/`+`/`-`, the EQ view, `f` (favorite), `a` (comment), and `d`
+  (the Connect **device picker** — forwarded, so you transfer playback among the
+  controlled account's devices) all go to the controlled instance (favorites/
+  comments post from *its* account), whose now-playing/volume/DSP it renders
+  behind a `◉ Controlling remote` banner. Your
+  **Favorites / Yours / Profile** tabs show the *controlled account's* lists
+  (fetched over gRPC), so you can browse and play its stations; the global tabs
+  (Trending/Popular/Recent) and search stay local.
+- `atradio --no-tui` **always** serves and **errors on conflict** (a socket is
+  already live → exit non-zero).
+
+```bash
+atradio --no-tui              # instance A: headless server (owns the socket)
+atradio                       # instance B: auto-detects A and controls it
+atradio --connect             # …the same, explicitly (default socket)
+atradio --connect unix:/path/to/grpc.sock   # a specific socket
+atradio --connect 127.0.0.1:7799 --token …  # a TCP endpoint (see below)
+atradio --no-grpc             # neither serve nor connect — fully local
+```
+
+Drive it from anything that speaks gRPC — e.g. [`grpcurl`](https://github.com/fullstorydev/grpcurl)
+(reflection is enabled):
+
+```bash
+SOCK="$HOME/.config/atradio/grpc.sock"   # macOS: ~/Library/Application Support/fm.atradio.atradio/grpc.sock
+grpcurl -plaintext "unix:$SOCK" list
+grpcurl -plaintext "unix:$SOCK" atradio.v1.AtradioControl/GetState
+grpcurl -plaintext -d '{"volume":0.4}' "unix:$SOCK" atradio.v1.AtradioControl/SetVolume
+```
+
+**Settings** — configure it under `[grpc]` in `~/.config/atradio/settings.toml`:
+
+```toml
+[grpc]
+enabled = true      # serve the control API (default true; --no-grpc overrides)
+# socket = "…"      # override the default socket path
+http    = false     # also serve gRPC over TCP (default false)
+host    = "127.0.0.1"
+port    = 7799      # TCP port (also settable with --grpc-port)
+# token = "…"       # bearer token required on the TCP endpoint; auto-generated
+                    # on first use and written back here
+```
+
+The Unix socket is guarded by file permissions; the **TCP endpoint requires a
+bearer token** (`--token`, or `[grpc].token` — one is generated and persisted on
+first use). Pass the same token with `--connect host:port --token …`.
 
 ## Platform notes
 

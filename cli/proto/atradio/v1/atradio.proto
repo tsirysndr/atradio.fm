@@ -1,0 +1,182 @@
+syntax = "proto3";
+
+package atradio.v1;
+
+// Control a running `atradio` process (TUI or `--no-tui` daemon): drive
+// playback, load a station, edit the Rockbox DSP/EQ chain, and favorite —
+// plus a state stream for a remote now-playing bar. Served over a unix
+// socket by default and, when configured, TCP (guarded by a bearer token).
+service AtradioControl {
+  // One-shot snapshot of playback + audio settings.
+  rpc GetState(GetStateRequest) returns (State) {}
+  // Snapshots streamed at ~2 Hz (playback state, now-playing, DSP).
+  rpc WatchState(WatchStateRequest) returns (stream State) {}
+
+  // Transport.
+  rpc Play(PlayRequest) returns (State) {}
+  rpc Pause(PauseRequest) returns (State) {}
+  rpc Stop(StopRequest) returns (State) {}
+  rpc PlayPause(PlayPauseRequest) returns (State) {}
+  rpc ToggleMute(ToggleMuteRequest) returns (State) {}
+  // Absolute volume, 0.0..=1.0.
+  rpc SetVolume(SetVolumeRequest) returns (State) {}
+  // Start playing a station (unwraps playlists / resolves the stream).
+  rpc LoadStation(LoadStationRequest) returns (State) {}
+
+  // Audio / DSP chain.
+  rpc GetAudioSettings(GetAudioSettingsRequest) returns (AudioSettings) {}
+  // Replace the whole DSP chain and apply it live.
+  rpc SetAudioSettings(SetAudioSettingsRequest) returns (AudioSettings) {}
+  // Nudge one DSP panel row, mirroring the TUI +/- keys (row order matches
+  // tui/dsp_rows.rs; dir is +1/-1).
+  rpc AdjustDspRow(AdjustDspRowRequest) returns (AudioSettings) {}
+
+  // Favorite a station on the signed-in account. Returns the record URI.
+  rpc Favorite(FavoriteRequest) returns (FavoriteResponse) {}
+
+  // Browse the controlled instance's account lists (favorites / its own
+  // stations / recently-played), so a controller can play them remotely.
+  // Empty when the controlled instance isn't signed in.
+  rpc ListStations(ListStationsRequest) returns (StationList) {}
+
+  // Post a comment on a station from the signed-in account. Returns the URI.
+  rpc Comment(CommentRequest) returns (CommentResponse) {}
+
+  // atradio Connect: choose which of the controlled account's devices plays
+  // (the forwarded device picker). Empty device id = the controlled instance
+  // itself. The roster + current target are carried in `State`.
+  rpc SetConnectTarget(SetConnectTargetRequest) returns (State) {}
+}
+
+// The minimal station exchanged over the wire (mirrors remote::StationLite).
+// `id` uses the atradio convention: "rb:<uuid>" | "tunein:<id>" | "custom:<rkey>".
+message Station {
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  string favicon = 4;
+}
+
+enum PlaybackState {
+  PLAYBACK_STATE_STOPPED = 0;
+  PLAYBACK_STATE_PLAYING = 1;
+  PLAYBACK_STATE_PAUSED = 2;
+}
+
+// The Rockbox DSP chain (mirrors player::dsp::AudioSettings). Gains are dB.
+message AudioSettings {
+  bool eq_enabled = 1;
+  // Per-band gain in dB, one per band (32 Hz … 16 kHz), 10 entries.
+  repeated int32 eq_gains = 2;
+  int32 bass = 3;
+  int32 treble = 4;
+  // "off" | "meier" | "custom".
+  string crossfeed_mode = 5;
+  // Crossfeed direct-path gain in tenths of dB (<= 0).
+  int32 crossfeed_direct_tenths = 6;
+  int32 pbe = 7;
+  int32 pbe_precut = 8;
+  int32 surround_delay = 9;
+  int32 surround_balance = 10;
+  int32 comp_threshold = 11;
+  int32 comp_ratio = 12;
+  // "stereo" | "mono" | "custom" | "mono-left" | "mono-right" | "karaoke" | "swap".
+  string channel_mode = 13;
+  int32 stereo_width = 14;
+}
+
+message State {
+  PlaybackState playback = 1;
+  Station station = 2;
+  // ICY "now playing" line, empty when unknown.
+  string title = 3;
+  float volume = 4;
+  bool muted = 5;
+  AudioSettings audio = 6;
+  // Bumped on every change so watchers can cheaply detect edits.
+  uint64 version = 7;
+  // atradio Connect roster of the controlled account (for the forwarded picker).
+  repeated ConnectDevice connect_devices = 8;
+  // The device the controlled instance is driving; empty = itself.
+  string connect_target = 9;
+  // Whether the controlled instance's Connect link is online.
+  bool connect_online = 10;
+}
+
+// A device in the controlled account's atradio Connect roster.
+message ConnectDevice {
+  string id = 1;
+  string name = 2;
+  string platform = 3;
+  bool is_self = 4;
+  bool playing = 5;
+  Station station = 6;
+}
+
+message GetStateRequest {}
+message WatchStateRequest {}
+message PlayRequest {}
+message PauseRequest {}
+message StopRequest {}
+message PlayPauseRequest {}
+message ToggleMuteRequest {}
+
+message SetVolumeRequest {
+  float volume = 1;
+}
+
+message LoadStationRequest {
+  Station station = 1;
+}
+
+message GetAudioSettingsRequest {}
+
+message SetAudioSettingsRequest {
+  AudioSettings audio = 1;
+}
+
+message AdjustDspRowRequest {
+  uint32 row = 1;
+  int32 dir = 2;
+}
+
+message FavoriteRequest {
+  Station station = 1;
+}
+
+message FavoriteResponse {
+  string uri = 1;
+}
+
+// Which of the account's lists to browse.
+enum StationSource {
+  STATION_SOURCE_FAVORITES = 0;
+  // The account's own added stations ("Yours").
+  STATION_SOURCE_STATIONS = 1;
+  // The account's recently-played.
+  STATION_SOURCE_RECENT = 2;
+}
+
+message ListStationsRequest {
+  StationSource source = 1;
+  // Max results; 0 lets the server pick a sensible default.
+  uint32 limit = 2;
+}
+
+message StationList {
+  repeated Station stations = 1;
+}
+
+message CommentRequest {
+  Station station = 1;
+  string text = 2;
+}
+
+message CommentResponse {
+  string uri = 1;
+}
+
+message SetConnectTargetRequest {
+  // Empty = take control back to the controlled instance itself.
+  string device_id = 1;
+}

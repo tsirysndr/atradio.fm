@@ -28,7 +28,7 @@ pub fn rows(s: &AudioSettings) -> Vec<Row> {
         v.push(Row {
             label: format!("  {}", freq_label(hz)),
             value: format!("{:+.0} dB", s.eq_gains[i]),
-            fill: Some(norm(s.eq_gains[i] as f32, -24.0, 24.0)),
+            fill: Some(norm(s.eq_gains[i], -24.0, 24.0)),
         });
     }
     v.push(Row {

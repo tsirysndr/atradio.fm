@@ -53,7 +53,11 @@ jobs:
 
       - name: Install Linux build deps
         if: startsWith(matrix.os, 'ubuntu')
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config protobuf-compiler
+
+      - name: Install macOS build deps
+        if: startsWith(matrix.os, 'macos')
+        run: brew install protobuf
 
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }} --bin atradio

@@ -12,6 +12,7 @@ mod appview;
 mod atproto;
 mod cli;
 mod config;
+mod grpc;
 #[cfg(target_os = "linux")]
 mod mpris;
 mod player;

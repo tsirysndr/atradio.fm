@@ -25,6 +25,8 @@ let
     nativeBuildInputs = [
       pkgs.pkg-config
       pkgs.stdenv.cc
+      # tonic-build regenerates src/grpc/ from proto/ at build time.
+      pkgs.protobuf
     ] ++ lib.optionals pkgs.stdenv.isDarwin [
       # coreaudio-sys generates its CoreAudio bindings with bindgen at build
       # time; bindgenHook provides libclang + the Nix Apple SDK.
@@ -85,6 +87,8 @@ let
       rust-analyzer
       pkg-config
       stdenv.cc
+      protobuf # protoc for tonic-build codegen
+      grpcurl # poke the gRPC control API by hand
     ];
 
     # Link-time libraries. pkg-config only picks up `.pc` files from

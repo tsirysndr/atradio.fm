@@ -7,6 +7,42 @@ use serde::{Deserialize, Serialize};
 
 use crate::player::dsp::AudioSettings;
 
+/// gRPC control API configuration (`[grpc]` in settings.toml). CLI flags
+/// (`--connect`, `--grpc-port`, `--no-grpc`) take precedence over these.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GrpcSettings {
+    /// Serve the control API on a unix socket. On by default — the socket lets
+    /// a second `atradio` control this one instead of starting a rival player.
+    pub enabled: bool,
+    /// Unix socket path; unset = `grpc.sock` next to the session file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub socket: Option<String>,
+    /// Also serve the API over TCP/HTTP2 on `host:port`. Off by default.
+    pub http: bool,
+    /// TCP port, used only when `http = true`.
+    pub port: u16,
+    /// TCP bind address, used only when `http = true`.
+    pub host: String,
+    /// Bearer token required on the TCP endpoint; auto-generated and written
+    /// back here on first use. The unix socket never requires it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+}
+
+impl Default for GrpcSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            socket: None,
+            http: false,
+            port: 7799,
+            host: "127.0.0.1".to_string(),
+            token: None,
+        }
+    }
+}
+
 /// Serializable mirror of [`AudioSettings`] plus player prefs. Enums are stored
 /// as lowercase strings to keep the file human-editable.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,6 +54,10 @@ pub struct Settings {
     /// `settings.toml`; falls back to a hostname-based default when empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_name: Option<String>,
+
+    /// gRPC control API (`[grpc]` section).
+    #[serde(default)]
+    pub grpc: GrpcSettings,
 
     pub eq_enabled: bool,
     pub eq_gains: Vec<f32>,
@@ -41,6 +81,7 @@ impl Default for Settings {
         Self {
             volume: 0.8,
             device_name: None,
+            grpc: GrpcSettings::default(),
             eq_enabled: d.eq_enabled,
             eq_gains: d.eq_gains.to_vec(),
             bass: d.bass,
@@ -64,6 +105,16 @@ impl Settings {
         session_path.with_file_name("settings.toml")
     }
 
+    /// The gRPC control socket path: the configured `[grpc] socket`, else
+    /// `grpc.sock` next to the session file (mirrors how `settings.toml` and
+    /// the device id are derived).
+    pub fn grpc_socket_path(&self, session_path: &Path) -> PathBuf {
+        match &self.grpc.socket {
+            Some(p) => PathBuf::from(p),
+            None => session_path.with_file_name("grpc.sock"),
+        }
+    }
+
     pub fn load(session_path: &Path) -> Self {
         std::fs::read_to_string(Self::path(session_path))
             .ok()
@@ -83,26 +134,26 @@ impl Settings {
 
     /// Build the runtime [`AudioSettings`] from the persisted values.
     pub fn audio(&self) -> AudioSettings {
-        let mut a = AudioSettings::default();
-        a.eq_enabled = self.eq_enabled;
-        for (i, slot) in a.eq_gains.iter_mut().enumerate() {
-            if let Some(g) = self.eq_gains.get(i) {
-                *slot = *g;
-            }
+        let mut eq_gains = AudioSettings::default().eq_gains;
+        for (slot, g) in eq_gains.iter_mut().zip(&self.eq_gains) {
+            *slot = *g;
         }
-        a.bass = self.bass;
-        a.treble = self.treble;
-        a.crossfeed_mode = str_to_crossfeed(&self.crossfeed_mode);
-        a.crossfeed_direct = self.crossfeed_direct;
-        a.pbe = self.pbe;
-        a.pbe_precut = self.pbe_precut;
-        a.surround_delay = self.surround_delay;
-        a.surround_balance = self.surround_balance;
-        a.comp_threshold = self.comp_threshold;
-        a.comp_ratio = self.comp_ratio;
-        a.channel_mode = str_to_channel(&self.channel_mode);
-        a.stereo_width = self.stereo_width;
-        a
+        AudioSettings {
+            eq_enabled: self.eq_enabled,
+            eq_gains,
+            bass: self.bass,
+            treble: self.treble,
+            crossfeed_mode: str_to_crossfeed(&self.crossfeed_mode),
+            crossfeed_direct: self.crossfeed_direct,
+            pbe: self.pbe,
+            pbe_precut: self.pbe_precut,
+            surround_delay: self.surround_delay,
+            surround_balance: self.surround_balance,
+            comp_threshold: self.comp_threshold,
+            comp_ratio: self.comp_ratio,
+            channel_mode: str_to_channel(&self.channel_mode),
+            stereo_width: self.stereo_width,
+        }
     }
 
     /// Capture the current runtime DSP + volume back into the persisted shape.
@@ -127,7 +178,7 @@ impl Settings {
 
 use rockbox_playback::{ChannelMode, CrossfeedMode};
 
-fn crossfeed_to_str(m: CrossfeedMode) -> &'static str {
+pub(crate) fn crossfeed_to_str(m: CrossfeedMode) -> &'static str {
     match m {
         CrossfeedMode::Off => "off",
         CrossfeedMode::Meier => "meier",
@@ -135,7 +186,7 @@ fn crossfeed_to_str(m: CrossfeedMode) -> &'static str {
     }
 }
 
-fn str_to_crossfeed(s: &str) -> CrossfeedMode {
+pub(crate) fn str_to_crossfeed(s: &str) -> CrossfeedMode {
     match s {
         "meier" => CrossfeedMode::Meier,
         "custom" => CrossfeedMode::Custom,
@@ -143,7 +194,7 @@ fn str_to_crossfeed(s: &str) -> CrossfeedMode {
     }
 }
 
-fn channel_to_str(m: ChannelMode) -> &'static str {
+pub(crate) fn channel_to_str(m: ChannelMode) -> &'static str {
     match m {
         ChannelMode::Stereo => "stereo",
         ChannelMode::Mono => "mono",
@@ -155,7 +206,7 @@ fn channel_to_str(m: ChannelMode) -> &'static str {
     }
 }
 
-fn str_to_channel(s: &str) -> ChannelMode {
+pub(crate) fn str_to_channel(s: &str) -> ChannelMode {
     match s {
         "mono" => ChannelMode::Mono,
         "custom" => ChannelMode::Custom,

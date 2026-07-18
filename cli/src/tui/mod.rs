@@ -1,6 +1,6 @@
 //! The interactive terminal UI: an async render/event loop over ratatui.
 
-mod dsp_rows;
+pub(crate) mod dsp_rows;
 mod state;
 mod ui;
 
@@ -25,6 +25,7 @@ use tokio::sync::mpsc;
 use crate::appview::{AppView, StationInfo};
 use crate::atproto::Atproto;
 use crate::config::Config;
+use crate::grpc::{GrpcCmd, GrpcState};
 use crate::player::{Player, State as PlayState};
 use crate::radio::RadioBrowser;
 use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
@@ -69,13 +70,20 @@ pub fn status_glyph(state: PlayState) -> &'static str {
     }
 }
 
-pub async fn run(config: Config) -> Result<()> {
+pub async fn run(
+    config: Config,
+    grpc_endpoints: Option<crate::grpc::server::Endpoints>,
+    grpc_remote: Option<crate::grpc::client::GrpcRemote>,
+) -> Result<()> {
     let atproto = Atproto::new(config.session_path.clone());
     let profile = atproto.profile();
     let logged_in = profile.is_some();
     let handle = profile.as_ref().map(|p| p.handle.clone());
     let display_name = profile.as_ref().and_then(|p| p.display_name.clone());
 
+    // The engine owns a cpal stream (!Send); it's shared on this thread only, so
+    // the Arc-not-Send/Sync lint doesn't apply.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = Arc::new(Player::new()?);
 
     // MPRIS (Linux): the engine handle is !Send, so the D-Bus tasks talk to
@@ -159,6 +167,37 @@ pub async fn run(config: Config) -> Result<()> {
     };
     app.self_device_id = Some(device_id);
 
+    // gRPC remote-control mode: this TUI drives another instance. Transport /
+    // load / DSP / favorite are routed to it; navigation stays local.
+    app.grpc_remote = grpc_remote;
+    if let Some(r) = &app.grpc_remote {
+        r.request_lists(); // populate Favorites / Yours / Profile from the remote
+        app.toast
+            .set("Controlling a remote atradio — Enter sends the station there");
+    }
+
+    // gRPC control API: serve this instance so another atradio (or grpcurl) can
+    // drive it. Commands come in over an mpsc — applied on this thread, since
+    // the player is !Send — and state goes out over a watch the loop refreshes.
+    let (grpc_state_tx, grpc_state_rx) = tokio::sync::watch::channel(GrpcState::default());
+    let mut grpc_cmd_rx = if let Some(eps) = grpc_endpoints {
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<GrpcCmd>();
+        match crate::grpc::server::spawn(eps, cmd_tx, grpc_state_rx) {
+            Ok(bound) => {
+                if let Some(p) = &bound.socket {
+                    app.toast.set(format!("gRPC control on {}", p.display()));
+                }
+            }
+            Err(e) => app.toast.set(format!("gRPC control off: {e}")),
+        }
+        cmd_rx
+    } else {
+        // Born-closed (another instance serves, or disabled): the arm never fires.
+        let (_tx, cmd_rx) = mpsc::unbounded_channel::<GrpcCmd>();
+        cmd_rx
+    };
+    let mut grpc_version: u64 = 0;
+
     // Set up the terminal.
     let mut term = setup_terminal()?;
 
@@ -169,30 +208,81 @@ pub async fn run(config: Config) -> Result<()> {
     spawn_load_popular(&appview, &tx);
     spawn_load_recent_global(&appview, &tx);
     if let Some(actor) = atproto.actor() {
-        spawn_load_favorites(&appview, &tx, actor.clone());
-        spawn_load_stations(&appview, &tx, actor.clone());
-        spawn_load_profile_recent(&appview, &tx, actor.clone());
+        // In remote-control mode the account lists come from the controlled
+        // instance (see the render loop); only the local notifications stay local.
+        if app.grpc_remote.is_none() {
+            spawn_load_favorites(&appview, &tx, actor.clone());
+            spawn_load_stations(&appview, &tx, actor.clone());
+            spawn_load_profile_recent(&appview, &tx, actor.clone());
+        }
         spawn_load_notifications(&appview, &tx, actor);
     }
 
     let mut events = EventStream::new();
     let mut ticker = tokio::time::interval(Duration::from_millis(250));
+    // In remote-control mode, re-pull the controlled account's lists periodically
+    // so remotely-added favorites / stations show up without a reconnect.
+    let mut list_refresh: u32 = 0;
 
     let res = loop {
-        // Render.
-        let np = player.now_playing();
-        #[cfg(target_os = "linux")]
-        let _ = mpris_np_tx.send(np.clone());
-        app.volume = player.volume();
-        app.muted = player.is_muted();
-        // Broadcast this device's playback to the Connect hub.
-        let _ = local_state_tx.send(WireState {
-            playing: matches!(np.state, PlayState::Playing),
-            station: app.current.as_ref().map(station_to_lite),
-            title: np.line(),
-            volume: player.volume(),
-            muted: player.is_muted(),
-        });
+        // Render. In remote-control mode the now-playing, volume, and DSP come
+        // from the controlled instance's mirror; otherwise from the local engine.
+        let np = if let Some(remote) = &app.grpc_remote {
+            let (wire, audio, err) = remote.snapshot();
+            let lists = remote.lists();
+            let (connect_devices, connect_target, connect_online) = remote.connect();
+            // (borrow of `remote` ends here — now free to mutate `app`)
+            app.current = wire.station.clone().map(lite_to_station);
+            app.volume = wire.volume;
+            app.muted = wire.muted;
+            app.dsp = audio;
+            // Mirror the controlled account's Connect roster so the device picker
+            // (`d`) shows and drives the *remote's* devices.
+            app.remote_devices = connect_devices;
+            app.remote_target = connect_target;
+            app.connect_online = connect_online;
+            // The account-specific lists mirror the controlled instance; the
+            // global tabs (Trending/Popular/Recent) stay local — identical anyway.
+            app.favorites = lists.favorites.into_iter().map(lite_to_station).collect();
+            app.stations = lists.stations.into_iter().map(lite_to_station).collect();
+            app.profile_recent = lists.recent.into_iter().map(lite_to_station).collect();
+            app.clamp_selection();
+            if app.profile_recent_selected >= app.profile_recent.len() {
+                app.profile_recent_selected = app.profile_recent.len().saturating_sub(1);
+            }
+            // Surface connection health as a persistent banner (see the player
+            // bar) rather than re-setting a toast every frame.
+            app.grpc_conn_error = err;
+            synth_now_playing(&wire)
+        } else {
+            let np = player.now_playing();
+            #[cfg(target_os = "linux")]
+            let _ = mpris_np_tx.send(np.clone());
+            app.volume = player.volume();
+            app.muted = player.is_muted();
+            // Broadcast this device's playback to the Connect hub and the gRPC
+            // watch channel (built once, shared by both).
+            let wire = WireState {
+                playing: matches!(np.state, PlayState::Playing),
+                station: app.current.as_ref().map(station_to_lite),
+                title: np.line(),
+                volume: player.volume(),
+                muted: player.is_muted(),
+            };
+            let _ = local_state_tx.send(wire.clone());
+            grpc_version += 1;
+            let _ = grpc_state_tx.send(GrpcState {
+                wire,
+                audio: app.dsp.clone(),
+                version: grpc_version,
+                // Expose our Connect roster so a gRPC controller can forward the
+                // device picker to us.
+                connect_devices: app.remote_devices.clone(),
+                connect_target: app.remote_target.clone(),
+                connect_online: app.connect_online,
+            });
+            np
+        };
         if let Err(e) = term.draw(|f| ui::draw(f, &app, &np)) {
             break Err(e.into());
         }
@@ -236,6 +326,10 @@ pub async fn run(config: Config) -> Result<()> {
             Some(cmd) = remote_cmd_rx.recv() => {
                 apply_remote_cmd(cmd, &mut app, &player, &browser, &atproto, &appview, &tx);
             }
+            // gRPC control API: another atradio (or grpcurl) is driving this one.
+            Some(cmd) = grpc_cmd_rx.recv() => {
+                apply_grpc_cmd(cmd, &mut app, &player, &browser, &atproto, &appview, &tx);
+            }
             // atradio Connect: roster / presence / status updates.
             Some(evt) = remote_evt_rx.recv() => {
                 apply_remote_event(evt, &mut app, &atproto);
@@ -248,6 +342,14 @@ pub async fn run(config: Config) -> Result<()> {
                     let q = app.search_query.clone();
                     if !q.trim().is_empty() {
                         spawn_search(&browser, &tx, q);
+                    }
+                }
+                // Refresh the remote's account lists every ~3s.
+                if let Some(r) = &app.grpc_remote {
+                    list_refresh += 1;
+                    if list_refresh >= 12 {
+                        list_refresh = 0;
+                        r.request_lists();
                     }
                 }
             }
@@ -285,10 +387,14 @@ pub async fn run(config: Config) -> Result<()> {
 
     // Persist volume + DSP on exit, then push the DSP chain up to the PDS so it
     // syncs to the web app / other devices (best-effort — never blocks quitting).
-    settings.update_from(&app.dsp, player.volume());
-    settings.save(&config.session_path);
-    if atproto.is_logged_in() {
-        let _ = atproto.put_audio_settings(&app.dsp).await;
+    // Skip in remote-control mode: `app.dsp` mirrors the controlled instance, so
+    // saving it would clobber our own local settings.
+    if app.grpc_remote.is_none() {
+        settings.update_from(&app.dsp, player.volume());
+        settings.save(&config.session_path);
+        if atproto.is_logged_in() {
+            let _ = atproto.put_audio_settings(&app.dsp).await;
+        }
     }
 
     restore_terminal(&mut term)?;
@@ -427,41 +533,39 @@ fn handle_event(
             }
         }
         KeyCode::Char(' ') => {
-            if !route_remote(app, RemoteCmd::PlayPause) {
+            if let Some(r) = &app.grpc_remote {
+                r.play_pause();
+            } else if !route_remote(app, RemoteCmd::PlayPause) {
                 player.toggle();
             }
         }
         KeyCode::Char('m') => {
-            if !route_remote(app, RemoteCmd::ToggleMute) {
+            if let Some(r) = &app.grpc_remote {
+                r.toggle_mute();
+            } else if !route_remote(app, RemoteCmd::ToggleMute) {
                 player.toggle_mute();
             }
         }
+        KeyCode::Char('x') => {
+            if let Some(r) = &app.grpc_remote {
+                r.stop();
+            } else if !route_remote(app, RemoteCmd::Stop) {
+                player.stop();
+                app.current = None;
+            }
+        }
         KeyCode::Char('d') => {
-            if app.logged_in {
+            // In remote mode the roster comes from the controlled (signed-in)
+            // instance, so a logged-out controller can still open the picker.
+            if app.grpc_remote.is_some() || app.logged_in {
                 app.device_sel = 0;
                 app.overlay = Overlay::Devices;
             } else {
                 app.toast.set("Sign in first (press s) to use Connect.");
             }
         }
-        KeyCode::Char('+') | KeyCode::Char('=') => {
-            if app.view == View::Dsp {
-                if dsp_rows::adjust(&mut app.dsp, app.dsp_row, 1) {
-                    player.apply_dsp(&app.dsp);
-                }
-            } else if !route_remote_volume(app, 0.05) {
-                player.bump_volume(0.05);
-            }
-        }
-        KeyCode::Char('-') | KeyCode::Char('_') => {
-            if app.view == View::Dsp {
-                if dsp_rows::adjust(&mut app.dsp, app.dsp_row, -1) {
-                    player.apply_dsp(&app.dsp);
-                }
-            } else if !route_remote_volume(app, -0.05) {
-                player.bump_volume(-0.05);
-            }
-        }
+        KeyCode::Char('+') | KeyCode::Char('=') => adjust_or_volume(app, player, 1),
+        KeyCode::Char('-') | KeyCode::Char('_') => adjust_or_volume(app, player, -1),
         KeyCode::Char('f') => favorite_selected(app, atproto, tx),
         KeyCode::Char('A') => {
             if app.logged_in {
@@ -544,12 +648,20 @@ fn play_selected(
     let Some(station) = station else {
         return;
     };
-    // Controlling a remote device: send the station there instead of playing it.
-    if app.remote_active() {
-        if route_remote(app, RemoteCmd::LoadStation(station_to_lite(&station))) {
-            app.toast.set(format!("▶ {} → remote", station.name));
-            return;
+    // gRPC remote-control: send the station to the instance we're driving.
+    if app.grpc_remote.is_some() {
+        let name = station.name.clone();
+        let lite = station_to_lite(&station);
+        if let Some(r) = &app.grpc_remote {
+            r.load_station(lite);
         }
+        app.toast.set(format!("▶ {name} → remote"));
+        return;
+    }
+    // Controlling a Connect device: send the station there instead of playing it.
+    if app.remote_active() && route_remote(app, RemoteCmd::LoadStation(station_to_lite(&station))) {
+        app.toast.set(format!("▶ {} → remote", station.name));
+        return;
     }
     start_playing(app, browser, atproto, appview, tx, station);
 }
@@ -659,6 +771,23 @@ fn lite_to_station(s: StationLite) -> StationInfo {
     }
 }
 
+/// Build a display-only `NowPlaying` from a controlled instance's wire state,
+/// so the player panel renders the remote's playback in remote-control mode.
+fn synth_now_playing(wire: &WireState) -> crate::player::NowPlaying {
+    crate::player::NowPlaying {
+        state: if wire.playing {
+            PlayState::Playing
+        } else if wire.station.is_some() {
+            PlayState::Paused
+        } else {
+            PlayState::Stopped
+        },
+        title: wire.title.clone().unwrap_or_default(),
+        volume: wire.volume,
+        ..Default::default()
+    }
+}
+
 /// Route a transport command to the controlled remote device. Returns true when
 /// it was sent (i.e. a remote is active) so callers can skip the local action.
 fn route_remote(app: &App, cmd: RemoteCmd) -> bool {
@@ -682,6 +811,25 @@ fn route_remote_volume(app: &App, delta: f32) -> bool {
     route_remote(app, RemoteCmd::SetVolume(next))
 }
 
+/// `+`/`-`: in the DSP view, adjust the focused row; elsewhere nudge the volume.
+/// In gRPC remote-control mode both are sent to the controlled instance.
+fn adjust_or_volume(app: &mut App, player: &Arc<Player>, dir: i32) {
+    if app.view == View::Dsp {
+        if let Some(r) = &app.grpc_remote {
+            r.adjust_dsp_row(app.dsp_row, dir);
+        } else if dsp_rows::adjust(&mut app.dsp, app.dsp_row, dir) {
+            player.apply_dsp(&app.dsp);
+        }
+    } else {
+        let delta = dir as f32 * 0.05;
+        if let Some(r) = &app.grpc_remote {
+            r.bump_volume(delta);
+        } else if !route_remote_volume(app, delta) {
+            player.bump_volume(delta);
+        }
+    }
+}
+
 /// Apply a command received from a peer to the local player.
 fn apply_remote_cmd(
     cmd: RemoteCmd,
@@ -703,6 +851,82 @@ fn apply_remote_cmd(
             // Being told to play a station means this device becomes active.
             app.remote_target = None;
             start_playing(app, browser, atproto, appview, tx, lite_to_station(s));
+        }
+    }
+}
+
+/// Apply a command from the gRPC control API. Transport/load reuse the Connect
+/// path; DSP + favorite mirror the local key handlers.
+#[allow(clippy::too_many_arguments)]
+fn apply_grpc_cmd(
+    cmd: GrpcCmd,
+    app: &mut App,
+    player: &Arc<Player>,
+    browser: &RadioBrowser,
+    atproto: &Arc<Atproto>,
+    appview: &AppView,
+    tx: &mpsc::UnboundedSender<Msg>,
+) {
+    match cmd {
+        GrpcCmd::Remote(rc) => apply_remote_cmd(rc, app, player, browser, atproto, appview, tx),
+        GrpcCmd::SetAudio(a) => {
+            app.dsp = a;
+            player.apply_dsp(&app.dsp);
+        }
+        GrpcCmd::AdjustDspRow { row, dir } => {
+            if dsp_rows::adjust(&mut app.dsp, row, dir) {
+                player.apply_dsp(&app.dsp);
+            }
+        }
+        GrpcCmd::Favorite(s, reply) => {
+            if !atproto.is_logged_in() {
+                let _ = reply.send(Err("not signed in".to_string()));
+                return;
+            }
+            let station = lite_to_station(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::ListStations {
+            source,
+            limit,
+            reply,
+        } => {
+            let Some(actor) = atproto.actor() else {
+                let _ = reply.send(Ok(Vec::new()));
+                return;
+            };
+            let av = appview.clone();
+            tokio::spawn(async move {
+                let r = crate::grpc::fetch_account_list(&av, &actor, source, limit).await;
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::SetConnectTarget(target) => match target {
+            None => {
+                // Take control back to this instance; stop the device we drove.
+                if let (Some(prev), Some(ctrl)) =
+                    (app.remote_target.take(), app.remote_control.clone())
+                {
+                    ctrl.command(prev, RemoteCmd::Stop);
+                }
+            }
+            Some(id) => app.remote_target = Some(id),
+        },
+        GrpcCmd::Comment(s, text, reply) => {
+            if !atproto.is_logged_in() {
+                let _ = reply.send(Err("not signed in".to_string()));
+                return;
+            }
+            let station = lite_to_station(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.comment(&station, &text).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
         }
     }
 }
@@ -740,8 +964,9 @@ fn apply_remote_event(evt: RemoteEvent, app: &mut App, atproto: &Arc<Atproto>) {
             app.connect_online = false;
             // Keep the toast short; the daemon logs the full detail to stdout.
             let brief: String = detail.chars().take(80).collect();
-            app.toast
-                .set(format!("Connect auth failed ({brief}) — press s to sign in"));
+            app.toast.set(format!(
+                "Connect auth failed ({brief}) — press s to sign in"
+            ));
         }
     }
 }
@@ -763,6 +988,25 @@ fn handle_devices_keys(code: KeyCode, app: &mut App) {
             }
         }
         KeyCode::Enter => {
+            // In gRPC remote mode the roster belongs to the controlled instance,
+            // so forward the selection to it (its own state stream echoes back).
+            if app.grpc_remote.is_some() {
+                let (target, msg) = if app.device_sel == 0 {
+                    (None, "Playing on the remote".to_string())
+                } else if let Some(dev) = app.other_devices().get(app.device_sel - 1) {
+                    (Some(dev.id.clone()), format!("Remote → {}", dev.name))
+                } else {
+                    (None, String::new())
+                };
+                if !msg.is_empty() {
+                    if let Some(r) = &app.grpc_remote {
+                        r.set_connect_target(target);
+                    }
+                    app.toast.set(msg);
+                }
+                app.overlay = Overlay::None;
+                return;
+            }
             if app.device_sel == 0 {
                 // "This device" — take back control.
                 if let (Some(prev), Some(ctrl)) =
@@ -922,6 +1166,16 @@ fn favorite_selected(app: &mut App, atproto: &Arc<Atproto>, tx: &mpsc::Unbounded
     let Some(station) = station else {
         return;
     };
+    // gRPC remote-control: the controlled instance favorites with its account.
+    if app.grpc_remote.is_some() {
+        let name = station.name.clone();
+        let lite = station_to_lite(&station);
+        if let Some(r) = &app.grpc_remote {
+            r.favorite(lite);
+        }
+        app.toast.set(format!("★ {name} → remote"));
+        return;
+    }
     if !atproto.is_logged_in() {
         app.toast.set("Sign in first: run `atradio login`.");
         return;
@@ -999,6 +1253,15 @@ fn handle_compose_keys(
                 return;
             }
             let Some(station) = station else { return };
+            // gRPC remote-control: the controlled instance comments with its own
+            // account (the local session may be logged out or a different user).
+            if app.grpc_remote.is_some() {
+                if let Some(r) = &app.grpc_remote {
+                    r.comment(station_to_lite(&station), text);
+                }
+                app.toast.set("💬 Comment → remote");
+                return;
+            }
             if !atproto.is_logged_in() {
                 app.toast.set("Sign in first: run `atradio login`.");
                 return;

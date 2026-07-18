@@ -1,6 +1,6 @@
 //! Command-line surface. With no subcommand, the interactive TUI launches.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 use crate::appview::AppView;
@@ -36,6 +36,25 @@ pub struct Cli {
     /// the web app or other clients control playback. Waits until Ctrl-C.
     #[arg(long, global = true)]
     pub no_tui: bool,
+
+    /// Control another running atradio over its gRPC API instead of playing
+    /// locally. With no value, connects to the default unix socket; otherwise
+    /// give a `unix:PATH`, `host:port`, or `http://host:port` address.
+    #[arg(long, value_name = "ADDR", num_args = 0..=1, default_missing_value = "", global = true)]
+    pub connect: Option<String>,
+
+    /// Serve the gRPC control API over TCP on this port (implies [grpc].http).
+    #[arg(long, value_name = "PORT", global = true)]
+    pub grpc_port: Option<u16>,
+
+    /// Don't start or connect to the gRPC control API — run fully local.
+    #[arg(long, global = true)]
+    pub no_grpc: bool,
+
+    /// Bearer token for a TCP gRPC endpoint (overrides [grpc].token). Used both
+    /// when serving `--grpc-port` and when connecting with `--connect host:port`.
+    #[arg(long, value_name = "TOKEN", global = true)]
+    pub token: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -120,16 +139,35 @@ pub enum ServiceAction {
     Uninstall,
 }
 
+/// gRPC-related CLI flags, resolved from `Cli` and threaded into the TUI/daemon.
+#[derive(Clone, Default)]
+pub struct GrpcOpts {
+    /// `--connect [ADDR]`: control a remote instead of playing locally.
+    pub connect: Option<String>,
+    /// `--grpc-port`: serve the control API over TCP on this port.
+    pub port: Option<u16>,
+    /// `--no-grpc`: don't serve or connect.
+    pub disabled: bool,
+    /// `--token`: bearer token for a TCP endpoint (serve or connect).
+    pub token: Option<String>,
+}
+
 pub async fn run(cli: Cli) -> Result<()> {
     let config = Config::from_env();
     let no_tui = cli.no_tui;
+    let grpc = GrpcOpts {
+        connect: cli.connect,
+        port: cli.grpc_port,
+        disabled: cli.no_grpc,
+        token: cli.token,
+    };
 
     match cli.command.unwrap_or(Command::Tui) {
         Command::Tui => {
             if no_tui {
-                cmd_daemon(config).await
+                cmd_daemon(config, grpc).await
             } else {
-                crate::tui::run(config).await
+                cmd_tui(config, grpc).await
             }
         }
         Command::Search { query, limit } => cmd_search(query.join(" "), limit).await,
@@ -207,6 +245,9 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
         s.stream_url
     };
 
+    // The engine owns a cpal stream (!Send); it's shared on one thread only, so
+    // the Arc-not-Send/Sync lint doesn't apply.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = std::sync::Arc::new(crate::player::Player::new()?);
 
     // MPRIS (Linux): snapshots out over a watch channel, transport commands
@@ -257,13 +298,19 @@ async fn cmd_play(target: String, _config: Config) -> Result<()> {
 }
 
 /// Headless atradio Connect device: no TUI, just an online controllable player.
-async fn cmd_daemon(config: Config) -> Result<()> {
+async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use crate::appview::StationInfo;
     use crate::player::State as PlayState;
-    use crate::remote::{RemoteCmd, RemoteConfig, RemoteEvent, StationLite, WireState};
+    use crate::remote::{RemoteConfig, RemoteEvent, StationLite, WireState};
+
+    if grpc.connect.is_some() {
+        anyhow::bail!(
+            "`--connect` controls another instance and needs the TUI — \
+             drop `--no-tui` to use it"
+        );
+    }
 
     let atproto = Arc::new(Atproto::new(config.session_path.clone()));
     if !atproto.is_logged_in() {
@@ -281,9 +328,36 @@ async fn cmd_daemon(config: Config) -> Result<()> {
     }
 
     let settings = crate::settings::Settings::load(&config.session_path);
+    let appview = AppView::new(&config.appview_url);
+    // !Send engine shared on a single thread — see the note in `cmd_play`.
+    #[allow(clippy::arc_with_non_send_sync)]
     let player = Arc::new(crate::player::Player::new()?);
+    let mut dsp = settings.audio();
     player.set_volume(settings.volume);
-    player.apply_dsp(&settings.audio());
+    player.apply_dsp(&dsp);
+
+    // gRPC control API. Bind BEFORE Connect so a socket conflict fails fast
+    // (another atradio already owns it → exit with an error).
+    let (grpc_cmd_tx, mut grpc_cmd_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::grpc::GrpcCmd>();
+    let (grpc_state_tx, grpc_state_rx) =
+        tokio::sync::watch::channel(crate::grpc::GrpcState::default());
+    match resolve_grpc_endpoints(&config, &settings, &grpc)? {
+        Some(eps) => {
+            let bound = crate::grpc::server::spawn(eps, grpc_cmd_tx, grpc_state_rx)?;
+            if let Some(p) = &bound.socket {
+                println!("◈ gRPC control API on {}", p.display());
+            }
+            if let Some(a) = &bound.tcp {
+                println!("◈ gRPC control API on tcp {a} (token required)");
+            }
+        }
+        None => {
+            drop(grpc_cmd_tx);
+            drop(grpc_state_rx);
+        }
+    }
+    let mut grpc_version: u64 = 0;
 
     let device_id = crate::remote::load_or_create_device_id(&config.session_path);
     let device_name = settings
@@ -306,49 +380,38 @@ async fn cmd_daemon(config: Config) -> Result<()> {
     println!("Control it from the web app or another client. Press Ctrl-C to stop.");
 
     let mut current: Option<StationLite> = None;
+    // atradio Connect roster, tracked so the gRPC control API can expose it (the
+    // forwarded device picker) and drive which account device plays.
+    let connect_ctrl = remote.control.clone();
+    let mut connect_devices: Vec<crate::remote::Device> = Vec::new();
+    let mut connect_target: Option<String> = None;
+    let mut connect_online = false;
     let mut ticker = tokio::time::interval(Duration::from_millis(500));
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => break,
-            Some(cmd) = remote.cmd_rx.recv() => match cmd {
-                RemoteCmd::Play => player.play(),
-                RemoteCmd::Pause => player.pause(),
-                RemoteCmd::PlayPause => player.toggle(),
-                RemoteCmd::Stop => { player.stop(); current = None; }
-                RemoteCmd::SetVolume(v) => player.set_volume(v),
-                RemoteCmd::ToggleMute => player.toggle_mute(),
-                RemoteCmd::LoadStation(s) => {
-                    let source = if s.id.starts_with("tunein:") {
-                        "tunein"
-                    } else if s.id.starts_with("custom:") {
-                        "custom"
-                    } else {
-                        "radio-browser"
-                    };
-                    // Unwrap playlists into a direct stream before playing.
-                    let resolved = crate::radio::resolve_stream(&s.url, source).await;
-                    if resolved.is_hls {
-                        println!("▶ {} — HLS not supported, skipping", s.name);
-                        continue;
-                    }
-                    player.play_url(&resolved.url);
-                    println!("▶ {}", s.name);
-                    let station = StationInfo {
-                        station_id: s.id.clone(),
-                        name: s.name.clone(),
-                        stream_url: s.url.clone(),
-                        source: source.to_string(),
-                        logo: s.favicon.clone(),
-                        ..Default::default()
-                    };
-                    current = Some(s);
-                    let at = atproto.clone();
-                    tokio::spawn(async move { let _ = at.set_play_status(&station).await; });
-                }
-            },
+            Some(cmd) = remote.cmd_rx.recv() => {
+                handle_remote_cmd(cmd, &player, &atproto, &mut current).await;
+            }
+            Some(cmd) = grpc_cmd_rx.recv() => {
+                apply_grpc_cmd(
+                    cmd, &player, &mut dsp, &atproto, &appview, &mut current,
+                    &mut connect_target, &connect_ctrl,
+                ).await;
+            }
             Some(evt) = remote.evt_rx.recv() => match evt {
                 RemoteEvent::Status(online) => {
+                    connect_online = online;
                     println!("{}", if online { "● connected" } else { "○ disconnected — retrying" });
+                }
+                RemoteEvent::Devices(devices) => {
+                    // Drop a target that left the roster.
+                    if let Some(t) = &connect_target {
+                        if !devices.iter().any(|d| &d.id == t && !d.is_self) {
+                            connect_target = None;
+                        }
+                    }
+                    connect_devices = devices;
                 }
                 RemoteEvent::Presence { cleanup, .. } => {
                     if cleanup {
@@ -367,12 +430,22 @@ async fn cmd_daemon(config: Config) -> Result<()> {
             },
             _ = ticker.tick() => {
                 let np = player.now_playing();
-                let _ = state_tx.send(WireState {
+                let wire = WireState {
                     playing: matches!(np.state, PlayState::Playing),
                     station: current.clone(),
                     title: np.line(),
                     volume: player.volume(),
                     muted: player.is_muted(),
+                };
+                let _ = state_tx.send(wire.clone());
+                grpc_version += 1;
+                let _ = grpc_state_tx.send(crate::grpc::GrpcState {
+                    wire,
+                    audio: dsp.clone(),
+                    version: grpc_version,
+                    connect_devices: connect_devices.clone(),
+                    connect_target: connect_target.clone(),
+                    connect_online,
                 });
             }
         }
@@ -380,6 +453,220 @@ async fn cmd_daemon(config: Config) -> Result<()> {
 
     println!("\nStopping atradio Connect device.");
     Ok(())
+}
+
+/// Decode the atradio station-id prefix into an AppView `source`.
+fn source_of(id: &str) -> &'static str {
+    if id.starts_with("tunein:") {
+        "tunein"
+    } else if id.starts_with("custom:") {
+        "custom"
+    } else {
+        "radio-browser"
+    }
+}
+
+/// Build the AppView `StationInfo` for a wire `StationLite` (play-status /
+/// favorite records).
+fn lite_to_info(s: &crate::remote::StationLite) -> crate::appview::StationInfo {
+    crate::appview::StationInfo {
+        station_id: s.id.clone(),
+        name: s.name.clone(),
+        stream_url: s.url.clone(),
+        source: source_of(&s.id).to_string(),
+        logo: s.favicon.clone(),
+        ..Default::default()
+    }
+}
+
+/// Apply a transport/load command to the local player (shared by the Connect
+/// and gRPC daemon arms). Runs on the loop thread — the player is `!Send`.
+async fn handle_remote_cmd(
+    cmd: crate::remote::RemoteCmd,
+    player: &crate::player::Player,
+    atproto: &std::sync::Arc<Atproto>,
+    current: &mut Option<crate::remote::StationLite>,
+) {
+    use crate::remote::RemoteCmd;
+    match cmd {
+        RemoteCmd::Play => player.play(),
+        RemoteCmd::Pause => player.pause(),
+        RemoteCmd::PlayPause => player.toggle(),
+        RemoteCmd::Stop => {
+            player.stop();
+            *current = None;
+        }
+        RemoteCmd::SetVolume(v) => player.set_volume(v),
+        RemoteCmd::ToggleMute => player.toggle_mute(),
+        RemoteCmd::LoadStation(s) => {
+            // Unwrap playlists into a direct stream before playing.
+            let resolved = crate::radio::resolve_stream(&s.url, source_of(&s.id)).await;
+            if resolved.is_hls {
+                println!("▶ {} — HLS not supported, skipping", s.name);
+                return;
+            }
+            player.play_url(&resolved.url);
+            println!("▶ {}", s.name);
+            let station = lite_to_info(&s);
+            *current = Some(s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let _ = at.set_play_status(&station).await;
+            });
+        }
+    }
+}
+
+/// Apply a gRPC command on the loop thread.
+#[allow(clippy::too_many_arguments)]
+async fn apply_grpc_cmd(
+    cmd: crate::grpc::GrpcCmd,
+    player: &crate::player::Player,
+    dsp: &mut crate::player::dsp::AudioSettings,
+    atproto: &std::sync::Arc<Atproto>,
+    appview: &AppView,
+    current: &mut Option<crate::remote::StationLite>,
+    connect_target: &mut Option<String>,
+    connect_ctrl: &crate::remote::RemoteControl,
+) {
+    use crate::grpc::GrpcCmd;
+    match cmd {
+        GrpcCmd::Remote(rc) => handle_remote_cmd(rc, player, atproto, current).await,
+        GrpcCmd::SetAudio(a) => {
+            *dsp = a;
+            player.apply_dsp(dsp);
+        }
+        GrpcCmd::AdjustDspRow { row, dir } => {
+            if crate::tui::dsp_rows::adjust(dsp, row, dir) {
+                player.apply_dsp(dsp);
+            }
+        }
+        GrpcCmd::Favorite(s, reply) => {
+            let station = lite_to_info(&s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.favorite(&station).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::ListStations {
+            source,
+            limit,
+            reply,
+        } => {
+            // Not signed in → no account lists; reply empty rather than error.
+            let Some(actor) = atproto.actor() else {
+                let _ = reply.send(Ok(Vec::new()));
+                return;
+            };
+            let av = appview.clone();
+            tokio::spawn(async move {
+                let r = crate::grpc::fetch_account_list(&av, &actor, source, limit).await;
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::Comment(s, text, reply) => {
+            let station = lite_to_info(&s);
+            let at = atproto.clone();
+            tokio::spawn(async move {
+                let r = at.comment(&station, &text).await.map_err(|e| e.to_string());
+                let _ = reply.send(r);
+            });
+        }
+        GrpcCmd::SetConnectTarget(target) => match target {
+            // Take control back: ask the device we were driving to stop.
+            None => {
+                if let Some(prev) = connect_target.take() {
+                    connect_ctrl.command(prev, crate::remote::RemoteCmd::Stop);
+                }
+            }
+            Some(id) => *connect_target = Some(id),
+        },
+    }
+}
+
+/// Interactive TUI, with gRPC startup negotiation: if another atradio already
+/// owns the control socket (or `--connect` was given), control it over gRPC
+/// instead of playing locally. Otherwise serve the control API so other
+/// instances / `grpcurl` can drive this one.
+async fn cmd_tui(config: Config, grpc: GrpcOpts) -> Result<()> {
+    let settings = crate::settings::Settings::load(&config.session_path);
+    let socket = settings.grpc_socket_path(&config.session_path);
+
+    // Which instance (if any) to control: an explicit `--connect ADDR`, or an
+    // already-live local socket (another atradio owns it). `--connect` with no
+    // value, and an auto-detected socket, both target the default unix socket.
+    let connect_addr = match &grpc.connect {
+        Some(addr) if !addr.trim().is_empty() => Some(addr.clone()),
+        Some(_) => Some(format!("unix:{}", socket.display())),
+        None if !grpc.disabled
+            && settings.grpc.enabled
+            && crate::grpc::server::socket_is_live(&socket) =>
+        {
+            Some(format!("unix:{}", socket.display()))
+        }
+        None => None,
+    };
+
+    if let Some(addr) = connect_addr {
+        // The client owns a runtime and dials synchronously, which would panic
+        // inside this async context — build it on a blocking thread.
+        let token = grpc.token.clone();
+        let dial_addr = addr.clone();
+        let remote =
+            tokio::task::spawn_blocking(move || crate::grpc::client::connect(&dial_addr, token))
+                .await
+                .context("gRPC connect task failed")?
+                .with_context(|| format!("could not control the atradio at {addr}"))?;
+        return crate::tui::run(config, None, Some(remote)).await;
+    }
+
+    let endpoints = resolve_grpc_endpoints(&config, &settings, &grpc)?;
+    crate::tui::run(config, endpoints, None).await
+}
+
+/// Resolve the gRPC endpoints to serve, from settings + CLI flags. TCP is used
+/// when `[grpc].http` or `--grpc-port` is set; its bearer token comes from
+/// `--token`, then `[grpc].token`, else a fresh one is generated + persisted.
+fn resolve_grpc_endpoints(
+    config: &Config,
+    settings: &crate::settings::Settings,
+    opts: &GrpcOpts,
+) -> Result<Option<crate::grpc::server::Endpoints>> {
+    if opts.disabled {
+        return Ok(None);
+    }
+    let g = &settings.grpc;
+    let socket = g
+        .enabled
+        .then(|| settings.grpc_socket_path(&config.session_path));
+    // `--grpc-port` overrides the configured port and implies HTTP.
+    let port = opts.port.or_else(|| g.http.then_some(g.port));
+    let tcp = match port {
+        Some(p) => {
+            let host: std::net::IpAddr = g
+                .host
+                .parse()
+                .with_context(|| format!("invalid [grpc] host {:?} in settings", g.host))?;
+            Some(std::net::SocketAddr::new(host, p))
+        }
+        None => None,
+    };
+    if socket.is_none() && tcp.is_none() {
+        return Ok(None);
+    }
+    let token = if tcp.is_none() {
+        None
+    } else if let Some(t) = opts.token.clone().or_else(|| g.token.clone()) {
+        Some(t)
+    } else {
+        let t = crate::grpc::server::generate_token()?;
+        let mut s = settings.clone();
+        s.grpc.token = Some(t.clone());
+        s.save(&config.session_path);
+        Some(t)
+    };
+    Ok(Some(crate::grpc::server::Endpoints { socket, tcp, token }))
 }
 
 async fn cmd_login(identifier: Option<String>, oauth: bool, config: &Config) -> Result<()> {

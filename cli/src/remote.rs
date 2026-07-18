@@ -187,9 +187,9 @@ async fn run(
             }
         };
 
-        match connect_once(&cfg, token, &mut state, &cmd_tx, &evt_tx, &mut out_rx).await {
-            Ok(true) => return, // local shutdown (state/control dropped)
-            Ok(false) | Err(_) => {}
+        if let Ok(true) = connect_once(&cfg, token, &mut state, &cmd_tx, &evt_tx, &mut out_rx).await
+        {
+            return; // local shutdown (state/control dropped)
         }
         // We had a live connection (or a post-auth failure); a fresh mint above
         // proves the session is fine, so allow a new prompt if it dies later.
@@ -223,7 +223,7 @@ async fn connect_once(
             "state": state.borrow().clone(),
         }
     });
-    sink.send(Message::Text(hello.to_string().into())).await?;
+    sink.send(Message::Text(hello.to_string())).await?;
 
     loop {
         tokio::select! {
@@ -240,7 +240,7 @@ async fn connect_once(
                 if changed.is_err() { return Ok(true); } // owner gone → shut down
                 let cur = state.borrow().clone();
                 let frame = json!({ "t": "state", "state": cur });
-                sink.send(Message::Text(frame.to_string().into())).await?;
+                sink.send(Message::Text(frame.to_string())).await?;
             }
             out = out_rx.recv() => {
                 match out {
@@ -250,7 +250,7 @@ async fn connect_once(
                             "target": target,
                             "cmd": cmd_to_json(&cmd),
                         });
-                        sink.send(Message::Text(frame.to_string().into())).await?;
+                        sink.send(Message::Text(frame.to_string())).await?;
                     }
                     None => return Ok(true),
                 }

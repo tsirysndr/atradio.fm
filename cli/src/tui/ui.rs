@@ -14,33 +14,45 @@ use crate::player::NowPlaying;
 use crate::theme;
 
 pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
-    let root = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(1), // top bar
-            Constraint::Min(3),    // content
-            Constraint::Length(4), // player bar
-            Constraint::Length(1), // footer
-        ])
-        .split(f.area());
-
     // Background fill.
     f.render_widget(
         Block::default().style(Style::default().bg(theme::BG)),
         f.area(),
     );
 
-    draw_topbar(f, root[0], app);
-    match app.view {
-        View::Home => draw_home(f, root[1], app),
-        View::Dsp => draw_dsp(f, root[1], app),
-        View::Comments => draw_comments(f, root[1], app),
-        View::Notifications => draw_notifications(f, root[1], app),
-        View::Profile => draw_profile(f, root[1], app),
-        View::Help => draw_help(f, root[1]),
+    // A permanent full-width banner sits above everything while this TUI is
+    // controlling another instance over gRPC, so remote mode is unmistakable.
+    let remote = app.grpc_remote.is_some();
+    let mut constraints: Vec<Constraint> = Vec::new();
+    if remote {
+        constraints.push(Constraint::Length(1)); // remote-control banner
     }
-    draw_player(f, root[2], app, np);
-    draw_footer(f, root[3], app);
+    constraints.push(Constraint::Length(1)); // top bar
+    constraints.push(Constraint::Min(3)); // content
+    constraints.push(Constraint::Length(4)); // player bar
+    constraints.push(Constraint::Length(1)); // footer
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .split(f.area());
+
+    let mut i = 0;
+    if remote {
+        draw_remote_banner(f, root[i], app);
+        i += 1;
+    }
+    draw_topbar(f, root[i], app);
+    let content = root[i + 1];
+    match app.view {
+        View::Home => draw_home(f, content, app),
+        View::Dsp => draw_dsp(f, content, app),
+        View::Comments => draw_comments(f, content, app),
+        View::Notifications => draw_notifications(f, content, app),
+        View::Profile => draw_profile(f, content, app),
+        View::Help => draw_help(f, content),
+    }
+    draw_player(f, root[i + 2], app, np);
+    draw_footer(f, root[i + 3], app);
 
     match app.overlay {
         Overlay::Search => draw_search(f, f.area(), app),
@@ -50,6 +62,33 @@ pub fn draw(f: &mut Frame, app: &App, np: &NowPlaying) {
         Overlay::Devices => draw_devices(f, f.area(), app),
         Overlay::None => {}
     }
+}
+
+/// Full-width top banner shown whenever the TUI is driving another instance
+/// over gRPC (`--connect`). Flips to a danger color if the link drops.
+fn draw_remote_banner(f: &mut Frame, area: Rect, app: &App) {
+    let (text, bg) = match &app.grpc_conn_error {
+        None => (
+            " ◉ Controlling a remote atradio — your keys drive it  ·  d: devices  ·  q: quit ",
+            theme::ORANGE,
+        ),
+        Some(_) => (
+            " ◉ Remote atradio — connection lost, reconnecting… ",
+            theme::DANGER,
+        ),
+    };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            text,
+            Style::default()
+                .fg(theme::BG)
+                .bg(bg)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(bg)),
+        area,
+    );
 }
 
 fn draw_topbar(f: &mut Frame, area: Rect, app: &App) {
@@ -267,11 +306,10 @@ fn draw_dsp(f: &mut Frame, area: Rect, app: &App) {
     let height = inner.height as usize;
     let start = app.dsp_row.saturating_sub(height.saturating_sub(1));
 
-    let mut y = inner.y;
     for (i, row) in rows.iter().enumerate().skip(start).take(height) {
         let is_sel = i == app.dsp_row;
+        let y = inner.y + (i - start) as u16;
         let line_area = Rect::new(inner.x, y, inner.width, 1);
-        y += 1;
 
         let label_w = 18u16.min(inner.width);
         let label_style = if is_sel {
@@ -568,8 +606,10 @@ fn draw_help(f: &mut Frame, area: Rect) {
         ),
         ("Enter", "play selected station"),
         ("Space", "play / pause"),
+        ("x", "stop"),
         ("+/-", "volume up / down   (or adjust DSP value)"),
         ("m", "mute"),
+        ("d", "Connect: pick a device to control"),
         ("/", "fuzzy station search"),
         ("f", "favorite the selected/current station"),
         ("A", "add a custom station (when signed in)"),
@@ -595,6 +635,15 @@ fn draw_help(f: &mut Frame, area: Rect) {
             Span::styled(d, Style::default().fg(theme::FG)),
         ]));
     }
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Remote control (--connect): the keys above drive the controlled",
+        Style::default().fg(theme::MUTED),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  instance; Favorites / Yours / Profile show its lists.",
+        Style::default().fg(theme::MUTED),
+    )));
     f.render_widget(Paragraph::new(lines), inner);
 }
 
@@ -616,8 +665,12 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
         .split(inner);
 
     // atradio Connect: when controlling a remote device, the player bar shows
-    // that device's playback instead of local audio.
-    if let Some(dev) = app.remote_target_device() {
+    // that device's playback instead of local audio. In gRPC remote-control mode
+    // the banner below takes over instead (the roster is the controlled one's).
+    if let Some(dev) = app
+        .remote_target_device()
+        .filter(|_| app.grpc_remote.is_none())
+    {
         let st = &dev.state;
         let glyph = if st.playing { "▶" } else { "⏸" };
         let name = st
@@ -661,6 +714,10 @@ fn draw_player(f: &mut Frame, area: Rect, app: &App, np: &NowPlaying) {
         );
         return;
     }
+
+    // gRPC remote-control mode falls through to the normal player rendering —
+    // `np` / `app.current` / `app.volume` are already mirrored from the
+    // controlled instance, and the top banner announces we're driving a remote.
 
     match &app.current {
         Some(s) => {
