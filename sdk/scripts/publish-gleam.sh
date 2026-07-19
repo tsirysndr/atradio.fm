@@ -51,6 +51,7 @@ open(path, "w").write(new)
 PY
 echo "rewrote gleam.toml dep → atradio_erl = \"$req\""
 
+cd "$gleam_dir" # gleam operates on the project in the cwd
 if [ "$dry" -eq 1 ]; then
   echo "DRY RUN — gleam.toml rewritten (restored on exit); not publishing."
   grep '^atradio_erl' "$toml"
