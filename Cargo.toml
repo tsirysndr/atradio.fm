@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["cli", "crates/atradio-sdk", "crates/atradio-uniffi"]
+members = ["cli", "crates/atradio-sdk", "crates/atradio-uniffi", "crates/atradio-nif"]
 
 # Release profile lives at the workspace root (Cargo ignores profiles set on
 # non-root members). These are the settings the `atradio` binary shipped with
