@@ -238,7 +238,7 @@ impl ActorInfo {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StationView {
     #[serde(default)]
@@ -248,7 +248,7 @@ pub struct StationView {
     pub created_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StationListOutput {
     #[serde(default)]
@@ -259,26 +259,26 @@ pub struct StationListOutput {
     pub items: Vec<StationView>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct RecentStationsOutput {
     #[serde(default)]
     pub items: Vec<StationView>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PopularItem {
     pub station: StationInfo,
     #[serde(default)]
     pub count: u32,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct PopularStationsOutput {
     #[serde(default)]
     pub items: Vec<PopularItem>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayView {
     pub station: StationInfo,
@@ -288,7 +288,7 @@ pub struct PlayView {
     pub actor: Option<ActorInfo>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayListOutput {
     #[serde(default)]
@@ -297,7 +297,7 @@ pub struct PlayListOutput {
     pub items: Vec<PlayView>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListenerCount {
     pub station_id: String,
@@ -305,13 +305,13 @@ pub struct ListenerCount {
     pub listeners: u32,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ListenerCountsOutput {
     #[serde(default)]
     pub counts: Vec<ListenerCount>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Gif {
     pub url: String,
@@ -321,7 +321,7 @@ pub struct Gif {
     pub alt: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommentView {
     #[serde(default)]
@@ -338,7 +338,7 @@ pub struct CommentView {
     pub created_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommentListOutput {
     #[serde(default)]
@@ -349,7 +349,7 @@ pub struct CommentListOutput {
     pub items: Vec<CommentView>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationView {
     #[serde(default)]
@@ -368,7 +368,7 @@ pub struct NotificationView {
     pub is_read: bool,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NotificationListOutput {
     #[serde(default)]

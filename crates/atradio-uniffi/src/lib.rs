@@ -11,9 +11,14 @@ use once_cell::sync::Lazy;
 
 uniffi::setup_scaffolding!();
 
+/// A plain C ABI over the same core (opaque handles + JSON), for languages that
+/// bind via a C FFI rather than UniFFI — the fiddle-based Ruby SDK, and later
+/// Clojure via the JVM Panama FFM API.
+pub mod capi;
+
 /// One multi-threaded tokio runtime drives every async SDK call across the FFI
 /// boundary. `block_on` from a host (non-runtime) thread is safe here.
-static RT: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+pub(crate) static RT: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -200,12 +205,16 @@ impl AppView {
     }
 
     pub fn recent_stations(&self, limit: u32) -> Result<Vec<StationView>, AtradioError> {
-        let out = RT.block_on(self.inner.recent_stations(limit)).map_err(err)?;
+        let out = RT
+            .block_on(self.inner.recent_stations(limit))
+            .map_err(err)?;
         Ok(out.into_iter().map(Into::into).collect())
     }
 
     pub fn popular_stations(&self, limit: u32) -> Result<Vec<PopularItem>, AtradioError> {
-        let out = RT.block_on(self.inner.popular_stations(limit)).map_err(err)?;
+        let out = RT
+            .block_on(self.inner.popular_stations(limit))
+            .map_err(err)?;
         Ok(out.into_iter().map(Into::into).collect())
     }
 
@@ -263,7 +272,8 @@ impl Agent {
 
     /// Favorite a station (idempotent; deterministic record key). Returns URI.
     pub fn favorite(&self, station: StationInfo) -> Result<String, AtradioError> {
-        RT.block_on(self.inner.favorite(&station.into())).map_err(err)
+        RT.block_on(self.inner.favorite(&station.into()))
+            .map_err(err)
     }
 
     /// Unfavorite a station (removes every record for its stationId).
