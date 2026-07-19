@@ -1,0 +1,44 @@
+{
+  "name": "@atradio/cli",
+  "version": "0.5.2",
+  "description": "atradio.fm in your terminal — a TUI radio player on the AT Protocol",
+  "bin": {
+    "atradio": "bin/atradio.js"
+  },
+  "files": [
+    "bin/atradio.js",
+    "README.md"
+  ],
+  "keywords": [
+    "atradio",
+    "radio",
+    "tui",
+    "terminal",
+    "atproto",
+    "music",
+    "cli"
+  ],
+  "license": "GPL-2.0-or-later",
+  "author": "Tsiry Sandratraina <tsiry.sndr@rocksky.app>",
+  "homepage": "https://github.com/tsirysndr/atradio.fm#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tsirysndr/atradio.fm.git",
+    "directory": "cli/npm"
+  },
+  "bugs": {
+    "url": "https://github.com/tsirysndr/atradio.fm/issues"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@atradio/cli-darwin-arm64": "0.5.2",
+    "@atradio/cli-darwin-x64": "0.5.2",
+    "@atradio/cli-linux-arm64": "0.5.2",
+    "@atradio/cli-linux-x64": "0.5.2"
+  }
+}

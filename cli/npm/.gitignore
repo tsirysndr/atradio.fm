@@ -1,0 +1,3 @@
+# Prebuilt binaries are dropped into each platform package at release time by
+# CI (from the GitHub Release tarballs) — never committed.
+platforms/*/bin/

@@ -16,6 +16,7 @@ when signed in — favorite stations, add your own, and post comments to your PD
 ## Contents
 
 - [Install](#install)
+  - [npm](#npm)
 - [Build (from a checkout)](#build-from-a-checkout)
 - [Usage](#usage)
 - [Signing in](#signing-in)
@@ -37,6 +38,19 @@ Prebuilt release tarballs, `.deb`, and `.rpm` packages are attached to every
 `netbsd-amd64`, `netbsd-aarch64`) — each contains the binary, README, and
 LICENSE. The BSD builds run in emulated VMs and are attached to the release
 shortly after it's published (aarch64 ones can take hours).
+
+### npm
+
+```bash
+npm install -g @atradio/cli
+atradio
+```
+
+`@atradio/cli` pulls in the prebuilt binary for your platform as an optional
+dependency (`@atradio/cli-<os>-<arch>`), so npm downloads only the one that
+matches your `os`/`cpu` — no build step, no postinstall. Covers macOS
+(arm64/x64) and Linux glibc (arm64/x64). On musl (e.g. Alpine), use another
+install method below or build from source.
 
 ### macOS / Linux — Homebrew
 
