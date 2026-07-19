@@ -1,5 +1,5 @@
 name = "atradio_gleam"
-version = "0.1.0"
+version = "1.0.0"
 target = "erlang"
 licences = ["MIT"]
 description = "Official Gleam SDK for atradio.fm, over the atradio_erl NIF package"
