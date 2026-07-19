@@ -9,8 +9,13 @@ import {
   IconUserCircle,
   IconBrandBluesky,
   IconBrandDiscord,
+  IconTerminal2,
 } from "@tabler/icons-react";
-import { addStationOpenAtom, openSearchPaletteAtom } from "@/atoms/ui";
+import {
+  addStationOpenAtom,
+  cliInstallOpenAtom,
+  openSearchPaletteAtom,
+} from "@/atoms/ui";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "./NotificationBell";
@@ -27,6 +32,7 @@ const iconLinkBase =
 export function Navbar() {
   const { t } = useTranslation("navbar");
   const openAddStation = useSetAtom(addStationOpenAtom);
+  const openCliInstall = useSetAtom(cliInstallOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
   const ensureAuth = useRequireAuth();
   const { isLoggedIn, profile, openLogin } = useAuth();
@@ -53,6 +59,19 @@ export function Navbar() {
                 /
               </kbd>
             </span>
+          </button>
+
+          {/* CLI lives in the topbar on desktop and moves to the footer on
+              mobile (iconLinkBase is hidden below sm; the footer button is
+              sm:hidden). */}
+          <button
+            type="button"
+            onClick={() => openCliInstall(true)}
+            className={iconLinkBase}
+            title={t("getCli")}
+            aria-label={t("getCli")}
+          >
+            <IconTerminal2 size={18} />
           </button>
 
           <a

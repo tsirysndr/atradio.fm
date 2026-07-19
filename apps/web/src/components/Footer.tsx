@@ -36,10 +36,12 @@ export function Footer() {
         </p>
 
         <nav className="flex items-center gap-1">
+          {/* CLI only appears here on mobile; on desktop it lives in the
+              topbar (Navbar). */}
           <button
             type="button"
             onClick={() => openCliInstall(true)}
-            className={iconLinkBase}
+            className={`${iconLinkBase} sm:hidden`}
             title={t("getCli", { ns: "navbar" })}
             aria-label={t("getCli", { ns: "navbar" })}
           >
