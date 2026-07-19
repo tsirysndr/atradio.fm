@@ -112,10 +112,10 @@ jobs:
             os: netbsd
             version: "10.1"
             pkg: sudo pkgin -y install rust
-          - target: x86_64-unknown-openbsd
-            os: openbsd
-            version: "7.6"
-            pkg: sudo pkg_add rust
+          #- target: x86_64-unknown-openbsd
+          #  os: openbsd
+          #  version: "7.9"
+          #  pkg: sudo pkg_add rust
     steps:
       - uses: actions/checkout@v4
       - name: Build native libs in ${{ matrix.os }} VM
