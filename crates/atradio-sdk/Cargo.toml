@@ -33,6 +33,9 @@ futures = "0.3"
 thiserror = "2"
 chrono = { version = "0.4", features = ["clock"] }
 smol_str = { version = "0.3", features = ["serde"] }
+# Deterministic favorite record keys (hex of sha256(stationId)); the web client
+# derives the same key, so favoriting a station is idempotent across platforms.
+sha2 = "0.10"
 
 [features]
 default = ["oauth", "dns", "appview"]

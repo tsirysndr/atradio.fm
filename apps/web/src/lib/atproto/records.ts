@@ -78,12 +78,28 @@ export async function listStations(
   });
 }
 
+/** Deterministic record key for a favorite: the first 8 bytes (64 bits) of
+ *  sha256(stationId) as lowercase hex — a stable 16-char rkey.
+ *
+ *  Must stay byte-for-byte identical to the atradio-sdk (Rust) `favorite_rkey`
+ *  so a station maps to the same record on CLI and web: favoriting it is
+ *  idempotent (putRecord overwrites the one record) and can never duplicate,
+ *  even across devices or from stale local state. */
+export async function favoriteRkey(stationId: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(stationId),
+  );
+  const bytes = new Uint8Array(digest).subarray(0, 8);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export async function putFavorite(
   client: Client,
   did: Did,
   station: Station,
 ): Promise<string> {
-  const rkey = tidNow();
+  const rkey = await favoriteRkey(station.id);
   await ok(
     client.post("com.atproto.repo.putRecord", {
       input: {

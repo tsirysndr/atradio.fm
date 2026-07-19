@@ -211,6 +211,25 @@ pub async fn run(
 
     let (tx, mut rx) = mpsc::unbounded_channel::<Msg>();
 
+    // Keep the session fresh in the background so favoriting / play-status keep
+    // working without a manual re-login. Refresh immediately (so reopening the
+    // TUI after a long idle recovers the token), then every 30 minutes.
+    if atproto.is_logged_in() {
+        let at = atproto.clone();
+        let tx2 = tx.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(30 * 60));
+            loop {
+                tick.tick().await;
+                if let Err(e) = at.refresh_session().await {
+                    let _ = tx2.send(Msg::Toast(format!(
+                        "session expired: {e} — press s to sign in"
+                    )));
+                }
+            }
+        });
+    }
+
     // Kick off initial loads.
     spawn_load_trending(&appview, &tx);
     spawn_load_popular(&appview, &tx);

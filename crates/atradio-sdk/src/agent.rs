@@ -335,6 +335,41 @@ impl AtradioAgent {
             .map_err(|e| SdkError::Auth(format!("service auth decode: {e:?}")))?;
         Ok(out.token.to_string())
     }
+
+    /// Proactively refresh the stored session so it stays valid without a
+    /// re-login. Works for both app-password and OAuth: it resumes the session
+    /// and forces a token refresh, persisting the rotated token. Held behind
+    /// [`Self::auth_lock`] so the rotation can't race another op (a double-spent
+    /// refresh token gets the whole session revoked).
+    ///
+    /// Call this on a background timer (and once at startup, so reopening the app
+    /// after a long idle recovers the token automatically). Returns:
+    /// - [`SdkError::NotAuthenticated`] if no session is stored (nothing to do),
+    /// - [`SdkError::SessionExpired`] if the refresh token itself is dead — the
+    ///   only case that genuinely needs the user to run `login` again.
+    pub async fn refresh_session(&self) -> Result<()> {
+        if !self.is_logged_in() {
+            return Err(SdkError::NotAuthenticated);
+        }
+        let _guard = self.auth_lock.lock().await;
+        if self.is_oauth() {
+            // resume_oauth proactively refreshes near expiry; force a refresh so
+            // the window always slides forward and the rotation is persisted.
+            let session = self.resume_oauth().await?;
+            session.refresh().await.map_err(auth_err)?;
+        } else {
+            let session = CredentialSession::new(self.store.clone(), self.resolver.clone());
+            let actor = self.actor();
+            let hint = SessionHint::from_optional_input(actor.as_deref());
+            match session.resume(&hint).await.map_err(auth_err)? {
+                CredentialResumeResult::Resumed(_) => {
+                    session.refresh().await.map_err(auth_err)?;
+                }
+                CredentialResumeResult::LoginRequired(_) => return Err(SdkError::SessionExpired),
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Low-level record writes. Both app-password (`CredentialSession`) and OAuth
@@ -390,13 +425,25 @@ impl AtradioAgent {
 /// Record-write convenience verbs — the SDK's high-level surface, mirroring
 /// `@atproto/api`'s `post()` / `like()`.
 impl AtradioAgent {
-    /// Favorite a station (`fm.atradio.favorite`). Returns the created record URI.
+    /// Favorite a station (`fm.atradio.favorite`). **Idempotent:** the record key
+    /// is derived from the station id ([`favorite_rkey`]), so favoriting the same
+    /// station twice overwrites the one record instead of creating a duplicate —
+    /// on this client and the web, which derives the same key. Returns the URI.
     pub async fn favorite(&self, station: &StationInfo) -> Result<String> {
+        let did = self
+            .profile()
+            .map(|p| p.did)
+            .ok_or(SdkError::NotAuthenticated)?;
+        let rkey = favorite_rkey(&station.station_id);
         let record = Favorite::new()
             .station(gen_station(station))
             .created_at(Datetime::now())
             .build();
-        self.create(record, "create favorite").await
+        let rk: RecordKey<Rkey> = rkey
+            .parse()
+            .map_err(|e| SdkError::Auth(format!("favorite rkey: {e}")))?;
+        self.put(rk, record, "create favorite").await?;
+        Ok(format!("at://{did}/fm.atradio.favorite/{rkey}"))
     }
 
     /// Post a comment on a station (`fm.atradio.comment`). Returns the URI.
@@ -531,4 +578,17 @@ fn gen_station(s: &StationInfo) -> GenStation {
 /// Parse a URL string into a lexicon `UriValue`, dropping anything invalid.
 fn parse_uri(s: &str) -> Option<UriValue> {
     UriValue::new_owned(s).ok()
+}
+
+/// The deterministic record key for a favorite: the first 8 bytes (64 bits) of
+/// `sha256(station_id)`, lowercase hex — a stable 16-char rkey.
+///
+/// The web client derives the **same** key from the same station id, so a given
+/// station always maps to one favorite record and favoriting it is idempotent
+/// across CLI and web. 64 bits is ample against collisions among a user's own
+/// favorites, and 16 chars keeps the key short (about a TID's length).
+pub fn favorite_rkey(station_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(station_id.as_bytes());
+    digest[..8].iter().map(|b| format!("{b:02x}")).collect()
 }

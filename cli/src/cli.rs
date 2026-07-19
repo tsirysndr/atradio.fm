@@ -383,6 +383,28 @@ async fn cmd_daemon(config: Config, grpc: GrpcOpts) -> Result<()> {
         );
     }
 
+    // Keep the session fresh in the background so writes (play status, favorites)
+    // keep working over a long-running daemon without a manual re-login. Fires
+    // immediately (recovering the token if the daemon was down for a while), then
+    // every 30 minutes.
+    {
+        let at = atproto.clone();
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(Duration::from_secs(30 * 60));
+            loop {
+                tick.tick().await;
+                if !at.is_logged_in() {
+                    continue;
+                }
+                if let Err(e) = at.refresh_session().await {
+                    eprintln!(
+                        "○ session refresh failed: {e} — run `atradio login` to re-authenticate"
+                    );
+                }
+            }
+        });
+    }
+
     let settings = crate::settings::Settings::load(&config.session_path);
     let appview = AppView::new(&config.appview_url);
     // !Send engine shared on a single thread — see the note in `cmd_play`.
