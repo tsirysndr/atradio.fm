@@ -6,8 +6,12 @@
 
   The jar ships src + resources/ (including atradio/manifest.json) but NOT the
   ~11 MB native library: fm.atradio.native downloads the matching prebuilt from
-  the GitHub release on first load, verifying it against the manifest checksum."
-  (:require [clojure.tools.build.api :as b]))
+  the GitHub release on first load, verifying it against the manifest checksum.
+
+  `clojure -T:build deploy` deploys to Clojars — set CLOJARS_USERNAME +
+  CLOJARS_PASSWORD (a deploy token); the fm.atradio group must be verified."
+  (:require [clojure.tools.build.api :as b]
+            [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'fm.atradio/sdk)
 (def version "0.1.0")
@@ -25,9 +29,16 @@
                 :basis @basis
                 :src-dirs ["src"]
                 :scm {:url "https://github.com/tsirysndr/atradio.fm"
-                      :tag (str "clojure-v" version)}})
+                      :tag (str "bindings-v" version)}})
   ;; Ship source + resources (manifest.json); the native lib is downloaded on
   ;; first load, never bundled.
   (b/copy-dir {:src-dirs ["src" "resources"] :target-dir class-dir})
   (b/jar {:class-dir class-dir :jar-file jar-file})
   (println "wrote" jar-file))
+
+(defn deploy [_]
+  (jar nil)
+  (dd/deploy {:installer :remote
+              :artifact jar-file
+              :pom-file (b/pom-path {:lib lib :class-dir class-dir})})
+  (println "deployed" lib version "to Clojars"))

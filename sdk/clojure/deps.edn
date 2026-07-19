@@ -9,5 +9,7 @@
   ;; native-access warnings from the FFM API).
   :run {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
   ;; `clojure -T:build jar` — build the Clojars jar (group fm.atradio).
-  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+  ;; `clojure -T:build deploy` — build + deploy to Clojars (see publish-clojure.sh).
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}
+                 slipset/deps-deploy {:mvn/version "0.2.2"}}
           :ns-default build}}}

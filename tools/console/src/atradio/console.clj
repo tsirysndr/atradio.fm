@@ -72,8 +72,14 @@
 (defn sdk-ruby "Build the Ruby SDK binding (fiddle)" [] (sdk! "ruby" "bash" "build.sh"))
 (defn sdk-clojure "Build the Clojure SDK binding (Panama)" [] (sdk! "clojure" "bash" "build.sh"))
 (defn sdk-erlang "Build the Erlang SDK binding (Rustler NIF)" [] (sdk! "erlang" "bash" "build.sh"))
-(defn sdk-erlang-publish "Publish Erlang SDK to Hex: (sdk-erlang-publish \"erlang-v0.1.0\")"
+(defn sdk-erlang-publish "Publish Erlang SDK to Hex: (sdk-erlang-publish \"bindings-v0.1.0\")"
   [tag] (sdk! "scripts" "bash" "publish-erlang.sh" tag))
+(defn sdk-python-publish "Publish Python SDK to PyPI: (sdk-python-publish \"bindings-v0.1.0\")"
+  [tag] (sdk! "scripts" "bash" "publish-python.sh" tag))
+(defn sdk-ruby-publish "Publish Ruby SDK to RubyGems: (sdk-ruby-publish \"bindings-v0.1.0\")"
+  [tag] (sdk! "scripts" "bash" "publish-ruby.sh" tag))
+(defn sdk-clojure-publish "Publish Clojure SDK to Clojars: (sdk-clojure-publish \"bindings-v0.1.0\")"
+  [tag] (sdk! "scripts" "bash" "publish-clojure.sh" tag))
 
 (def ^:private commands
   [["(install)"       "Install all workspace deps"]
@@ -110,6 +116,9 @@
    ["(sdk-clojure)"   "Build the Clojure SDK (Panama)"]
    ["(sdk-erlang)"    "Build the Erlang SDK (Rustler NIF)"]
    ["(sdk-erlang-publish t)" "Publish Erlang SDK to Hex (tag)"]
+   ["(sdk-python-publish t)" "Publish Python SDK to PyPI (tag)"]
+   ["(sdk-ruby-publish t)" "Publish Ruby SDK to RubyGems (tag)"]
+   ["(sdk-clojure-publish t)" "Publish Clojure SDK to Clojars (tag)"]
    ["(help)"          "Show this list"]])
 
 (defn help "List all console commands" []

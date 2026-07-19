@@ -42,6 +42,12 @@
   sdk:erlang    {:doc "Build the Erlang SDK binding (Rustler NIF)" :task (shell {:dir (str root "/sdk/erlang")} "bash" "build.sh")}
   sdk:erlang-publish {:doc "Publish Erlang SDK to Hex: bb sdk:erlang-publish <tag>"
                       :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-erlang.sh" *command-line-args*)}
+  sdk:python-publish {:doc "Publish Python SDK to PyPI: bb sdk:python-publish <tag>"
+                      :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-python.sh" *command-line-args*)}
+  sdk:ruby-publish {:doc "Publish Ruby SDK to RubyGems: bb sdk:ruby-publish <tag>"
+                    :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-ruby.sh" *command-line-args*)}
+  sdk:clojure-publish {:doc "Publish Clojure SDK to Clojars: bb sdk:clojure-publish <tag>"
+                       :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-clojure.sh" *command-line-args*)}
 
   repl          {:doc "Launch the interactive Clojure + rebel console"
                  :task (clojure "-M:console")}}}
