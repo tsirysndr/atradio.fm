@@ -4,7 +4,8 @@
   "packageManager": "bun@1.3.14",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "sdk/typescript"
   ],
   "scripts": {
     "dev": "turbo dev",

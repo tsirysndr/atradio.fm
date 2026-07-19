@@ -1,0 +1,24 @@
+{
+  "name": "@atradio/sdk",
+  "version": "0.1.0",
+  "description": "Official TypeScript SDK for atradio.fm, built on atcute",
+  "type": "module",
+  "license": "MIT",
+  "repository": "github:tsirysndr/atradio.fm",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@atcute/atproto": "^3.1.10",
+    "@atcute/client": "^4.2.1",
+    "@atcute/lexicons": "^1.3.1",
+    "@atcute/tid": "^1.1.2",
+    "@atradio/lexicons": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}
