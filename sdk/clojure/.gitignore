@@ -1,0 +1,7 @@
+# Native library produced by build.sh (regenerate with `./build.sh`).
+/native/*.dylib
+/native/*.so
+/native/*.dll
+
+/.cpcache/
+/.clj-kondo/

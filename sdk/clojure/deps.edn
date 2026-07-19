@@ -1,0 +1,10 @@
+{:paths ["src" "native"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.0"}
+        org.clojure/data.json {:mvn/version "2.5.0"}}
+ :aliases
+ {;; `clojure -M:smoke` — live read smoke test.
+  :smoke {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]
+          :main-opts ["-m" "atradio.smoke"]}
+  ;; Add these jvm-opts for any app using the SDK (silences the restricted-method
+  ;; native-access warnings from the FFM API).
+  :run {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]}}}
