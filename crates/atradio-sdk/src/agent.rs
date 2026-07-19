@@ -14,8 +14,10 @@ use jacquard::client::credential_session::{
 use jacquard::client::{Agent, AgentSessionExt, FileAuthStore};
 use jacquard::common::session::SessionHint;
 use jacquard::identity::JacquardResolver;
-use jacquard::types::string::{Datetime, UriValue};
+use jacquard::types::string::{Datetime, Nsid, UriValue};
+use jacquard_common::types::ident::AtIdentifier;
 use jacquard_common::types::recordkey::{RecordKey, Rkey};
+use jacquard_common::xrpc::XrpcClient;
 
 use crate::appview::{AppView, StationInfo};
 use crate::auth::{atradio_scopes, fetch_profile, Profile};
@@ -399,6 +401,45 @@ impl AtradioAgent {
         Ok(out.uri.to_string())
     }
 
+    /// The record keys of every `fm.atradio.favorite` whose body's `stationId`
+    /// matches `station_id`. The rkey is not the join key (it changed schemes),
+    /// so we read the `stationId` out of each record. Paginates the repo.
+    async fn favorite_rkeys_for(&self, station_id: &str) -> Result<Vec<String>> {
+        let did = self
+            .profile()
+            .map(|p| p.did)
+            .ok_or(SdkError::NotAuthenticated)?;
+        let _guard = self.auth_lock.lock().await;
+        if self.is_oauth() {
+            let agent = Agent::from(self.resume_oauth().await?);
+            list_favorite_rkeys(&agent, &did, station_id).await
+        } else {
+            let agent = self.credential_agent().await?;
+            list_favorite_rkeys(&agent, &did, station_id).await
+        }
+    }
+
+    /// Delete a single favorite record by rkey, resuming whichever session exists.
+    async fn delete_favorite(&self, rkey: &str) -> Result<()> {
+        let rk: RecordKey<Rkey> = rkey
+            .parse()
+            .map_err(|e| SdkError::Auth(format!("favorite rkey: {e}")))?;
+        let _guard = self.auth_lock.lock().await;
+        if self.is_oauth() {
+            Agent::from(self.resume_oauth().await?)
+                .delete_record::<Favorite>(rk)
+                .await
+                .map_err(|e| SdkError::Auth(format!("delete favorite: {e:?}")))?;
+        } else {
+            self.credential_agent()
+                .await?
+                .delete_record::<Favorite>(rk)
+                .await
+                .map_err(|e| SdkError::Auth(format!("delete favorite: {e:?}")))?;
+        }
+        Ok(())
+    }
+
     /// Put (upsert) a record at `rkey`, resuming whichever session exists.
     async fn put<R>(&self, rkey: RecordKey<Rkey>, record: R, what: &'static str) -> Result<()>
     where
@@ -428,22 +469,48 @@ impl AtradioAgent {
     /// Favorite a station (`fm.atradio.favorite`). **Idempotent:** the record key
     /// is derived from the station id ([`favorite_rkey`]), so favoriting the same
     /// station twice overwrites the one record instead of creating a duplicate —
-    /// on this client and the web, which derives the same key. Returns the URI.
+    /// on this client and the web, which derives the same key.
+    ///
+    /// It also reconciles favorites created under the *old* random keys: after
+    /// writing the canonical record, it deletes any other favorite record for the
+    /// same `stationId` (matched on the record body, since the keys differ). The
+    /// canonical record is written first, so an interrupted reconcile never loses
+    /// the favorite. Returns the canonical record URI.
     pub async fn favorite(&self, station: &StationInfo) -> Result<String> {
         let did = self
             .profile()
             .map(|p| p.did)
             .ok_or(SdkError::NotAuthenticated)?;
-        let rkey = favorite_rkey(&station.station_id);
+        let canonical = favorite_rkey(&station.station_id);
         let record = Favorite::new()
             .station(gen_station(station))
             .created_at(Datetime::now())
             .build();
-        let rk: RecordKey<Rkey> = rkey
+        let rk: RecordKey<Rkey> = canonical
             .parse()
             .map_err(|e| SdkError::Auth(format!("favorite rkey: {e}")))?;
+        // Create-before-delete: write the canonical record, then fold in legacy.
         self.put(rk, record, "create favorite").await?;
-        Ok(format!("at://{did}/fm.atradio.favorite/{rkey}"))
+        if let Ok(rkeys) = self.favorite_rkeys_for(&station.station_id).await {
+            for rkey in rkeys {
+                if rkey != canonical {
+                    // Best-effort: a stray legacy dupe left behind is harmless.
+                    let _ = self.delete_favorite(&rkey).await;
+                }
+            }
+        }
+        Ok(format!("at://{did}/fm.atradio.favorite/{canonical}"))
+    }
+
+    /// Unfavorite a station: delete **every** `fm.atradio.favorite` record for
+    /// this `stationId` — the canonical one plus any legacy random-keyed dupes —
+    /// so a station can't linger favorited under an old key.
+    pub async fn unfavorite(&self, station: &StationInfo) -> Result<()> {
+        let rkeys = self.favorite_rkeys_for(&station.station_id).await?;
+        for rkey in rkeys {
+            self.delete_favorite(&rkey).await?;
+        }
+        Ok(())
     }
 
     /// Post a comment on a station (`fm.atradio.comment`). Returns the URI.
@@ -578,6 +645,64 @@ fn gen_station(s: &StationInfo) -> GenStation {
 /// Parse a URL string into a lexicon `UriValue`, dropping anything invalid.
 fn parse_uri(s: &str) -> Option<UriValue> {
     UriValue::new_owned(s).ok()
+}
+
+/// List (paginated) the rkeys of every `fm.atradio.favorite` in `did`'s repo
+/// whose body `station.stationId` equals `station_id`. Generic over the session
+/// agent (credential or OAuth), both of which are `XrpcClient`s.
+async fn list_favorite_rkeys<A: XrpcClient + Sync>(
+    agent: &A,
+    did: &str,
+    station_id: &str,
+) -> Result<Vec<String>> {
+    use jacquard::api::com_atproto::repo::list_records::ListRecords;
+    use smol_str::SmolStr;
+
+    let repo = AtIdentifier::<SmolStr>::new_owned(did).map_err(auth_err)?;
+    let collection = Nsid::<SmolStr>::new_owned("fm.atradio.favorite").map_err(auth_err)?;
+
+    let mut rkeys = Vec::new();
+    let mut cursor: Option<SmolStr> = None;
+    loop {
+        let req = ListRecords::<SmolStr> {
+            collection: collection.clone(),
+            cursor: cursor.clone(),
+            limit: Some(100),
+            repo: repo.clone(),
+            reverse: None,
+        };
+        let resp = XrpcClient::send(agent, req)
+            .await
+            .map_err(|e| SdkError::Auth(format!("listRecords: {e:?}")))?;
+        let page = resp
+            .parse::<SmolStr>()
+            .map_err(|e| SdkError::Auth(format!("listRecords decode: {e:?}")))?;
+
+        for rec in &page.records {
+            let matches = serde_json::to_value(&rec.value)
+                .ok()
+                .and_then(|v| {
+                    v.get("station")
+                        .and_then(|s| s.get("stationId"))
+                        .and_then(|s| s.as_str())
+                        .map(|s| s == station_id)
+                })
+                .unwrap_or(false);
+            if matches {
+                // rkey is the last path segment of the at:// uri.
+                let uri = rec.uri.to_string();
+                if let Some(rkey) = uri.rsplit('/').next() {
+                    rkeys.push(rkey.to_string());
+                }
+            }
+        }
+
+        match page.cursor {
+            Some(c) if !page.records.is_empty() => cursor = Some(c),
+            _ => break,
+        }
+    }
+    Ok(rkeys)
 }
 
 /// The deterministic record key for a favorite: the first 8 bytes (64 bits) of

@@ -116,6 +116,23 @@ export async function putFavorite(
   return rkey;
 }
 
+/** Delete every `fm.atradio.favorite` record for `stationId` except `keep`
+ *  (a rkey to preserve, if given). This folds favorites created under the old
+ *  random keys into the canonical deterministic key: matching is on the record
+ *  body's stationId, since the keys differ. Best-effort and idempotent. */
+export async function pruneFavoriteDuplicates(
+  client: Client,
+  did: Did,
+  stationId: string,
+  keep?: string,
+): Promise<void> {
+  const all = await listFavorites(client, did);
+  const dupes = all.filter((f) => f.station.id === stationId && f.rkey !== keep);
+  for (const d of dupes) {
+    await deleteAtradioRecord(client, did, NSID.favorite, d.rkey);
+  }
+}
+
 export async function putStation(
   client: Client,
   did: Did,

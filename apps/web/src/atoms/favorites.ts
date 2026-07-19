@@ -1,11 +1,10 @@
 import { atom } from "jotai";
 import { consola } from "consola";
-import { NSID } from "@atradio/lexicons";
 import type { Station } from "@/lib/types";
 import { clientAtom, didAtom } from "./auth";
 import {
   putFavorite,
-  deleteAtradioRecord,
+  pruneFavoriteDuplicates,
   type StoredStation,
 } from "@/lib/atproto/records";
 
@@ -24,17 +23,28 @@ export const favoriteIdsAtom = atom(
   (get) => new Set(get(favoritesAtom).map((s) => s.id)),
 );
 
-/** Replace the favorites list (used by the on-login loader). */
+/** Replace the favorites list (used by the on-login loader). Dedupes by station
+ *  id so favorites left under old random keys don't show twice; the canonical
+ *  (deterministic-key) record wins, and toggling the station later prunes the
+ *  strays on the PDS. */
 export const setFavoritesAtom = atom(
   null,
   (_get, set, items: StoredStation[]) => {
+    const byId = new Map<string, StoredStation>();
+    for (const i of items) {
+      const prev = byId.get(i.station.id);
+      // Prefer the canonical key (matches favoriteRkey(stationId)); else keep
+      // the first seen.
+      if (!prev) byId.set(i.station.id, i);
+    }
+    const unique = [...byId.values()];
     set(
       favoritesAtom,
-      items.map((i) => i.station),
+      unique.map((i) => i.station),
     );
     set(
       favoriteRkeysAtom,
-      Object.fromEntries(items.map((i) => [i.station.id, i.rkey])),
+      Object.fromEntries(unique.map((i) => [i.station.id, i.rkey])),
     );
   },
 );
@@ -57,7 +67,6 @@ export const toggleFavoriteAtom = atom(
     const exists = current.some((s) => s.id === station.id);
 
     if (exists) {
-      const rkey = rkeys[station.id];
       set(
         favoritesAtom,
         current.filter((s) => s.id !== station.id),
@@ -66,7 +75,8 @@ export const toggleFavoriteAtom = atom(
       delete nextRkeys[station.id];
       set(favoriteRkeysAtom, nextRkeys);
       try {
-        if (rkey) await deleteAtradioRecord(client, did, NSID.favorite, rkey);
+        // Delete every record for this station — canonical + any legacy dupes.
+        await pruneFavoriteDuplicates(client, did, station.id);
       } catch (err) {
         consola.error("[favorites] remove failed", err);
         set(favoritesAtom, current);
@@ -80,6 +90,8 @@ export const toggleFavoriteAtom = atom(
           ...get(favoriteRkeysAtom),
           [station.id]: rkey,
         });
+        // Fold any favorites left under old random keys into the canonical one.
+        await pruneFavoriteDuplicates(client, did, station.id, rkey);
       } catch (err) {
         consola.error("[favorites] add failed", err);
         set(favoritesAtom, current);
