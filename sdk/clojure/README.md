@@ -1,5 +1,7 @@
 # atradio (Clojure SDK)
 
+[![Clojars Project](https://img.shields.io/clojars/v/fm.atradio/sdk.svg)](https://clojars.org/fm.atradio/sdk)
+
 The official **Clojure SDK** for [atradio.fm](https://atradio.fm). It binds the
 shared Rust core (`atradio-sdk`) through the crate's plain **C ABI** using the
 JVM **Panama** FFM API (`java.lang.foreign`) — no JNI, no C glue. The auth /
