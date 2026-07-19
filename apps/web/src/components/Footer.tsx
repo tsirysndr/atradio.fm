@@ -81,7 +81,11 @@ export function Footer() {
             <IconTangled size={18} />
           </a>
 
-          <LanguageSwitcher menuPlacement="top" />
+          {/* Language switcher only appears here on mobile; on desktop it
+              lives in the topbar (Navbar). */}
+          <div className="sm:hidden">
+            <LanguageSwitcher menuPlacement="top" />
+          </div>
         </nav>
       </div>
     </footer>

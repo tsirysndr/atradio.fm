@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "./NotificationBell";
 import { DevicePicker } from "./DevicePicker";
 import { IconTangled } from "./IconTangled";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
@@ -106,6 +107,11 @@ export function Navbar() {
           >
             <IconTangled size={18} />
           </a>
+
+          {/* Language switcher: topbar on desktop, footer on mobile. */}
+          <div className="hidden sm:block">
+            <LanguageSwitcher />
+          </div>
 
           <Button
             size="sm"
