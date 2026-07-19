@@ -9,12 +9,6 @@ an `AtradioAgent` wraps a jacquard session and exposes high-level convenience
 verbs plus a typed namespace escape hatch; reads go through an unauthenticated
 `AppView` client.
 
-> **Status: scaffold.** Construction, auth (app-password + OAuth), service-auth
-> minting, and the read-only `AppView` client are implemented. The record-write
-> verbs and the generated `fm.atradio.*` lexicon bindings land during the CLI
-> migration. See [`docs/sdk-design.md`](../../docs/sdk-design.md) for the full
-> design and roadmap.
-
 ## Quickstart
 
 ```rust
