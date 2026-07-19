@@ -17,7 +17,7 @@
  * `AtradioAgent.fromClient(client, did)`.
  */
 export { AtradioAgent } from "./agent.ts";
-export type { AgentOptions, LoginOptions } from "./agent.ts";
+export type { AgentOptions, LoginOptions, StoredStation } from "./agent.ts";
 export { AppView } from "./appview.ts";
 export type { PopularItem } from "./appview.ts";
 export { favoriteRkey } from "./favorite-rkey.ts";

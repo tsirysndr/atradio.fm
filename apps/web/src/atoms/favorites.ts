@@ -1,12 +1,9 @@
 import { atom } from "jotai";
 import { consola } from "consola";
+import { favoriteRkey } from "@atradio/sdk";
 import type { Station } from "@/lib/types";
-import { clientAtom, didAtom } from "./auth";
-import {
-  putFavorite,
-  pruneFavoriteDuplicates,
-  type StoredStation,
-} from "@/lib/atproto/records";
+import { agentAtom } from "./auth";
+import type { StoredStation } from "@/lib/atproto/records";
 
 /**
  * Favorites are the logged-in user's `fm.atradio.favorite` records, held in
@@ -58,9 +55,8 @@ export const clearFavoritesAtom = atom(null, (_get, set) => {
 export const toggleFavoriteAtom = atom(
   null,
   async (get, set, station: Station) => {
-    const client = get(clientAtom);
-    const did = get(didAtom);
-    if (!client || !did) return; // gated at the UI; nothing to do
+    const agent = get(agentAtom);
+    if (!agent) return; // gated at the UI; nothing to do
 
     const current = get(favoritesAtom);
     const rkeys = get(favoriteRkeysAtom);
@@ -75,8 +71,8 @@ export const toggleFavoriteAtom = atom(
       delete nextRkeys[station.id];
       set(favoriteRkeysAtom, nextRkeys);
       try {
-        // Delete every record for this station — canonical + any legacy dupes.
-        await pruneFavoriteDuplicates(client, did, station.id);
+        // Deletes every record for this station — canonical + any legacy dupes.
+        await agent.unfavorite(station);
       } catch (err) {
         consola.error("[favorites] remove failed", err);
         set(favoritesAtom, current);
@@ -85,13 +81,12 @@ export const toggleFavoriteAtom = atom(
     } else {
       set(favoritesAtom, [station, ...current]);
       try {
-        const rkey = await putFavorite(client, did, station);
+        // Idempotent write at the canonical key; also folds in legacy dupes.
+        await agent.favorite(station);
         set(favoriteRkeysAtom, {
           ...get(favoriteRkeysAtom),
-          [station.id]: rkey,
+          [station.id]: await favoriteRkey(station.id),
         });
-        // Fold any favorites left under old random keys into the canonical one.
-        await pruneFavoriteDuplicates(client, did, station.id, rkey);
       } catch (err) {
         consola.error("[favorites] add failed", err);
         set(favoritesAtom, current);

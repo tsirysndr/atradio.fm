@@ -22,6 +22,7 @@
     "@atcute/oauth-browser-client": "^3.0.0",
     "@atcute/tid": "^1.1.2",
     "@atradio/lexicons": "workspace:*",
+    "@atradio/sdk": "workspace:*",
     "@fontsource/jetbrains-mono": "^5.1.1",
     "@fontsource/lexend": "^5.1.1",
     "@fontsource/outfit": "^5.1.1",

@@ -11,12 +11,15 @@ import { now as tidNow } from "@atcute/tid";
 import {
   ACTOR_STATUS_RKEY,
   AUDIO_SETTINGS_RKEY,
+  audioSettingsRecordSchema,
   audioSettingsRecordToData,
   buildActorStatusRecord,
   buildAudioSettingsRecord,
   buildCommentRecord,
   buildFavoriteRecord,
+  buildReactionRecord,
   buildStationRecord,
+  favoriteRecordToStation,
   NSID,
   rkeyFromUri,
   stationRecordToStation,
@@ -27,6 +30,7 @@ import {
   type Mention,
   type Station,
   type StationDraft,
+  type StationRecord,
 } from "@atradio/lexicons";
 import { AppView } from "./appview.ts";
 import { favoriteRkey } from "./favorite-rkey.ts";
@@ -51,6 +55,13 @@ export interface LoginOptions {
 
 export interface AgentOptions {
   appview?: string;
+}
+
+/** A record stored in the user's repo: the decoded station + its rkey and URI. */
+export interface StoredStation {
+  station: Station;
+  rkey: string;
+  uri: string;
 }
 
 /**
@@ -274,7 +285,122 @@ export class AtradioAgent {
     return out.token;
   }
 
+  /** Post an emoji reaction to a station. Returns the record URI. */
+  async reaction(station: Station, emoji: string): Promise<string> {
+    const rkey = tidNow();
+    await ok(
+      this.client.post("com.atproto.repo.putRecord", {
+        input: {
+          repo: this.did,
+          collection: NSID.reaction as Nsid,
+          rkey,
+          record: asRecord(buildReactionRecord(station, emoji)),
+        },
+      }),
+    );
+    return `at://${this.did}/${NSID.reaction}/${rkey}`;
+  }
+
+  /** Edit one of the user's comments (by its at-uri). */
+  async updateComment(
+    uri: string,
+    station: Station,
+    text: string,
+    opts: { facets?: Mention[]; gif?: GifEmbed; createdAt?: string } = {},
+  ): Promise<void> {
+    await ok(
+      this.client.post("com.atproto.repo.putRecord", {
+        input: {
+          repo: this.did,
+          collection: NSID.comment as Nsid,
+          rkey: rkeyFromUri(uri),
+          record: asRecord(buildCommentRecord(station, text, opts)),
+        },
+      }),
+    );
+  }
+
+  /** Delete one of the user's comments (by its at-uri). */
+  async deleteComment(uri: string): Promise<void> {
+    await this.deleteRecord(NSID.comment, rkeyFromUri(uri));
+  }
+
+  /** Delete an arbitrary record in the user's repo by collection + rkey. */
+  async deleteRecord(collection: string, rkey: string): Promise<void> {
+    await ok(
+      this.client.post("com.atproto.repo.deleteRecord", {
+        input: { repo: this.did, collection: collection as Nsid, rkey },
+      }),
+    );
+  }
+
+  /** The user's favorited stations (one entry per record). */
+  async listFavorites(): Promise<StoredStation[]> {
+    const records = await this.#listAll(NSID.favorite);
+    return records.map((r) => ({
+      station: favoriteRecordToStation(r.value as unknown as FavoriteRecord),
+      rkey: rkeyFromUri(r.uri),
+      uri: r.uri,
+    }));
+  }
+
+  /** The user's own created (custom) stations. */
+  async listStations(): Promise<StoredStation[]> {
+    const records = await this.#listAll(NSID.station);
+    return records.map((r) => {
+      const rkey = rkeyFromUri(r.uri);
+      return {
+        station: stationRecordToStation(r.value as unknown as StationRecord, rkey),
+        rkey,
+        uri: r.uri,
+      };
+    });
+  }
+
+  /** The raw audio-settings singleton record, or `null` if absent/invalid. */
+  async getAudioSettingsRecord(): Promise<AudioSettingsRecord | null> {
+    try {
+      const out = await ok(
+        this.client.get("com.atproto.repo.getRecord", {
+          params: {
+            repo: this.did,
+            collection: NSID.audioSettings as Nsid,
+            rkey: AUDIO_SETTINGS_RKEY,
+          },
+        }),
+      );
+      const parsed = audioSettingsRecordSchema.safeParse(out.value);
+      return parsed.success ? (parsed.data as AudioSettingsRecord) : null;
+    } catch (err) {
+      if (isRecordNotFound(err)) return null;
+      throw err;
+    }
+  }
+
   // ---- internals -------------------------------------------------------
+
+  /** List every record in a collection of the user's repo (paginated). */
+  async #listAll(
+    collection: string,
+  ): Promise<{ uri: string; value: unknown }[]> {
+    const out: { uri: string; value: unknown }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await ok(
+        this.client.get("com.atproto.repo.listRecords", {
+          params: {
+            repo: this.did,
+            collection: collection as Nsid,
+            limit: 100,
+            cursor,
+          },
+        }),
+      );
+      for (const r of page.records) out.push({ uri: r.uri, value: r.value });
+      cursor = page.cursor;
+    } while (cursor);
+    return out;
+  }
 
   /** Every favorite record whose body `station.stationId` matches. */
   async #favoriteRkeysFor(stationId: string): Promise<string[]> {
