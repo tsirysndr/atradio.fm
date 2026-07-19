@@ -1,0 +1,17 @@
+# This package is primarily a rebar3 / Hex package (see rebar.config); the Hex
+# release is published with rebar3 and does NOT include this file. It exists so
+# the Gleam SDK (sdk/gleam) can consume this package as a LOCAL PATH dependency
+# during monorepo development — Gleam requires a gleam.toml at a path
+# dependency's root. Consumers of the published `atradio_erl` package depend on
+# the rebar3 Hex release instead, which Gleam compiles via rebar3.
+name = "atradio_erl"
+version = "0.1.0"
+target = "erlang"
+licences = ["MIT"]
+description = "Erlang NIF over the atradio-sdk C ABI (the shared atradio.fm Rust core)"
+
+[repository]
+type = "github"
+user = "tsirysndr"
+repo = "atradio.fm"
+path = "sdk/erlang"

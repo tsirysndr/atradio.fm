@@ -1,0 +1,25 @@
+name = "atradio_gleam"
+version = "0.1.0"
+target = "erlang"
+licences = ["MIT"]
+description = "Official Gleam SDK for atradio.fm, over the atradio_erl NIF package"
+
+[repository]
+type = "github"
+user = "tsirysndr"
+repo = "atradio.fm"
+# This package lives in a monorepo subdirectory; `path` makes the HexDocs
+# "source" links resolve to sdk/gleam/. `tag_prefix` is prepended to Gleam's
+# default v<version>, so "bindings-" yields the bindings-v<version> release tag.
+path = "sdk/gleam"
+tag_prefix = "bindings-"
+
+# The native code lives in the shared atradio_erl package (its loader downloads
+# the matching prebuilt on first load). Local monorepo dev uses the path dep;
+# publish-gleam.sh swaps it for the released Hex version.
+[dependencies]
+gleam_stdlib = ">= 0.44.0 and < 2.0.0"
+atradio_erl = { path = "../erlang" }
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"
