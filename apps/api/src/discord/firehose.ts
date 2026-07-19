@@ -32,6 +32,41 @@ const queue: DiscordEmbed[] = [];
 let timer: NodeJS.Timeout | null = null;
 let dropped = 0;
 
+/**
+ * Cross-connection dedup. We subscribe to all four Jetstream hosts at once for
+ * redundancy, so the same commit is delivered ~4×. Keyed by a host-stable record
+ * identity (see `dedupeKey`), we post each record only once. Entries expire after
+ * a short window — long enough to cover the gap between redundant deliveries.
+ */
+const DEDUP_TTL_MS = 5 * 60 * 1000;
+const DEDUP_MAX = 20000;
+/** key → expiry epoch ms; Map keeps insertion order for oldest-first eviction. */
+const seen = new Map<string, number>();
+
+/**
+ * Returns true the FIRST time a record identity is seen (caller should forward),
+ * false for subsequent redundant deliveries within the dedup window.
+ */
+export function claimFirstDelivery(key: string): boolean {
+  const now = Date.now();
+  const exp = seen.get(key);
+  if (exp !== undefined && exp > now) return false;
+
+  seen.set(key, now + DEDUP_TTL_MS);
+  if (seen.size > DEDUP_MAX) {
+    for (const [k, e] of seen) {
+      if (e <= now) seen.delete(k);
+    }
+    // Still over budget after pruning expired? Drop oldest insertions.
+    while (seen.size > DEDUP_MAX) {
+      const oldest = seen.keys().next().value;
+      if (oldest === undefined) break;
+      seen.delete(oldest);
+    }
+  }
+  return true;
+}
+
 async function flush(): Promise<void> {
   if (queue.length === 0) return;
 

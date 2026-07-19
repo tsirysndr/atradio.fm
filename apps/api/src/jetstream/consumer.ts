@@ -14,7 +14,7 @@ import { env } from "../env";
 import { db, schema } from "../db";
 import { getProfile, getProfiles } from "../lib/profile";
 import { publishLive } from "../live/bus";
-import { enqueueFirehoseEmbed } from "../discord/firehose";
+import { claimFirstDelivery, enqueueFirehoseEmbed } from "../discord/firehose";
 import { buildFirehoseEmbed } from "../discord/format";
 
 const WANTED: string[] = [
@@ -436,6 +436,12 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
 async function forwardCommitToFirehose(evt: JetstreamEvent): Promise<void> {
   const c = evt.commit;
   if (!c || !WANTED.includes(c.collection)) return;
+  // Skip redundant deliveries of the same record from our other Jetstream
+  // connections. cid pins the exact record version for create/update; deletes
+  // have none, so operation+rkey identifies them. time_us differs per host, so
+  // it can't be part of the key.
+  const key = `${c.operation}:${c.collection}:${evt.did}:${c.rkey}:${c.cid ?? ""}`;
+  if (!claimFirstDelivery(key)) return;
   try {
     const embed = buildFirehoseEmbed(c, await getActorInfo(evt.did));
     if (embed) enqueueFirehoseEmbed(embed);
