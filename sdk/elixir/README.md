@@ -1,5 +1,12 @@
 # atradio_ex
 
+[![Hex.pm](https://img.shields.io/hexpm/v/atradio_ex.svg?logo=elixir)](https://hex.pm/packages/atradio_ex)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/atradio_ex/)
+![Elixir](https://img.shields.io/badge/Elixir-1.15%2B-4B275F?logo=elixir&logoColor=white)
+![Erlang/OTP](https://img.shields.io/badge/Erlang%2FOTP-27%2B-A90533?logo=erlang&logoColor=white)
+![NIF](https://img.shields.io/badge/native-erl__nif-5C4B8A)
+![License](https://img.shields.io/badge/license-MIT-blue)
+
 The official **Elixir SDK** for [atradio.fm](https://atradio.fm). A thin wrapper
 over the [`atradio_erl`](https://hex.pm/packages/atradio_erl) NIF package (the
 shared Rust core) — so the auth / record / reconcile logic is identical to the
