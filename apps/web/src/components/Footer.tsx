@@ -1,12 +1,20 @@
 import { Trans, useTranslation } from "react-i18next";
-import { IconBrandBluesky, IconBrandDiscord } from "@tabler/icons-react";
+import { useSetAtom } from "jotai";
+import {
+  IconBrandBluesky,
+  IconBrandDiscord,
+  IconTerminal2,
+} from "@tabler/icons-react";
+import { cliInstallOpenAtom } from "@/atoms/ui";
 import { IconTangled } from "./IconTangled";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const iconLinkBase =
   "flex h-9 w-9 items-center justify-center rounded-full text-foreground/60 transition-colors hover:text-foreground";
 
 export function Footer() {
   const { t } = useTranslation(["footer", "navbar"]);
+  const openCliInstall = useSetAtom(cliInstallOpenAtom);
   const year = new Date().getFullYear();
 
   return (
@@ -28,6 +36,16 @@ export function Footer() {
         </p>
 
         <nav className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => openCliInstall(true)}
+            className={iconLinkBase}
+            title={t("getCli", { ns: "navbar" })}
+            aria-label={t("getCli", { ns: "navbar" })}
+          >
+            <IconTerminal2 size={18} />
+          </button>
+
           <a
             href="https://bsky.app/profile/atradio.fm"
             target="_blank"
@@ -60,6 +78,8 @@ export function Footer() {
           >
             <IconTangled size={18} />
           </a>
+
+          <LanguageSwitcher menuPlacement="top" />
         </nav>
       </div>
     </footer>

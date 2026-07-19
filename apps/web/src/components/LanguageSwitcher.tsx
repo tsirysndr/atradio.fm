@@ -7,7 +7,12 @@ import {
   type LanguageCode,
 } from "@/i18n";
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({
+  menuPlacement = "bottom",
+}: {
+  /** Which way the dropdown opens. Use "top" in the footer. */
+  menuPlacement?: "top" | "bottom";
+}) {
   const { t, i18n } = useTranslation("navbar");
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -49,7 +54,9 @@ export function LanguageSwitcher() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-11 z-50 min-w-40 overflow-hidden rounded-xl border border-white/10 bg-synth-panel/95 p-1 shadow-xl backdrop-blur-xl"
+          className={`absolute right-0 z-50 min-w-40 overflow-hidden rounded-xl border border-white/10 bg-synth-panel/95 p-1 shadow-xl backdrop-blur-xl ${
+            menuPlacement === "top" ? "bottom-11" : "top-11"
+          }`}
         >
           {SUPPORTED_LANGUAGES.map((lang) => {
             const active = lang.code === current;

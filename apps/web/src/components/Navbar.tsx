@@ -9,19 +9,13 @@ import {
   IconUserCircle,
   IconBrandBluesky,
   IconBrandDiscord,
-  IconTerminal2,
 } from "@tabler/icons-react";
-import {
-  addStationOpenAtom,
-  cliInstallOpenAtom,
-  openSearchPaletteAtom,
-} from "@/atoms/ui";
+import { addStationOpenAtom, openSearchPaletteAtom } from "@/atoms/ui";
 import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "./NotificationBell";
 import { DevicePicker } from "./DevicePicker";
 import { IconTangled } from "./IconTangled";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const navLinkBase =
   "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-foreground/60 transition-colors hover:text-foreground";
@@ -33,7 +27,6 @@ const iconLinkBase =
 export function Navbar() {
   const { t } = useTranslation("navbar");
   const openAddStation = useSetAtom(addStationOpenAtom);
-  const openCliInstall = useSetAtom(cliInstallOpenAtom);
   const openSearch = useSetAtom(openSearchPaletteAtom);
   const ensureAuth = useRequireAuth();
   const { isLoggedIn, profile, openLogin } = useAuth();
@@ -60,16 +53,6 @@ export function Navbar() {
                 /
               </kbd>
             </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => openCliInstall(true)}
-            className={navLinkBase}
-            title={t("getCli")}
-          >
-            <IconTerminal2 size={16} />
-            <span className="hidden sm:inline">{t("cli")}</span>
           </button>
 
           <a
@@ -104,8 +87,6 @@ export function Navbar() {
           >
             <IconTangled size={18} />
           </a>
-
-          <LanguageSwitcher />
 
           <Button
             size="sm"
