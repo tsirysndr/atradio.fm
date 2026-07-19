@@ -62,6 +62,16 @@
 (defn cli-login "Sign in (app password via env, or --oauth)" [] (cli! "cargo" "run" "--" "login"))
 (defn cli-whoami "Show the signed-in account" [] (cli! "cargo" "run" "--" "whoami"))
 (defn cli-gen-lexicons "Regenerate the CLI's Rust lexicon bindings" [] (cli! "bash" "scripts/gen-lexicons.sh"))
+(defn cli-npm-assemble
+  "Download the release binaries into the npm platform packages (no publish):
+  (cli-npm-assemble) or (cli-npm-assemble \"v0.5.2\")"
+  ([] (root! "bash" "cli/npm/scripts/publish-local.sh"))
+  ([version] (root! "bash" "cli/npm/scripts/publish-local.sh" version)))
+(defn cli-npm-publish
+  "Assemble + publish @atradio/cli (and its platform packages) to npm:
+  (cli-npm-publish) or (cli-npm-publish \"v0.5.2\"). Requires npm login."
+  ([] (root! "bash" "cli/npm/scripts/publish-local.sh" "--publish"))
+  ([version] (root! "bash" "cli/npm/scripts/publish-local.sh" version "--publish")))
 
 ;; ---- SDKs (one Rust core; Rust + TS + Go native, Python/Ruby/Clojure/Erlang via FFI) ----
 (defn- sdk! [sub & args] (run* (str "sdk/" sub) args))
@@ -119,6 +129,8 @@
    ["(cli-login)"     "Sign in via the CLI"]
    ["(cli-whoami)"    "Show the signed-in account"]
    ["(cli-gen-lexicons)" "Regenerate CLI lexicon bindings"]
+   ["(cli-npm-assemble)" "Download release binaries into npm packages"]
+   ["(cli-npm-publish)"  "Assemble + publish @atradio/cli to npm"]
    ["(sdk-native)"    "Build native binding libs (release)"]
    ["(sdk-ts)"        "Typecheck the TypeScript SDK"]
    ["(sdk-go)"        "Build the Go SDK"]
