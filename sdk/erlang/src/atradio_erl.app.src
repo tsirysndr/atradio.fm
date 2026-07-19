@@ -1,4 +1,4 @@
-{application, atradio,
+{application, atradio_erl,
  [{description,
    "Official Erlang SDK for atradio.fm — a Rustler NIF over the shared Rust "
    "core (atradio-sdk): AppView reads, record writes, and the deterministic "

@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (default erlang-v<vsn> from sdk/erlang/src/atradio.app.src)"
+        description: "Release tag (default erlang-v<vsn> from sdk/erlang/src/atradio_erl.app.src)"
         type: string
         required: false
   push:
@@ -49,8 +49,8 @@ jobs:
           elif [ "${{ github.ref_type }}" = "tag" ]; then
             TAG="${{ github.ref_name }}"
           else
-            VER="$(sed -n 's/.*{vsn, *"\([^"]*\)".*/\1/p' sdk/erlang/src/atradio.app.src | head -1)"
-            [ -n "$VER" ] || { echo "could not read {vsn,...} from atradio.app.src" >&2; exit 1; }
+            VER="$(sed -n 's/.*{vsn, *"\([^"]*\)".*/\1/p' sdk/erlang/src/atradio_erl.app.src | head -1)"
+            [ -n "$VER" ] || { echo "could not read {vsn,...} from atradio_erl.app.src" >&2; exit 1; }
             TAG="bindings-v$VER"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"

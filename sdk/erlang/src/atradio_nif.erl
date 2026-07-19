@@ -48,7 +48,7 @@ resolve_nif(Base, Target) ->
 %% Directory holding the NIF .so — the app's priv when installed, or ../priv
 %% relative to the .beam for a raw monorepo build.
 nif_dir() ->
-    case code:priv_dir(atradio) of
+    case code:priv_dir(atradio_erl) of
         {error, _} ->
             case code:which(?MODULE) of
                 Beam when is_list(Beam) ->
