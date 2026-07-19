@@ -257,8 +257,11 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
+          # Leading ./ forces npm to treat the arg as a local folder — a bare
+          # "platforms/x" matches npm's github:user/repo shorthand and triggers
+          # a git ls-remote against a nonexistent repo.
           for target in darwin-x64 darwin-arm64 linux-x64 linux-arm64; do
-            npm publish "platforms/${target}" --access public --provenance
+            npm publish "./platforms/${target}" --access public --provenance
           done
 
       - name: Publish @atradio/cli
