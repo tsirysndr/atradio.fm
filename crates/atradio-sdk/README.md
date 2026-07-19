@@ -1,5 +1,9 @@
 # atradio-sdk
 
+[![Crates.io](https://img.shields.io/crates/v/atradio-sdk.svg)](https://crates.io/crates/atradio-sdk)
+[![Documentation](https://docs.rs/atradio-sdk/badge.svg)](https://docs.rs/atradio-sdk)
+[![License](https://img.shields.io/crates/l/atradio-sdk.svg)](#license)
+
 The official Rust SDK for [atradio.fm](https://atradio.fm) — a social
 internet-radio platform on the [AT Protocol](https://atproto.com) — built on top
 of [jacquard](https://crates.io/crates/jacquard).
@@ -68,4 +72,9 @@ atradio-sdk = { version = "0.1", default-features = false, features = ["appview"
 
 ## License
 
-MIT OR Apache-2.0.
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <https://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
