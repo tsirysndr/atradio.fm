@@ -14,6 +14,10 @@ Gem::Specification.new do |spec|
   # `fiddle` is used for FFI — stdlib on Ruby < 3.5, a default gem on 3.5+.
   spec.add_dependency "fiddle"
 
+  # Dev tooling: `rake console` / `bin/console` for an interactive IRB session.
+  spec.add_development_dependency "irb"
+  spec.add_development_dependency "rake"
+
   # Ship the Ruby source + the download manifest, but NOT the ~11 MB native lib:
   # lib/manifest.json carries the release tag + per-triple sha256, and the loader
   # (lib/atradio/native.rb) downloads the matching prebuilt on first use,

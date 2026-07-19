@@ -1,0 +1,13 @@
+# frozen_string_literal: true
+
+desc "Start an interactive IRB console with the atradio SDK loaded"
+task :console do
+  ruby "bin/console"
+end
+
+desc "Run the live read smoke test"
+task :smoke do
+  ruby "examples/smoke.rb"
+end
+
+task default: :smoke

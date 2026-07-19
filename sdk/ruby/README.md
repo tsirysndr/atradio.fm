@@ -16,6 +16,20 @@ cd sdk/ruby
 ruby examples/smoke.rb
 ```
 
+## Interactive console (IRB)
+
+Play with the SDK in a REPL — the `Atradio` module and `Atradio::Agent` are
+loaded and ready:
+
+```bash
+bin/console                # or: rake console
+```
+
+```ruby
+Atradio.recent_stations(5)
+Atradio.favorite_rkey("rb:...")
+```
+
 ## Usage
 
 ```ruby

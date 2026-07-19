@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Interactive IRB console for the atradio Ruby SDK.
+#
+#   cd sdk/ruby
+#   ./build.sh          # build the native lib once
+#   bin/console         # or: rake console
+#
+# Drops you into IRB with the `atradio` SDK required — the `Atradio` module and
+# `Atradio::Agent` are ready to use:
+#
+#   Atradio.recent_stations(5)
+#   Atradio.favorite_rkey("rb:...")
+
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "atradio"
+require "irb"
+
+puts <<~BANNER
+  atradio Ruby SDK #{Atradio::VERSION} console
+    Atradio               — reads (recent_stations, popular_stations, favorites, …)
+    Atradio::Agent.login  — authenticated writes
+    try: Atradio.recent_stations(5)
+BANNER
+
+IRB.start(__FILE__)

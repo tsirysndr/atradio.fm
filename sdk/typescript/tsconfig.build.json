@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    // Source imports use explicit .ts extensions; rewrite them to .js in the
+    // emitted JS + d.ts (TS 5.7+). Lets tsc emit despite allowImportingTsExtensions.
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src"]
+}

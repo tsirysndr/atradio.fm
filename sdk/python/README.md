@@ -16,6 +16,20 @@ cd sdk/python
 uv run examples/smoke.py
 ```
 
+## Interactive console (IPython)
+
+Play with the SDK in a REPL. `av` (an unauthenticated `AppView`) plus `AppView`,
+`Agent`, and `favorite_rkey` are pre-imported:
+
+```bash
+uv run --group console console.py
+```
+
+```python
+In [1]: av.recent_stations(3)
+In [2]: favorite_rkey("rb:...")
+```
+
 ## Usage
 
 ```python

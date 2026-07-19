@@ -7,6 +7,10 @@ requires-python = ">=3.9"
 license = "MIT"
 authors = [{ name = "Tsiry Sandratraina" }]
 
+[dependency-groups]
+# Interactive REPL for playing with the SDK: `uv run --group console console.py`.
+console = ["ipython>=8"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

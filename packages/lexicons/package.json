@@ -1,13 +1,27 @@
 {
   "name": "@atradio/lexicons",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "fm.atradio.* AT Protocol lexicon types, zod schemas, and record mappers for atradio.fm",
   "type": "module",
+  "license": "MIT",
+  "repository": "github:tsirysndr/atradio.fm",
+  "homepage": "https://atradio.fm",
+  "keywords": [
+    "atradio",
+    "atproto",
+    "at-protocol",
+    "bluesky",
+    "lexicon",
+    "lexicons",
+    "radio"
+  ],
   "exports": {
     ".": "./src/index.ts",
     "./lexicons/*.json": "./lexicons/*.json"
   },
+  "files": ["dist", "lexicons"],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "pkl:eval": "pkl eval -f json",
     "pkl:gen": "tsx ./scripts/pkl.ts",
     "typecheck": "tsc --noEmit"
@@ -22,5 +36,6 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "zx": "^8.3.0"
-  }
+  },
+  "//": "Dev resolves `.` to src (bun/vite). publish-typescript.sh rewrites exports/main/types → dist at publish time, then restores this file."
 }

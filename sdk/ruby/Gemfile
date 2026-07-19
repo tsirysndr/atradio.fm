@@ -1,0 +1,6 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Development dependencies (rake, irb) come from the gemspec.
+gemspec

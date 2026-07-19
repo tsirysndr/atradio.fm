@@ -40,6 +40,8 @@
   sdk:ruby      {:doc "Build the Ruby SDK binding (fiddle)" :task (shell {:dir (str root "/sdk/ruby")} "bash" "build.sh")}
   sdk:clojure   {:doc "Build the Clojure SDK binding (Panama)" :task (shell {:dir (str root "/sdk/clojure")} "bash" "build.sh")}
   sdk:erlang    {:doc "Build the Erlang SDK binding (Rustler NIF)" :task (shell {:dir (str root "/sdk/erlang")} "bash" "build.sh")}
+  sdk:ts-publish {:doc "Publish TypeScript SDK to npm: bb sdk:ts-publish [--dry-run]"
+                  :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-typescript.sh" *command-line-args*)}
   sdk:erlang-publish {:doc "Publish Erlang SDK to Hex: bb sdk:erlang-publish <tag>"
                       :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-erlang.sh" *command-line-args*)}
   sdk:python-publish {:doc "Publish Python SDK to PyPI: bb sdk:python-publish <tag>"
