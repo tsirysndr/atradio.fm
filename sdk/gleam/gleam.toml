@@ -12,7 +12,7 @@ repo = "atradio.fm"
 # "source" links resolve to sdk/gleam/. `tag_prefix` is prepended to Gleam's
 # default v<version>, so "bindings-" yields the bindings-v<version> release tag.
 path = "sdk/gleam"
-tag_prefix = "bindings-"
+tag_prefix = "gleam-"
 
 # The native code lives in the shared atradio_erl package (its loader downloads
 # the matching prebuilt on first load). Local monorepo dev uses the path dep;
