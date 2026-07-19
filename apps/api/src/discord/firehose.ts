@@ -2,70 +2,50 @@ import { consola } from "consola";
 import { env } from "../env";
 
 /**
- * Forwards every Jetstream event to the Discord `#firehose` channel via an
- * incoming webhook. Fire-and-forget: Discord failures never block indexing.
+ * Transport for the Discord `#firehose` channel: queues rich embeds and flushes
+ * them to an incoming webhook on an interval. Fire-and-forget — Discord failures
+ * never block Jetstream indexing.
  *
- * Events are batched and flushed on an interval so a burst of firehose traffic
- * can't blow past Discord's webhook rate limit (~5 requests / 2s per webhook).
- * Each flush packs as many events as fit into one message (Discord's 2000-char
- * content cap), so one HTTP call carries many events.
+ * Batching serves two purposes: it packs up to `EMBEDS_PER_MESSAGE` events into a
+ * single HTTP call, and it keeps us under Discord's webhook rate limit (~5 req/2s)
+ * even when the firehose bursts. Embeds are built by `./format`.
  */
 
-/** Anything shaped like a Jetstream envelope — kept loose on purpose. */
-interface FirehoseEvent {
-  did: string;
-  time_us: number;
-  kind: string;
-  commit?: {
-    operation: string;
-    collection: string;
-    rkey: string;
-  };
+export interface DiscordEmbed {
+  title?: string;
+  url?: string;
+  description?: string;
+  color?: number;
+  timestamp?: string;
+  author?: { name: string; url?: string; icon_url?: string };
+  thumbnail?: { url: string };
+  footer?: { text: string; icon_url?: string };
 }
 
+/** Discord allows at most 10 embeds per webhook message. */
+const EMBEDS_PER_MESSAGE = 10;
 const FLUSH_INTERVAL_MS = 2000;
-const DISCORD_CONTENT_LIMIT = 2000;
 /** Cap the in-memory queue so a firehose spike can't grow it unbounded. */
 const MAX_QUEUE = 5000;
 
-const queue: string[] = [];
+const queue: DiscordEmbed[] = [];
 let timer: NodeJS.Timeout | null = null;
 let dropped = 0;
-
-/** One-line human summary of an event for the channel. */
-function formatEvent(evt: FirehoseEvent): string {
-  const c = evt.commit;
-  if (evt.kind === "commit" && c) {
-    return `\`${c.operation}\` **${c.collection}** \`${c.rkey}\` — \`${evt.did}\``;
-  }
-  return `\`${evt.kind}\` — \`${evt.did}\``;
-}
 
 async function flush(): Promise<void> {
   if (queue.length === 0) return;
 
-  // Pack lines into one message without exceeding Discord's content limit.
-  const lines: string[] = [];
-  let len = 0;
-  while (queue.length > 0) {
-    const next = queue[0];
-    // +1 for the joining newline.
-    if (len + next.length + 1 > DISCORD_CONTENT_LIMIT) break;
-    lines.push(queue.shift()!);
-    len += next.length + 1;
-  }
-
-  const content = lines.join("\n");
+  const embeds = queue.splice(0, EMBEDS_PER_MESSAGE);
   try {
     const res = await fetch(env.DISCORD_FIREHOSE_WEBHOOK_URL, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+      body: JSON.stringify({ embeds, allowed_mentions: { parse: [] } }),
     });
     if (res.status === 429) {
-      // Rate limited: put these lines back and let the next tick retry.
-      queue.unshift(...lines);
-      const retryAfter = Number(res.headers.get("retry-after") ?? "1");
+      // Rate limited: put these back at the front and let the next tick retry.
+      queue.unshift(...embeds);
+      const retryAfter = res.headers.get("retry-after") ?? "1";
       consola.warn(`[firehose] Discord rate limited; retrying in ${retryAfter}s`);
     } else if (!res.ok) {
       consola.warn(`[firehose] Discord webhook responded ${res.status}`);
@@ -76,10 +56,10 @@ async function flush(): Promise<void> {
 }
 
 /**
- * Queue a single Jetstream event for delivery to the `#firehose` channel.
- * No-op when the webhook URL is unset, so the consumer runs fine without it.
+ * Queue one embed for the `#firehose` channel. No-op when the webhook URL is
+ * unset, so the consumer runs fine without Discord configured.
  */
-export function forwardToFirehose(evt: FirehoseEvent): void {
+export function enqueueFirehoseEmbed(embed: DiscordEmbed): void {
   if (!env.DISCORD_FIREHOSE_WEBHOOK_URL) return;
 
   if (queue.length >= MAX_QUEUE) {
@@ -89,7 +69,7 @@ export function forwardToFirehose(evt: FirehoseEvent): void {
     }
     return;
   }
-  queue.push(formatEvent(evt));
+  queue.push(embed);
 
   if (!timer) {
     timer = setInterval(() => {

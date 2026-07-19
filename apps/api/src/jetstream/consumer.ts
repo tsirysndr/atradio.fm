@@ -14,7 +14,8 @@ import { env } from "../env";
 import { db, schema } from "../db";
 import { getProfile, getProfiles } from "../lib/profile";
 import { publishLive } from "../live/bus";
-import { forwardToFirehose } from "../discord/firehose";
+import { enqueueFirehoseEmbed } from "../discord/firehose";
+import { buildFirehoseEmbed } from "../discord/format";
 
 const WANTED: string[] = [
   NSID.favorite,
@@ -427,16 +428,31 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
   else if (c.collection === NSID.reaction) await indexReaction(evt.did, c, uri);
 }
 
+/**
+ * Mirror a fm.atradio.* commit to the Discord #firehose channel. Runs after
+ * indexing so the actor's profile is already cached (enriches the embed with
+ * avatar/handle). Identity/account events and other collections are skipped.
+ */
+async function forwardCommitToFirehose(evt: JetstreamEvent): Promise<void> {
+  const c = evt.commit;
+  if (!c || !WANTED.includes(c.collection)) return;
+  try {
+    const embed = buildFirehoseEmbed(c, await getActorInfo(evt.did));
+    if (embed) enqueueFirehoseEmbed(embed);
+  } catch (err) {
+    consola.warn("[firehose] failed to build embed", err);
+  }
+}
+
 async function handleEvent(evt: JetstreamEvent): Promise<void> {
   if (evt.time_us > cursor) cursor = evt.time_us;
-  // Mirror every raw event to the Discord #firehose channel (no-op if unset).
-  forwardToFirehose(evt);
   if (evt.kind === "commit") {
     try {
       await processCommit(evt);
     } catch (err) {
       consola.error("[jetstream] processing error", err);
     }
+    await forwardCommitToFirehose(evt);
   }
 }
 
