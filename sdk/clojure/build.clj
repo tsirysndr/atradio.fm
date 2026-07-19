@@ -14,7 +14,7 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'fm.atradio/sdk)
-(def version "0.1.1")
+(def version "0.1.2")
 (def class-dir "target/classes")
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 (def jar-file (format "target/atradio-sdk-%s.jar" version))

@@ -15,7 +15,7 @@
             [clojure.data.json :as json])
   (:import [java.io File]
            [java.net URI]
-           [java.net.http HttpClient HttpRequest HttpResponse$BodyHandlers]
+           [java.net.http HttpClient HttpClient$Redirect HttpRequest HttpResponse$BodyHandlers]
            [java.nio.file Files Path StandardCopyOption]
            [java.nio.file.attribute FileAttribute]
            [java.security MessageDigest]))
@@ -54,7 +54,11 @@
 (defn- download-verify [repo tag t ext sha ^File dest]
   (let [file (str "libatradio_uniffi-" t "." ext)
         url (str "https://github.com/" repo "/releases/download/" tag "/" file)
-        client (.build (HttpClient/newBuilder))
+        ;; GitHub release download URLs 302-redirect to a signed CDN host;
+        ;; the JDK client defaults to Redirect/NEVER, so follow them explicitly.
+        client (.. (HttpClient/newBuilder)
+                   (followRedirects HttpClient$Redirect/NORMAL)
+                   (build))
         req (-> (HttpRequest/newBuilder (URI/create url)) (.GET) (.build))
         resp (.send client req (HttpResponse$BodyHandlers/ofByteArray))]
     (when-not (= 200 (.statusCode resp))
