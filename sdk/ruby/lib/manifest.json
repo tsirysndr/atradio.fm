@@ -1,5 +1,12 @@
 {
   "repo": "tsirysndr/atradio.fm",
   "tag": "bindings-v0.1.0",
-  "checksums": {}
+  "checksums": {
+    "aarch64-apple-darwin": "add588bdc7df1b3d44925df1d30b332921d091cdc2f7a21943c842c7193daca0",
+    "aarch64-linux-gnu": "0eebcd1592907b73caf96250a726591221f61d5669ba57ed87dfd796bf35f2cb",
+    "x86_64-apple-darwin": "bae2f0e29853309b5975c12e227b5cc27766263dac119fa54204d29a1a876ea6",
+    "x86_64-linux-gnu": "2db8025ea5f3dce745ebd6b6ecb64c90cfe8ceaa78d7f0b6afa0bfcc5da239b4",
+    "x86_64-unknown-freebsd": "f7d016cc10f5114404504e27b8286101381d51881bedd5b8457fe686c367bc63",
+    "x86_64-unknown-netbsd": "f22ff3e8972e3914b5a780fbcd8fcdad7a1a14f4ff1336b247882c45c8abe0bf"
+  }
 }
