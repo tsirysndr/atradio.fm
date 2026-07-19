@@ -29,7 +29,7 @@
                 :basis @basis
                 :src-dirs ["src"]
                 :scm {:url "https://github.com/tsirysndr/atradio.fm"
-                      :tag (str "bindings-v" version)}
+                      :tag (str "clojure-v" version)}
                 :pom-data [[:licenses
                             [:license
                              [:name "MIT"]
