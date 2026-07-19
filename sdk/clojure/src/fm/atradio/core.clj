@@ -1,4 +1,4 @@
-(ns atradio.core
+(ns fm.atradio.core
   "Official Clojure SDK for atradio.fm.
 
   JVM Panama (java.lang.foreign) bindings to the shared Rust core's C ABI

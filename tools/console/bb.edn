@@ -33,5 +33,15 @@
   cli:whoami    {:doc "Show the signed-in account" :task (shell {:dir (str root "/cli")} "cargo" "run" "--" "whoami")}
   cli:gen       {:doc "Regenerate the CLI's Rust lexicon bindings" :task (shell {:dir (str root "/cli")} "bash" "scripts/gen-lexicons.sh")}
 
+  sdk:native    {:doc "Build the native binding libs (release: uniffi + nif)" :task (shell {:dir (str root "/sdk/scripts")} "bash" "build-native.sh")}
+  sdk:ts        {:doc "Typecheck the TypeScript SDK (@atradio/sdk)" :task (shell {:dir (str root "/sdk/typescript")} "bun" "run" "typecheck")}
+  sdk:go        {:doc "Build the Go SDK" :task (shell {:dir (str root "/sdk/go")} "go" "build" "./...")}
+  sdk:python    {:doc "Build the Python SDK binding (UniFFI)" :task (shell {:dir (str root "/sdk/python")} "bash" "build.sh")}
+  sdk:ruby      {:doc "Build the Ruby SDK binding (fiddle)" :task (shell {:dir (str root "/sdk/ruby")} "bash" "build.sh")}
+  sdk:clojure   {:doc "Build the Clojure SDK binding (Panama)" :task (shell {:dir (str root "/sdk/clojure")} "bash" "build.sh")}
+  sdk:erlang    {:doc "Build the Erlang SDK binding (Rustler NIF)" :task (shell {:dir (str root "/sdk/erlang")} "bash" "build.sh")}
+  sdk:erlang-publish {:doc "Publish Erlang SDK to Hex: bb sdk:erlang-publish <tag>"
+                      :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-erlang.sh" *command-line-args*)}
+
   repl          {:doc "Launch the interactive Clojure + rebel console"
                  :task (clojure "-M:console")}}}

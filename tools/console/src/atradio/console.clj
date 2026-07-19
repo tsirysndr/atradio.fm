@@ -63,6 +63,18 @@
 (defn cli-whoami "Show the signed-in account" [] (cli! "cargo" "run" "--" "whoami"))
 (defn cli-gen-lexicons "Regenerate the CLI's Rust lexicon bindings" [] (cli! "bash" "scripts/gen-lexicons.sh"))
 
+;; ---- SDKs (one Rust core; Rust + TS + Go native, Python/Ruby/Clojure/Erlang via FFI) ----
+(defn- sdk! [sub & args] (run* (str "sdk/" sub) args))
+(defn sdk-native "Build the native binding libs (release: uniffi + nif)" [] (sdk! "scripts" "bash" "build-native.sh"))
+(defn sdk-ts "Typecheck the TypeScript SDK (@atradio/sdk)" [] (sdk! "typescript" "bun" "run" "typecheck"))
+(defn sdk-go "Build the Go SDK" [] (sdk! "go" "go" "build" "./..."))
+(defn sdk-python "Build the Python SDK binding (UniFFI)" [] (sdk! "python" "bash" "build.sh"))
+(defn sdk-ruby "Build the Ruby SDK binding (fiddle)" [] (sdk! "ruby" "bash" "build.sh"))
+(defn sdk-clojure "Build the Clojure SDK binding (Panama)" [] (sdk! "clojure" "bash" "build.sh"))
+(defn sdk-erlang "Build the Erlang SDK binding (Rustler NIF)" [] (sdk! "erlang" "bash" "build.sh"))
+(defn sdk-erlang-publish "Publish Erlang SDK to Hex: (sdk-erlang-publish \"erlang-v0.1.0\")"
+  [tag] (sdk! "scripts" "bash" "publish-erlang.sh" tag))
+
 (def ^:private commands
   [["(install)"       "Install all workspace deps"]
    ["(dev)"           "Run every app in dev"]
@@ -90,6 +102,14 @@
    ["(cli-login)"     "Sign in via the CLI"]
    ["(cli-whoami)"    "Show the signed-in account"]
    ["(cli-gen-lexicons)" "Regenerate CLI lexicon bindings"]
+   ["(sdk-native)"    "Build native binding libs (release)"]
+   ["(sdk-ts)"        "Typecheck the TypeScript SDK"]
+   ["(sdk-go)"        "Build the Go SDK"]
+   ["(sdk-python)"    "Build the Python SDK (UniFFI)"]
+   ["(sdk-ruby)"      "Build the Ruby SDK (fiddle)"]
+   ["(sdk-clojure)"   "Build the Clojure SDK (Panama)"]
+   ["(sdk-erlang)"    "Build the Erlang SDK (Rustler NIF)"]
+   ["(sdk-erlang-publish t)" "Publish Erlang SDK to Hex (tag)"]
    ["(help)"          "Show this list"]])
 
 (defn help "List all console commands" []

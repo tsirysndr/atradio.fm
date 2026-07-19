@@ -1,0 +1,16 @@
+%% Manifest for the first-load NIF download (see src/atradio_nif.erl).
+%%
+%% `repo` + `tag` locate the GitHub release; one `{checksum, Triple, Sha256}`
+%% per shipped platform is appended by sdk/scripts/gen-erlang-manifest.sh (run by
+%% sdk/scripts/publish-erlang.sh) from the release artifacts, just before
+%% `rebar3 hex publish`. Committed without checksums; a local `./build.sh` dev
+%% build (priv/atradio_nif.so) is preferred over any download anyway.
+{repo, "tsirysndr/atradio.fm"}.
+{tag, "erlang-v0.1.0"}.
+%% {checksum, "aarch64-apple-darwin", "<sha256>"}.
+%% {checksum, "x86_64-apple-darwin", "<sha256>"}.
+%% {checksum, "x86_64-linux-gnu", "<sha256>"}.
+%% {checksum, "aarch64-linux-gnu", "<sha256>"}.
+%% {checksum, "x86_64-unknown-freebsd", "<sha256>"}.
+%% {checksum, "x86_64-unknown-netbsd", "<sha256>"}.
+%% {checksum, "x86_64-unknown-openbsd", "<sha256>"}.

@@ -1,6 +1,6 @@
-(ns atradio.smoke
+(ns fm.atradio.smoke
   "Live read smoke test. Run: clojure -M:smoke"
-  (:require [atradio.core :as at]))
+  (:require [fm.atradio.core :as at]))
 
 (defn -main [& _]
   (let [recent (at/recent-stations 3)]

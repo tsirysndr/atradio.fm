@@ -4,7 +4,10 @@
  :aliases
  {;; `clojure -M:smoke` — live read smoke test.
   :smoke {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]
-          :main-opts ["-m" "atradio.smoke"]}
+          :main-opts ["-m" "fm.atradio.smoke"]}
   ;; Add these jvm-opts for any app using the SDK (silences the restricted-method
   ;; native-access warnings from the FFM API).
-  :run {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]}}}
+  :run {:jvm-opts ["--enable-native-access=ALL-UNNAMED"]}
+  ;; `clojure -T:build jar` — build the Clojars jar (group fm.atradio).
+  :build {:deps {io.github.clojure/tools.build {:mvn/version "0.10.5"}}
+          :ns-default build}}}

@@ -1,0 +1,15 @@
+{application, atradio,
+ [{description,
+   "Official Erlang SDK for atradio.fm — a Rustler NIF over the shared Rust "
+   "core (atradio-sdk): AppView reads, record writes, and the deterministic "
+   "favorite record key shared across every atradio SDK."},
+  {vsn, "0.1.0"},
+  {registered, []},
+  %% crypto/inets/ssl/public_key back the first-load NIF download + checksum
+  %% verify in atradio_nif. kernel/stdlib are mandatory.
+  {applications, [kernel, stdlib, crypto, inets, ssl, public_key]},
+  {env, []},
+  {modules, []},
+  {licenses, ["MIT"]},
+  {links, [{"GitHub", "https://github.com/tsirysndr/atradio.fm"}]}
+ ]}.

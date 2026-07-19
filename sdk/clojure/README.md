@@ -20,8 +20,11 @@ mise exec -- clojure -M:smoke
 
 ## Usage
 
+Coordinate (Clojars): `fm.atradio/sdk` — the reverse-domain group (atradio.fm).
+Build the jar with `clojure -T:build jar`.
+
 ```clojure
-(require '[atradio.core :as at])
+(require '[fm.atradio.core :as at])
 
 ;; Reads — unauthenticated.
 (map #(get-in % ["station" "name"]) (at/recent-stations 10))
