@@ -14,7 +14,7 @@
             [deps-deploy.deps-deploy :as dd]))
 
 (def lib 'fm.atradio/sdk)
-(def version "0.1.0")
+(def version "0.1.1")
 (def class-dir "target/classes")
 (def basis (delay (b/create-basis {:project "deps.edn"})))
 (def jar-file (format "target/atradio-sdk-%s.jar" version))
@@ -29,7 +29,11 @@
                 :basis @basis
                 :src-dirs ["src"]
                 :scm {:url "https://github.com/tsirysndr/atradio.fm"
-                      :tag (str "bindings-v" version)}})
+                      :tag (str "bindings-v" version)}
+                :pom-data [[:licenses
+                            [:license
+                             [:name "MIT"]
+                             [:url "https://opensource.org/licenses/MIT"]]]]})
   ;; Ship source + resources (manifest.json); the native lib is downloaded on
   ;; first load, never bundled.
   (b/copy-dir {:src-dirs ["src" "resources"] :target-dir class-dir})
