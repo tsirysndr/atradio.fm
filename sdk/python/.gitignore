@@ -1,0 +1,10 @@
+# Build artifacts produced by build.sh (regenerate with `./build.sh`).
+/src/atradio/atradio_uniffi.py
+/src/atradio/*.so
+/src/atradio/*.dylib
+/src/atradio/*.dll
+
+# uv / Python
+/.venv/
+__pycache__/
+*.egg-info/

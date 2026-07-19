@@ -1,0 +1,17 @@
+[project]
+name = "atradio"
+version = "0.1.0"
+description = "Official Python SDK for atradio.fm — FFI bindings to the shared Rust core"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Tsiry Sandratraina" }]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/atradio"]
+# The generated module + native library are produced by build.sh; include them.
+artifacts = ["src/atradio/*.py", "src/atradio/*.so", "src/atradio/*.dylib", "src/atradio/*.dll"]
