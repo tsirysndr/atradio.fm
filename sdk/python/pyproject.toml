@@ -13,5 +13,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/atradio"]
-# The generated module + native library are produced by build.sh; include them.
-artifacts = ["src/atradio/*.py", "src/atradio/*.so", "src/atradio/*.dylib", "src/atradio/*.dll"]
+# Pure-Python wheel: ship the source + committed generated module + the download
+# manifest, but NOT the ~11 MB native lib (fetched on first import; see
+# _native.py). A gitignored local dev build (src/atradio/*.dylib|so|dll) must be
+# force-excluded so it can't leak into a locally-built wheel.
+artifacts = ["src/atradio/manifest.json"]
+exclude = ["src/atradio/*.so", "src/atradio/*.dylib", "src/atradio/*.dll"]

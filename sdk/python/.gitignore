@@ -1,5 +1,6 @@
-# Build artifacts produced by build.sh (regenerate with `./build.sh`).
-/src/atradio/atradio_uniffi.py
+# The generated + patched UniFFI module (atradio_uniffi.py) IS committed so the
+# published wheel is pure-Python. Only the ~11 MB native lib is a build artifact
+# (fetched on first import, or a local dev build via build.sh).
 /src/atradio/*.so
 /src/atradio/*.dylib
 /src/atradio/*.dll

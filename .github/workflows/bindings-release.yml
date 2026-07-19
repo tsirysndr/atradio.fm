@@ -51,7 +51,7 @@ jobs:
           else
             VER="$(sed -n 's/.*{vsn, *"\([^"]*\)".*/\1/p' sdk/erlang/src/atradio.app.src | head -1)"
             [ -n "$VER" ] || { echo "could not read {vsn,...} from atradio.app.src" >&2; exit 1; }
-            TAG="erlang-v$VER"
+            TAG="bindings-v$VER"
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Resolved release tag: $TAG"

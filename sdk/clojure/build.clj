@@ -2,11 +2,11 @@
   "Build the Clojars jar for the atradio Clojure SDK.
 
   Coordinate: fm.atradio/sdk (reverse-domain group — atradio.fm is owned).
-  Run: clojure -T:build jar   (after ./build.sh has produced native/).
+  Run: clojure -T:build jar
 
-  NOTE: the native library in native/ is platform-specific. This jar bundles the
-  host's lib; a real multi-platform release should ship per-platform classifiers
-  or download the matching lib on first load (as the Erlang SDK does)."
+  The jar ships src + resources/ (including atradio/manifest.json) but NOT the
+  ~11 MB native library: fm.atradio.native downloads the matching prebuilt from
+  the GitHub release on first load, verifying it against the manifest checksum."
   (:require [clojure.tools.build.api :as b]))
 
 (def lib 'fm.atradio/sdk)
@@ -26,6 +26,8 @@
                 :src-dirs ["src"]
                 :scm {:url "https://github.com/tsirysndr/atradio.fm"
                       :tag (str "clojure-v" version)}})
-  (b/copy-dir {:src-dirs ["src" "native"] :target-dir class-dir})
+  ;; Ship source + resources (manifest.json); the native lib is downloaded on
+  ;; first load, never bundled.
+  (b/copy-dir {:src-dirs ["src" "resources"] :target-dir class-dir})
   (b/jar {:class-dir class-dir :jar-file jar-file})
   (println "wrote" jar-file))

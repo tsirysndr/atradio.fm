@@ -8,21 +8,20 @@
 require "fiddle"
 require "fiddle/import"
 require "json"
-require "rbconfig"
 
 module Atradio
   VERSION = "0.1.0"
 
-  lib_name =
-    case RbConfig::CONFIG["host_os"]
-    when /darwin/ then "libatradio_uniffi.dylib"
-    when /mswin|mingw|cygwin/ then "atradio_uniffi.dll"
-    else "libatradio_uniffi.so"
-    end
-  LIB_PATH = File.expand_path(lib_name, __dir__)
-
-  # Raised when the core returns an `{"error": …}` envelope.
+  # Raised on native-lib resolution failure or an `{"error": …}` envelope.
   class Error < StandardError; end
+end
+
+require_relative "atradio/native"
+
+module Atradio
+  # Local dev build if present, else a checksum-verified download from the
+  # GitHub release (cached). See Atradio::Native.
+  LIB_PATH = Native.resolve
 
   module C
     extend Fiddle::Importer

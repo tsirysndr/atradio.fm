@@ -6,7 +6,7 @@
 %% `rebar3 hex publish`. Committed without checksums; a local `./build.sh` dev
 %% build (priv/atradio_nif.so) is preferred over any download anyway.
 {repo, "tsirysndr/atradio.fm"}.
-{tag, "erlang-v0.1.0"}.
+{tag, "bindings-v0.1.0"}.
 %% {checksum, "aarch64-apple-darwin", "<sha256>"}.
 %% {checksum, "x86_64-apple-darwin", "<sha256>"}.
 %% {checksum, "x86_64-linux-gnu", "<sha256>"}.

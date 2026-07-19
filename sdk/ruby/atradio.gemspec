@@ -14,8 +14,11 @@ Gem::Specification.new do |spec|
   # `fiddle` is used for FFI — stdlib on Ruby < 3.5, a default gem on 3.5+.
   spec.add_dependency "fiddle"
 
-  spec.files = Dir["lib/**/*.rb", "README.md"]
-  # NOTE: the native library (lib/libatradio_uniffi.*) is produced by build.sh
-  # and is platform-specific; a real release would ship per-platform binaries.
+  # Ship the Ruby source + the download manifest, but NOT the ~11 MB native lib:
+  # lib/manifest.json carries the release tag + per-triple sha256, and the loader
+  # (lib/atradio/native.rb) downloads the matching prebuilt on first use,
+  # verifying it against the checksum. A local ./build.sh dev build (an untracked
+  # lib/libatradio_uniffi.*) is preferred over any download.
+  spec.files = Dir["lib/**/*.rb", "lib/manifest.json", "README.md"]
   spec.require_paths = ["lib"]
 end

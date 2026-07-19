@@ -4,25 +4,15 @@
   JVM Panama (java.lang.foreign) bindings to the shared Rust core's C ABI
   (crates/atradio-uniffi). The auth / record / reconcile logic is identical to
   the Rust, Go, TypeScript, Python, and Ruby SDKs. Requires JDK 22+."
-  (:require [clojure.java.io :as io]
-            [clojure.data.json :as json])
+  (:require [clojure.data.json :as json]
+            [fm.atradio.native :as native])
   (:import [java.lang.foreign Arena Linker FunctionDescriptor SymbolLookup
             ValueLayout MemoryLayout MemorySegment Linker$Option]
-           [java.lang.invoke MethodHandle]
-           [java.io File]))
+           [java.lang.invoke MethodHandle]))
 
-(def ^:private lib-name
-  (let [os (.toLowerCase (System/getProperty "os.name"))]
-    (cond
-      (.contains os "mac") "libatradio_uniffi.dylib"
-      (.contains os "win") "atradio_uniffi.dll"
-      :else "libatradio_uniffi.so")))
-
-(def ^:private lib-path
-  (if-let [r (io/resource lib-name)]
-    (.getAbsolutePath (File. (.toURI r)))
-    (throw (ex-info (str "native library " lib-name " not found on the classpath — run ./build.sh")
-                    {:lib lib-name}))))
+;; Local dev build if present on the classpath, else a checksum-verified download
+;; from the GitHub release (cached). See fm.atradio.native.
+(def ^:private lib-path (native/resolve-lib))
 
 (def ^:private ^Arena arena (Arena/ofShared))
 (def ^:private ^Linker linker (Linker/nativeLinker))

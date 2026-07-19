@@ -9,8 +9,10 @@ name: Release (BSD aarch64)
 
 on:
   push:
+    # Version tags only (v1.2.3). Excludes the binding release tags
+    # (bindings-v*, erlang-v*), which bindings-release.yml owns.
     tags:
-      - "v*"
+      - "v[0-9]*"
   workflow_dispatch:
     inputs:
       tag:
