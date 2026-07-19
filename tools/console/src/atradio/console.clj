@@ -72,6 +72,8 @@
 (defn sdk-ruby "Build the Ruby SDK binding (fiddle)" [] (sdk! "ruby" "bash" "build.sh"))
 (defn sdk-clojure "Build the Clojure SDK binding (Panama)" [] (sdk! "clojure" "bash" "build.sh"))
 (defn sdk-erlang "Build the Erlang SDK binding (Rustler NIF)" [] (sdk! "erlang" "bash" "build.sh"))
+(defn sdk-elixir "Compile the Elixir SDK (atradio_ex)" [] (sdk! "elixir" "mix" "compile"))
+(defn sdk-gleam "Build the Gleam SDK (atradio_gleam)" [] (sdk! "gleam" "gleam" "build"))
 (defn sdk-ts-publish "Publish TypeScript SDK to npm: (sdk-ts-publish) or (sdk-ts-publish \"--dry-run\")"
   ([] (sdk! "scripts" "bash" "publish-typescript.sh"))
   ([flag] (sdk! "scripts" "bash" "publish-typescript.sh" flag)))
@@ -83,6 +85,12 @@
   [tag] (sdk! "scripts" "bash" "publish-ruby.sh" tag))
 (defn sdk-clojure-publish "Publish Clojure SDK to Clojars: (sdk-clojure-publish \"bindings-v0.1.0\")"
   [tag] (sdk! "scripts" "bash" "publish-clojure.sh" tag))
+(defn sdk-elixir-publish "Publish Elixir SDK to Hex: (sdk-elixir-publish) or (sdk-elixir-publish \"--dry-run\")"
+  ([] (sdk! "scripts" "bash" "publish-elixir.sh"))
+  ([flag] (sdk! "scripts" "bash" "publish-elixir.sh" flag)))
+(defn sdk-gleam-publish "Publish Gleam SDK to Hex: (sdk-gleam-publish) or (sdk-gleam-publish \"--dry-run\")"
+  ([] (sdk! "scripts" "bash" "publish-gleam.sh"))
+  ([flag] (sdk! "scripts" "bash" "publish-gleam.sh" flag)))
 
 (def ^:private commands
   [["(install)"       "Install all workspace deps"]
@@ -118,11 +126,15 @@
    ["(sdk-ruby)"      "Build the Ruby SDK (fiddle)"]
    ["(sdk-clojure)"   "Build the Clojure SDK (Panama)"]
    ["(sdk-erlang)"    "Build the Erlang SDK (Rustler NIF)"]
+   ["(sdk-elixir)"    "Compile the Elixir SDK (atradio_ex)"]
+   ["(sdk-gleam)"     "Build the Gleam SDK (atradio_gleam)"]
    ["(sdk-ts-publish)"  "Publish TypeScript SDK to npm"]
    ["(sdk-erlang-publish t)" "Publish Erlang SDK to Hex (tag)"]
    ["(sdk-python-publish t)" "Publish Python SDK to PyPI (tag)"]
    ["(sdk-ruby-publish t)" "Publish Ruby SDK to RubyGems (tag)"]
    ["(sdk-clojure-publish t)" "Publish Clojure SDK to Clojars (tag)"]
+   ["(sdk-elixir-publish)" "Publish Elixir SDK to Hex"]
+   ["(sdk-gleam-publish)" "Publish Gleam SDK to Hex"]
    ["(help)"          "Show this list"]])
 
 (defn help "List all console commands" []

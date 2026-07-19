@@ -40,6 +40,8 @@
   sdk:ruby      {:doc "Build the Ruby SDK binding (fiddle)" :task (shell {:dir (str root "/sdk/ruby")} "bash" "build.sh")}
   sdk:clojure   {:doc "Build the Clojure SDK binding (Panama)" :task (shell {:dir (str root "/sdk/clojure")} "bash" "build.sh")}
   sdk:erlang    {:doc "Build the Erlang SDK binding (Rustler NIF)" :task (shell {:dir (str root "/sdk/erlang")} "bash" "build.sh")}
+  sdk:elixir    {:doc "Compile the Elixir SDK (atradio_ex; set ATRADIO_ERL_PATH=../erlang for local dev)" :task (shell {:dir (str root "/sdk/elixir")} "mix" "compile")}
+  sdk:gleam     {:doc "Build the Gleam SDK (atradio_gleam)" :task (shell {:dir (str root "/sdk/gleam")} "gleam" "build")}
   sdk:ts-publish {:doc "Publish TypeScript SDK to npm: bb sdk:ts-publish [--dry-run]"
                   :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-typescript.sh" *command-line-args*)}
   sdk:erlang-publish {:doc "Publish Erlang SDK to Hex: bb sdk:erlang-publish <tag>"
@@ -50,6 +52,10 @@
                     :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-ruby.sh" *command-line-args*)}
   sdk:clojure-publish {:doc "Publish Clojure SDK to Clojars: bb sdk:clojure-publish <tag>"
                        :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-clojure.sh" *command-line-args*)}
+  sdk:elixir-publish {:doc "Publish Elixir SDK to Hex: bb sdk:elixir-publish [--dry-run]"
+                      :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-elixir.sh" *command-line-args*)}
+  sdk:gleam-publish {:doc "Publish Gleam SDK to Hex: bb sdk:gleam-publish [--dry-run]"
+                     :task (apply shell {:dir (str root "/sdk/scripts")} "bash" "publish-gleam.sh" *command-line-args*)}
 
   repl          {:doc "Launch the interactive Clojure + rebel console"
                  :task (clojure "-M:console")}}}
