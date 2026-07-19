@@ -14,23 +14,23 @@ verbs plus a typed namespace escape hatch; reads go through an unauthenticated
 ```rust
 use atradio_sdk::AtradioAgent;
 
-# async fn demo() -> atradio_sdk::Result<()> {
-// Log in (persists the session to disk).
-let agent = AtradioAgent::builder()
-    .session_store("~/.config/atradio/session.json")
-    .build()?;
-agent.login_password("alice.bsky.social", "app-password").await?;
-// or: agent.login_oauth(Some("alice.bsky.social")).await?;  // browser + loopback
+async fn demo() -> atradio_sdk::Result<()> {
+  // Log in (persists the session to disk).
+  let agent = AtradioAgent::builder()
+      .session_store("~/.config/atradio/session.json")
+      .build()?;
+  agent.login_password("alice.bsky.social", "app-password").await?;
+  // or: agent.login_oauth(Some("alice.bsky.social")).await?;  // browser + loopback
 
-// Reads — unauthenticated, via the bundled AppView client.
-let recent = agent.appview().recent_stations(25).await?;
-let faves  = agent.appview().favorites("alice.bsky.social", 30).await?;
+  // Reads — unauthenticated, via the bundled AppView client.
+  let recent = agent.appview().recent_stations(25).await?;
+  let faves  = agent.appview().favorites("alice.bsky.social", 30).await?;
 
-// Writes — high-level verbs (implemented in a later milestone).
-// agent.favorite(&station).await?;
-// agent.comment(&station, "great stream 🎶").await?;
-# Ok(())
-# }
+  // Writes — high-level verbs (implemented in a later milestone).
+  // agent.favorite(&station).await?;
+  // agent.comment(&station, "great stream 🎶").await?;
+  Ok(())
+}
 ```
 
 Read-only, no auth:
