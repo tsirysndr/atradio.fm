@@ -30,6 +30,11 @@ export const env = {
   CONNECT_SERVICE_AUD:
     process.env.CONNECT_SERVICE_AUD ??
     `${process.env.CONNECT_SERVICE_DID ?? "did:web:api.atradio.fm"}#atradio_appview`,
+  /**
+   * Discord incoming-webhook URL for the `#firehose` channel. When set, every
+   * Jetstream event is forwarded there; unset disables the forwarder entirely.
+   */
+  DISCORD_FIREHOSE_WEBHOOK_URL: process.env.DISCORD_FIREHOSE_WEBHOOK_URL ?? "",
   /** All Jetstream hosts we connect to simultaneously for redundancy. */
   JETSTREAM_HOSTS: (process.env.JETSTREAM_HOSTS
     ? process.env.JETSTREAM_HOSTS.split(",")

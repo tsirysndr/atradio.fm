@@ -14,6 +14,7 @@ import { env } from "../env";
 import { db, schema } from "../db";
 import { getProfile, getProfiles } from "../lib/profile";
 import { publishLive } from "../live/bus";
+import { forwardToFirehose } from "../discord/firehose";
 
 const WANTED: string[] = [
   NSID.favorite,
@@ -428,6 +429,8 @@ async function processCommit(evt: JetstreamEvent): Promise<void> {
 
 async function handleEvent(evt: JetstreamEvent): Promise<void> {
   if (evt.time_us > cursor) cursor = evt.time_us;
+  // Mirror every raw event to the Discord #firehose channel (no-op if unset).
+  forwardToFirehose(evt);
   if (evt.kind === "commit") {
     try {
       await processCommit(evt);
