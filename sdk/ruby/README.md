@@ -1,5 +1,7 @@
 # atradio (Ruby SDK)
 
+[![Gem Version](https://badge.fury.io/rb/atradio.svg)](https://badge.fury.io/rb/atradio)
+
 The official **Ruby SDK** for [atradio.fm](https://atradio.fm). It binds to the
 shared Rust core (`atradio-sdk`) through the crate's plain **C ABI** using Ruby's
 stdlib [`fiddle`](https://docs.ruby-lang.org/en/master/Fiddle.html) — no `ffi`
