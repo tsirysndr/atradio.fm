@@ -1,6 +1,6 @@
 {
   "name": "@atradio/cli",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "atradio.fm in your terminal — a TUI radio player on the AT Protocol",
   "bin": {
     "atradio": "bin/atradio.js"
@@ -36,9 +36,9 @@
     "access": "public"
   },
   "optionalDependencies": {
-    "@atradio/cli-darwin-arm64": "0.5.2",
-    "@atradio/cli-darwin-x64": "0.5.2",
-    "@atradio/cli-linux-arm64": "0.5.2",
-    "@atradio/cli-linux-x64": "0.5.2"
+    "@atradio/cli-darwin-arm64": "0.5.3",
+    "@atradio/cli-darwin-x64": "0.5.3",
+    "@atradio/cli-linux-arm64": "0.5.3",
+    "@atradio/cli-linux-x64": "0.5.3"
   }
 }

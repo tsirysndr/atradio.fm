@@ -1,6 +1,6 @@
 [package]
 name = "atradio"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 description = "atradio.fm in your terminal — a TUI radio player on the AT Protocol"
 # NOTE: rockbox-playback is GPL-2.0-or-later; linking it makes this binary GPL.
@@ -27,7 +27,7 @@ jacquard = { version = "0.12", default-features = false, features = [
 jacquard-common = "0.12"
 
 # audio engine + DSP (GPL-2.0)
-rockbox-playback = ">=0.4.1"
+rockbox-playback = ">=0.4.2"
 
 # async runtime + HTTP (AppView reads, radio-browser search, ICY)
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time", "signal", "net"] }

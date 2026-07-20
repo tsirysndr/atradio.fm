@@ -1,6 +1,6 @@
 {
   "name": "@atradio/cli-linux-arm64",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Prebuilt atradio CLI binary for Linux (glibc, aarch64 / arm64).",
   "os": [
     "linux"

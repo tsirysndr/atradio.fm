@@ -64,12 +64,12 @@ Direct `.deb`:
 
 ```bash
 # amd64
-curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.5.2_amd64.deb
-sudo apt install ./atradio_0.5.2_amd64.deb
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.5.3_amd64.deb
+sudo apt install ./atradio_0.5.3_amd64.deb
 
 # arm64 (Raspberry Pi 4/5, Apple-silicon VM, …)
-curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.5.2_arm64.deb
-sudo apt install ./atradio_0.5.2_arm64.deb
+curl -LO https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio_0.5.3_arm64.deb
+sudo apt install ./atradio_0.5.3_arm64.deb
 ```
 
 Or via the Gemfury apt repo (auto-updates with `apt upgrade`):
@@ -86,7 +86,7 @@ Direct `.rpm`:
 
 ```bash
 sudo dnf install \
-  https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.5.2-1.x86_64.rpm
+  https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.5.3-1.x86_64.rpm
 ```
 
 Or via the Gemfury dnf/yum repo:
@@ -389,7 +389,7 @@ Discovery works from any instance (it doesn't need to advertise):
 ```bash
 atradio discover                 # list atradio instances on the network
 #   ● Living Room
-#       192.168.1.20:7799   v0.5.2   token
+#       192.168.1.20:7799   v0.5.3   token
 atradio --connect "Living Room" --token …   # resolve the name via mDNS
 atradio --connect                # no local server + one LAN peer → auto-connect
 ```

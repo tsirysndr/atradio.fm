@@ -326,7 +326,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "atradio"
-version = "0.5.2"
+version = "0.5.3"
 dependencies = [
  "anyhow",
  "atradio-sdk",
@@ -4035,9 +4035,9 @@ dependencies = [
 
 [[package]]
 name = "rockbox-playback"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e813d4ac60af94b8cdeed199a4d6eec687e34901776083ea929a984b31939c48"
+checksum = "0f27f6455d0ce77f9bf44162336be81450592e84e50504205be7199b3ac1c10f"
 dependencies = [
  "cpal",
  "reqwest",

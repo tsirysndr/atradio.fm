@@ -1,6 +1,6 @@
 {
   "name": "@atradio/cli-darwin-arm64",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Prebuilt atradio CLI binary for macOS (Apple Silicon / arm64).",
   "os": [
     "darwin"
