@@ -48,6 +48,9 @@ fn gun_open(url: String, headers: List(#(String, String))) -> Result(Opened, Nil
 @external(erlang, "proxy_gun_ffi", "go")
 fn gun_go(pump: Pid, subj: Subject(PumpMsg)) -> Nil
 
+@external(erlang, "proxy_gun_ffi", "stop")
+fn gun_stop(pump: Pid) -> Nil
+
 pub fn handle(req: Request(Connection)) -> Response(ResponseData) {
   case query_url(req) {
     Error(_) -> bad_request()
@@ -83,10 +86,17 @@ pub fn handle(req: Request(Connection)) -> Response(ResponseData) {
                 },
                 loop: fn(state, msg, conn) {
                   case msg {
-                    GunChunk(data) -> {
-                      let _ = mist.send_chunk(conn, data)
-                      mist.chunk_continue(state)
-                    }
+                    GunChunk(data) ->
+                      case mist.send_chunk(conn, data) {
+                        Ok(_) -> mist.chunk_continue(state)
+                        // The listener disconnected — stop the upstream pump so
+                        // gun closes the (now infinite-lived) connection instead
+                        // of streaming into a closed socket forever.
+                        Error(_) -> {
+                          gun_stop(pump)
+                          mist.chunk_stop()
+                        }
+                      }
                     GunEof -> mist.chunk_stop()
                     GunFailed -> mist.chunk_stop_abnormal("upstream error")
                   }

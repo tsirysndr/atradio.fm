@@ -7,7 +7,7 @@
 %% loop turns each into a `send_chunk`. When the client disconnects, mist stops
 %% the loop; a `stop`/timeout tears the upstream down.
 -module(proxy_gun_ffi).
--export([open/2, go/2, read_icy_title/1]).
+-export([open/2, go/2, stop/1, read_icy_title/1]).
 
 -define(REDIRECT_LIMIT, 5).
 -define(HEADER_TIMEOUT, 8000).
@@ -39,14 +39,31 @@ go(Pump, Subj) ->
     Pump ! {go, Subj},
     nil.
 
+%% stop(Pump) -> nil — tell the pump to close the upstream. The chunked
+%% response loop calls this when a `send_chunk` to the client fails (the
+%% listener went away), so the upstream connection is torn down promptly
+%% instead of streaming into a void until the DATA_TIMEOUT backstop.
+stop(Pump) ->
+    Pump ! stop,
+    nil.
+
 pump_open(Parent, _Url, _ReqHeaders, 0) ->
     Parent ! {failed, self()};
 pump_open(Parent, Url, ReqHeaders, Hops) ->
     case parse_url(Url) of
         {ok, {Scheme, Host, Port, Path}} ->
             Transport = case Scheme of <<"https">> -> tls; _ -> tcp end,
+            %% Radio streams (Icecast/SHOUTcast) send no content-length and no
+            %% chunked encoding, so the body is delimited by connection close.
+            %% gun treats that as `body_close`/`connection: close` and arms its
+            %% `closing_timeout` (default 15s), then force-closes the upstream —
+            %% cutting every stream off after ~15s. Disable that timer so the
+            %% stream runs for as long as the client keeps listening; teardown of
+            %% abandoned streams is handled explicitly (see `stop/1` + the pump's
+            %% DATA_TIMEOUT backstop).
             Opts = #{transport => Transport, retry => 0,
-                     tls_opts => [{verify, verify_none}]},
+                     tls_opts => [{verify, verify_none}],
+                     http_opts => #{closing_timeout => infinity}},
             case gun:open(binary_to_list(Host), Port, Opts) of
                 {ok, Conn} ->
                     case gun:await_up(Conn, ?HEADER_TIMEOUT) of
