@@ -1,6 +1,50 @@
 import { describe, expect, it } from "bun:test";
 import { DEFAULT_PORT, port } from "../src/config.ts";
 import { firstStreamUrl, isPlaylist, isUnwrappable } from "../src/playlist.ts";
+import { ChunkedDecoder } from "../src/upstream.ts";
+
+// ---- Transfer-Encoding: chunked decoder ------------------------------------
+
+/** Concatenate a decoder's emitted payloads into one string. */
+function decoded(parts: Buffer[]): string {
+  return Buffer.concat(parts).toString("latin1");
+}
+
+describe("ChunkedDecoder", () => {
+  it("strips framing from a single push", () => {
+    const d = new ChunkedDecoder();
+    const out = d.push(Buffer.from("4\r\nWiki\r\n6\r\npedia \r\n0\r\n\r\n"));
+    expect(decoded(out)).toBe("Wikipedia ");
+    expect(d.done).toBe(true);
+  });
+
+  it("reassembles framing split across pushes mid-size and mid-data", () => {
+    const d = new ChunkedDecoder();
+    let out: Buffer[] = [];
+    // size line split, then chunk data split.
+    out = out.concat(d.push(Buffer.from("4")));
+    out = out.concat(d.push(Buffer.from("\r\nWi")));
+    out = out.concat(d.push(Buffer.from("ki\r\n5\r\npedia\r\n")));
+    expect(decoded(out)).toBe("Wikipedia");
+    expect(d.done).toBe(false);
+    out = out.concat(d.push(Buffer.from("0\r\n\r\n")));
+    expect(d.done).toBe(true);
+  });
+
+  it("ignores chunk extensions on the size line", () => {
+    const d = new ChunkedDecoder();
+    const out = d.push(Buffer.from("3;foo=bar\r\nabc\r\n0\r\n\r\n"));
+    expect(decoded(out)).toBe("abc");
+    expect(d.done).toBe(true);
+  });
+
+  it("handles large hex sizes", () => {
+    const d = new ChunkedDecoder();
+    const body = "x".repeat(0x1a);
+    const out = d.push(Buffer.from(`1a\r\n${body}\r\n0\r\n\r\n`));
+    expect(decoded(out)).toBe(body);
+  });
+});
 
 // ---- config.port (PORT env var) --------------------------------------------
 

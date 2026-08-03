@@ -34,6 +34,8 @@ export interface Upstream {
   leftover: Buffer<ArrayBufferLike>;
   /** True when no body is expected (empty/`HEAD`-like response). */
   fin: boolean;
+  /** True when the body is `Transfer-Encoding: chunked` and must be de-framed. */
+  chunked: boolean;
 }
 
 interface Target {
@@ -134,8 +136,11 @@ export function open(
       }
 
       const fin = isBodiless(status, headers);
+      const chunked = (headers.get("transfer-encoding") ?? "")
+        .toLowerCase()
+        .includes("chunked");
       if (fin) socket.destroy();
-      resolve({ status, headers, socket, leftover, fin });
+      resolve({ status, headers, socket, leftover, fin, chunked });
     };
 
     socket.on("data", onData);
@@ -162,15 +167,27 @@ export function open(
 /**
  * Wrap a live upstream socket as a Web `ReadableStream` for `Response`, applying
  * socket-level backpressure and tearing the upstream down when the client
- * disconnects (`cancel` → `socket.destroy`).
+ * disconnects (`cancel` → `socket.destroy`). When the upstream is
+ * `Transfer-Encoding: chunked` the framing is stripped so only the payload
+ * bytes reach the client — otherwise the hex chunk-size lines would land in the
+ * audio decoder as garbage and stutter playback.
  */
 export function streamBody(up: Upstream): ReadableStream<Uint8Array> {
   const { socket, leftover } = up;
+  const decoder = up.chunked ? new ChunkedDecoder() : null;
   return new ReadableStream<Uint8Array>({
     start(controller) {
-      if (leftover.length > 0) controller.enqueue(leftover);
+      const emit = (raw: Buffer) => {
+        if (decoder === null) {
+          controller.enqueue(raw);
+          return;
+        }
+        for (const payload of decoder.push(raw)) controller.enqueue(payload);
+        if (decoder.done) safeClose(controller);
+      };
+      if (leftover.length > 0) emit(leftover);
       socket.on("data", (chunk: Buffer) => {
-        controller.enqueue(chunk);
+        emit(chunk);
         // Pause the socket while the client's queue is full.
         if (controller.desiredSize !== null && controller.desiredSize <= 0) socket.pause();
       });
@@ -192,6 +209,57 @@ export function streamBody(up: Upstream): ReadableStream<Uint8Array> {
       socket.destroy();
     },
   });
+}
+
+/**
+ * Incremental `Transfer-Encoding: chunked` decoder. Feed it raw socket bytes;
+ * it returns the payload bytes of any complete chunk data it can extract,
+ * buffering partial framing across calls. `done` flips true at the terminating
+ * `0\r\n` chunk. Trailers (and any bytes after them) are ignored.
+ */
+export class ChunkedDecoder {
+  private buf: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  private state: "size" | "data" | "crlf" = "size";
+  private remaining = 0;
+  done = false;
+
+  push(data: Buffer): Buffer[] {
+    this.buf = this.buf.length === 0 ? data : Buffer.concat([this.buf, data]);
+    const out: Buffer[] = [];
+    while (!this.done) {
+      if (this.state === "size") {
+        const nl = this.buf.indexOf("\r\n");
+        if (nl === -1) break; // size line not fully arrived yet
+        const line = this.buf.subarray(0, nl).toString("latin1");
+        // Strip any chunk extensions (`;name=value`) before the hex size.
+        const size = Number.parseInt(line.split(";")[0].trim(), 16);
+        this.buf = this.buf.subarray(nl + 2);
+        if (!Number.isFinite(size) || size < 0) {
+          this.done = true; // malformed framing — stop cleanly
+          break;
+        }
+        if (size === 0) {
+          this.done = true; // terminating chunk
+          break;
+        }
+        this.remaining = size;
+        this.state = "data";
+      } else if (this.state === "data") {
+        if (this.buf.length === 0) break;
+        const take = Math.min(this.remaining, this.buf.length);
+        out.push(this.buf.subarray(0, take));
+        this.buf = this.buf.subarray(take);
+        this.remaining -= take;
+        if (this.remaining === 0) this.state = "crlf";
+      } else {
+        // Skip the CRLF that terminates a chunk's data.
+        if (this.buf.length < 2) break;
+        this.buf = this.buf.subarray(2);
+        this.state = "size";
+      }
+    }
+    return out;
+  }
 }
 
 function safeClose(controller: ReadableStreamDefaultController<Uint8Array>): void {

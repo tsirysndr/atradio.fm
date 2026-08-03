@@ -7,7 +7,7 @@
  * `metaint*2 + 4096` bytes so an endless stream can't hang us.
  */
 
-import { open, type Upstream } from "./upstream.ts";
+import { ChunkedDecoder, open, type Upstream } from "./upstream.ts";
 
 const ICY_TIMEOUT = 8000;
 const ICY_EXTRA = 4096;
@@ -38,8 +38,14 @@ export async function readTitle(url: string): Promise<string | null> {
 function scan(up: Upstream, metaint: number, cap: number): Promise<string | null> {
   const { socket } = up;
   return new Promise((resolve) => {
-    let buf = up.leftover;
-    let consumed = up.leftover.length;
+    // ICY metaint interleaving sits *inside* the (optional) chunked framing, so
+    // de-frame first, then walk the decoded audio/metadata stream.
+    const decoder = up.chunked ? new ChunkedDecoder() : null;
+    const decode = (raw: Buffer): Buffer =>
+      decoder === null ? raw : concat(decoder.push(raw));
+
+    let buf: Buffer = decode(up.leftover);
+    let consumed = buf.length;
     let done = false;
 
     const finish = (title: string | null) => {
@@ -74,8 +80,10 @@ function scan(up: Upstream, metaint: number, cap: number): Promise<string | null
     };
 
     const onData = (chunk: Buffer) => {
-      buf = Buffer.concat([buf, chunk]);
-      consumed += chunk.length;
+      const payload = decode(chunk);
+      if (payload.length === 0) return;
+      buf = Buffer.concat([buf, payload]);
+      consumed += payload.length;
       tryParse();
     };
 
@@ -86,6 +94,13 @@ function scan(up: Upstream, metaint: number, cap: number): Promise<string | null
     // The header read may already have buffered a full block.
     tryParse();
   });
+}
+
+/** Concatenate the decoder's output buffers into one (empty when it yielded none). */
+function concat(parts: Buffer[]): Buffer {
+  if (parts.length === 0) return Buffer.alloc(0);
+  if (parts.length === 1) return parts[0];
+  return Buffer.concat(parts);
 }
 
 function parseStreamTitle(meta: Buffer): string | null {
