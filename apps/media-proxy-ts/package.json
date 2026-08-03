@@ -1,0 +1,17 @@
+{
+  "name": "@atradio/media-proxy-ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Stateless reverse-proxy for radio streams, TuneIn, artwork, and ICY metadata (TypeScript/Bun port of apps/media-proxy).",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.14",
+    "typescript": "^5.7.2"
+  }
+}
