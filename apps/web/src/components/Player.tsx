@@ -144,6 +144,10 @@ export function Player() {
 
   /** Point the <audio> element at `url` when the wasm engine can't play it. */
   const fallbackToNative = (url: string) => {
+    // Exactly one backend is ever audible: stop the engine before handing off
+    // to the element, so a late engine error can't leave both playing at once.
+    const p = getRockboxPlayer();
+    if (p.ready) p.stop();
     engineRef.current = "native";
     const audio = audioRef.current;
     if (!audio) return;
@@ -228,6 +232,15 @@ export function Player() {
     lastEngineTitleRef.current = null;
 
     // Tear down whatever the previous station was using.
+    //
+    // Mark that no backend owns playback for the duration of the switch. The
+    // engine's `stop()` below aborts the previous decode, which makes it emit
+    // an `error`; without this the global error handler would still see
+    // `engineRef === "rockbox"` (+ the previous URL) and "fall back" to the
+    // <audio> element, playing the OLD stream in parallel with the new one.
+    engineRef.current = null;
+    fallbackUrlRef.current = null;
+
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
