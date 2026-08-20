@@ -97,7 +97,7 @@ export function CliInstallModal() {
                 />
                 <CommandBlock
                   label={t("fedora")}
-                  command="sudo dnf install https://github.com/tsirysndr/atradio.fm/releases/latest/download/atradio-0.1.0-1.x86_64.rpm"
+                  command="sudo dnf install https://github.com/tsirysndr/atradio.fm/releases/download/v0.5.3/atradio-0.5.3-1.x86_64.rpm"
                 />
               </div>
 
