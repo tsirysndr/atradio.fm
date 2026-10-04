@@ -79,7 +79,7 @@ export default function SignIn({
 			polling = true;
 			try {
 				const a = await radio.auth("authStatus");
-				if (!live) return;
+				if (!live || !active.current) return;
 				if (a.url && a.url !== opened.current) {
 					opened.current = a.url;
 					Keyboard.dismiss();
@@ -111,9 +111,11 @@ export default function SignIn({
 			clearInterval(t);
 		};
 	}, [busy, onAuth]);
-	const cancel = async () => {
-		await radio.auth("authCancel").catch(() => {});
+	const cancel = () => {
+		active.current = false;
+		Keyboard.dismiss();
 		onClose();
+		void radio.auth("authCancel").catch(() => {});
 	};
 	if (authUrl)
 		return (
@@ -133,7 +135,13 @@ export default function SignIn({
 						gap: 18,
 					}}
 				>
-					<Pressable accessibilityRole="button" onPress={() => void cancel()}>
+					<Pressable
+						accessibilityRole="button"
+						accessibilityLabel="Cancel sign in"
+						onPress={cancel}
+						hitSlop={12}
+						style={{ minWidth: 64, minHeight: 48, justifyContent: "center" }}
+					>
 						<Text style={{ color: c.cyan, fontSize: 16 }}>Cancel</Text>
 					</Pressable>
 					<Text style={{ color: c.text, fontWeight: "700", flex: 1 }}>
@@ -174,13 +182,37 @@ export default function SignIn({
 						setAuthUrl("");
 						setBusy(false);
 						setError("Could not load sign-in. Please try again.");
-						void radio.auth("authCancel");
+						void radio.auth("authCancel").catch(() => {});
 					}}
 				/>
 			</View>
 		);
 	return (
 		<View style={{ flex: 1, backgroundColor: c.bg }}>
+			<View
+				style={{
+					paddingTop: insets.top + 8,
+					paddingHorizontal: 16,
+					alignItems: "flex-end",
+				}}
+			>
+				<Pressable
+					accessibilityRole="button"
+					accessibilityLabel="Close sign in"
+					onPress={cancel}
+					hitSlop={12}
+					style={{
+						width: 48,
+						height: 48,
+						alignItems: "center",
+						justifyContent: "center",
+						borderRadius: 24,
+						backgroundColor: c.surface,
+					}}
+				>
+					<Text style={{ color: c.text, fontSize: 30 }}>×</Text>
+				</Pressable>
+			</View>
 			<KeyboardAvoidingView
 				style={{ flex: 1 }}
 				behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -191,17 +223,10 @@ export default function SignIn({
 						flexGrow: 1,
 						justifyContent: "center",
 						padding: 28,
-						paddingTop: insets.top + 32,
+						paddingTop: 20,
 						paddingBottom: insets.bottom + 28,
 					}}
 				>
-					<Pressable
-						accessibilityLabel="Close sign in"
-						onPress={() => void cancel()}
-						style={{ alignSelf: "flex-end", padding: 12 }}
-					>
-						<Text style={{ color: c.muted, fontSize: 28 }}>×</Text>
-					</Pressable>
 					<Text style={s.brand}>atradio.fm</Text>
 					<Text style={s.title}>Your radio. Your people.</Text>
 					<Text style={s.help}>

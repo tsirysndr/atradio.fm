@@ -797,23 +797,46 @@ function Main() {
 						{ paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 },
 					]}
 				>
-					<Pressable
-						accessibilityLabel="Close player"
-						onPress={() => setExpanded(false)}
-						style={{ padding: 12, alignSelf: "flex-start" }}
-					>
-						<Feather name="chevron-down" size={28} color={c.text} />
-					</Pressable>
-					<Pressable
-						onPress={() => {
-							setExpanded(false);
-							setEqualizer(true);
+					<View
+						style={{
+							width: "100%",
+							flexDirection: "row",
+							alignItems: "center",
+							justifyContent: "space-between",
 						}}
-						style={{ flexDirection: "row", gap: 10, padding: 10 }}
 					>
-						<Feather name="sliders" size={20} color={c.cyan} />
-						<Text style={{ color: c.cyan }}>Equalizer</Text>
-					</Pressable>
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel="Close player"
+							onPress={() => setExpanded(false)}
+							hitSlop={10}
+							style={{
+								width: 48,
+								height: 48,
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Feather name="chevron-down" size={28} color={c.text} />
+						</Pressable>
+						<Pressable
+							accessibilityRole="button"
+							accessibilityLabel="Equalizer settings"
+							onPress={() => {
+								setExpanded(false);
+								setEqualizer(true);
+							}}
+							hitSlop={10}
+							style={{
+								width: 48,
+								height: 48,
+								alignItems: "center",
+								justifyContent: "center",
+							}}
+						>
+							<Feather name="sliders" size={24} color={c.cyan} />
+						</Pressable>
+					</View>
 					{player.station && <Artwork station={player.station} size={270} />}
 					<Text style={[s.heading, { textAlign: "center" }]}>
 						{player.station?.name}

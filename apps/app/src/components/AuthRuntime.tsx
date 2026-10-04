@@ -4,19 +4,26 @@ import { WebView } from "react-native-webview";
 import { authHtml } from "../auth/generated/runtime";
 import {
 	attachAuthRuntime,
+	prepareAuthRuntime,
 	detachAuthRuntime,
 	receiveAuthMessage,
 } from "../auth/client";
 const source = { html: authHtml, baseUrl: "https://atradio.fm/native-oauth/" };
 export default function AuthRuntime() {
 	const ref = useRef<WebView>(null);
-	useEffect(() => detachAuthRuntime, []);
+	const owner = useRef(Symbol("oauth-runtime")).current;
+	const ready = useRef(false);
+	const loaded = useRef(false);
+	useEffect(() => {
+		prepareAuthRuntime(owner);
+		return () => detachAuthRuntime(owner);
+	}, [owner]);
 	return (
 		<View
 			pointerEvents="none"
 			accessibilityElementsHidden
 			importantForAccessibility="no-hide-descendants"
-			style={{ position: "absolute", width: 1, height: 1, opacity: 0 }}
+			style={{ position: "absolute", width: 2, height: 2, opacity: 0.01 }}
 		>
 			<WebView
 				ref={ref}
@@ -29,8 +36,19 @@ export default function AuthRuntime() {
 				}
 				onMessage={({ nativeEvent }) => {
 					try {
-						if (JSON.parse(nativeEvent.data).ready) {
-							attachAuthRuntime((script) =>
+						const message = JSON.parse(nativeEvent.data);
+						if (message.fatal) {
+							console.warn("OAuth runtime startup:", message.fatal);
+							detachAuthRuntime(
+								owner,
+								"Could not initialize sign-in: " + message.fatal,
+							);
+							return;
+						}
+						if (message.ready) {
+							if (ready.current || !loaded.current) return;
+							ready.current = true;
+							attachAuthRuntime(owner, (script) =>
 								ref.current?.injectJavaScript(script),
 							);
 							return;
@@ -40,8 +58,26 @@ export default function AuthRuntime() {
 					}
 					receiveAuthMessage(nativeEvent.data);
 				}}
-				onError={detachAuthRuntime}
-				onRenderProcessGone={detachAuthRuntime}
+				onLoadEnd={() => {
+					loaded.current = true;
+					ref.current?.injectJavaScript(
+						"if(window.atradioAuth){window.ReactNativeWebView.postMessage(JSON.stringify({ready:true}));}true;",
+					);
+				}}
+				onError={() => {
+					ready.current = false;
+					detachAuthRuntime(
+						owner,
+						"Could not load sign-in. Please reopen the screen.",
+					);
+				}}
+				onRenderProcessGone={() => {
+					ready.current = false;
+					detachAuthRuntime(
+						owner,
+						"Sign-in was interrupted. Please restart the app.",
+					);
+				}}
 			/>
 		</View>
 	);

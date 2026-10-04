@@ -11,7 +11,9 @@ const script = (await result.outputs[0].text()).replace(
 );
 const html =
 	'<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>' +
+	"(function boot(){if(!window.ReactNativeWebView){setTimeout(boot,25);return;}try{" +
 	script +
+	"}catch(error){window.ReactNativeWebView.postMessage(JSON.stringify({fatal:error.message || String(error)}));}})();" +
 	"</script></body></html>";
 await mkdir("./src/auth/generated", { recursive: true });
 await writeFile(

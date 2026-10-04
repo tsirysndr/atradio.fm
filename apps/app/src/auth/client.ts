@@ -1,26 +1,51 @@
 import type { AuthState } from "../native";
 let nextId = 0;
+let activeOwner: symbol | undefined;
 let send: ((script: string) => void) | undefined;
 const waiting = new Map<
 	number,
 	{
 		script: string;
+		owner?: symbol;
+		sent?: boolean;
 		resolve: (state: any) => void;
 		reject: (e: Error) => void;
 		timer: ReturnType<typeof setTimeout>;
 	}
 >();
-export function attachAuthRuntime(inject: (script: string) => void) {
-	send = inject;
-	for (const request of waiting.values()) send(request.script);
+export function prepareAuthRuntime(owner: symbol) {
+	if (activeOwner === owner) return;
+	if (activeOwner) detachAuthRuntime(activeOwner);
+	activeOwner = owner;
 }
-export function detachAuthRuntime() {
-	send = undefined;
+export function attachAuthRuntime(
+	owner: symbol,
+	inject: (script: string) => void,
+) {
+	if (activeOwner !== owner) return;
+	send = inject;
 	for (const request of waiting.values()) {
-		clearTimeout(request.timer);
-		request.reject(new Error("Sign-in screen restarted. Please retry."));
+		if (!request.sent) {
+			request.owner = owner;
+			request.sent = true;
+			send(request.script);
+		}
 	}
-	waiting.clear();
+}
+export function detachAuthRuntime(
+	owner: symbol,
+	message = "Sign-in screen restarted. Please retry.",
+) {
+	if (activeOwner !== owner) return;
+	send = undefined;
+	activeOwner = undefined;
+	for (const [id, request] of waiting) {
+		if (request.owner === owner) {
+			clearTimeout(request.timer);
+			request.reject(new Error(message));
+			waiting.delete(id);
+		}
+	}
 }
 export function receiveAuthMessage(data: string) {
 	try {
@@ -46,7 +71,14 @@ export function request<T = AuthState>(
 			waiting.delete(id);
 			reject(new Error("Sign-in did not respond. Please retry."));
 		}, 20000);
-		waiting.set(id, { script, resolve, reject, timer });
+		waiting.set(id, {
+			script,
+			resolve,
+			reject,
+			timer,
+			owner: activeOwner,
+			sent: !!send,
+		});
 		send?.(script);
 	});
 }
