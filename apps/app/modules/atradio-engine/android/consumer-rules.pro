@@ -1,0 +1,1 @@
+-keep,allowoptimization class fm.atradio.engine.NativeEngine { native <methods>; }

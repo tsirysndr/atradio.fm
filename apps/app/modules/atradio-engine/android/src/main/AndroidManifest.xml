@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <service android:name="fm.atradio.engine.RadioService" android:exported="false" android:foregroundServiceType="mediaPlayback" android:stopWithTask="false" />
+  </application>
+</manifest>

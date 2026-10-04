@@ -1,0 +1,19 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'fm.atradio.engine'
+version = '1.0.0'
+android {
+  namespace 'fm.atradio.engine'
+  defaultConfig {
+    versionCode 1
+    versionName '1.0.0'
+    consumerProguardFiles 'consumer-rules.pro'
+  }
+}
+tasks.register('buildRustEngine', Exec) {
+  workingDir file("${projectDir}/../../..")
+  commandLine 'bash', file("${projectDir}/../../../scripts/build-android-engine.sh").absolutePath
+}
+preBuild.dependsOn('buildRustEngine')

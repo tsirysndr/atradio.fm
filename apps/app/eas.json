@@ -1,0 +1,1 @@
+{"cli":{"appVersionSource":"remote"},"build":{"base":{"bun":"1.4.2","android":{"image":"ubuntu-24.04-jdk-17-ndk-r27b"}},"production":{"extends":"base","environment":"production","android":{"buildType":"app-bundle","autoIncrement":true}},"preview":{"extends":"base","distribution":"internal","environment":"preview","android":{"buildType":"apk"}}}}
