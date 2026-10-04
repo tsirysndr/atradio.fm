@@ -3,7 +3,6 @@
 //! command entrypoint.
 
 mod audio;
-mod auth;
 
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -305,7 +304,6 @@ fn parse_repeat(mode: &str) -> RepeatMode {
 
 /// Dispatch one JSON command and return the JSON response.
 pub fn handle(input: &str) -> String {
-    if let Some(result) = auth::handle(input) { return result; }
 
     let request: Request = match serde_json::from_str(input) {
         Ok(r) => r,

@@ -14,6 +14,9 @@ object NativeEngine {
     System.loadLibrary("atradio_engine")
     nativeInit(context.applicationContext)
     loaded = true
+    context.getSharedPreferences("audio-settings", Context.MODE_PRIVATE).getString("equalizer", null)?.let {
+      command(JSONObject().put("cmd", "setAudioSettings").put("settings", JSONObject().put("equalizer", JSONObject(it))).toString())
+    }
   }
   @JvmStatic external fun nativeInit(context: Context)
   @JvmStatic external fun command(json: String): String
@@ -35,13 +38,26 @@ class AtradioEngineModule : Module() {
         ContextCompat.startForegroundService(c, Intent(c, RadioService::class.java).setAction(action))
       }
     }
-    AsyncFunction("status") { RadioService.snapshot.toString() }
-    AsyncFunction("auth") { command: String, handle: String ->
-      require(command in listOf("authStart", "authStatus", "authRestore", "authCancel", "authLogout"))
-      val c = context()
-      NativeEngine.load(c)
-      val dir = java.io.File(c.noBackupFilesDir, "atproto").apply { mkdirs() }
-      NativeEngine.command(JSONObject().put("cmd", command).put("path", dir.absolutePath).put("handle", handle).toString())
+    AsyncFunction("getEqualizer") {
+      context().getSharedPreferences("audio-settings", Context.MODE_PRIVATE).getString("equalizer", "null") ?: "null"
     }
+    AsyncFunction("setEqualizer") { json: String ->
+      val c = context()
+      val eq = JSONObject(json)
+      val bands = eq.getJSONArray("bands")
+      require(bands.length() == 10)
+      eq.put("precut", eq.optInt("precut").coerceIn(-240, 0))
+      for (i in 0 until bands.length()) {
+        val band = bands.getJSONObject(i)
+        band.put("gain", band.getInt("gain").coerceIn(-240, 240))
+        band.put("frequency", band.getInt("frequency").coerceIn(20, 22000))
+        band.put("q", 10)
+      }
+      NativeEngine.load(c)
+      val result = JSONObject(NativeEngine.command(JSONObject().put("cmd", "setAudioSettings").put("settings", JSONObject().put("equalizer", eq)).toString()))
+      check(result.optBoolean("ok")) { result.optString("error", "Could not apply equalizer") }
+      c.getSharedPreferences("audio-settings", Context.MODE_PRIVATE).edit().putString("equalizer", eq.toString()).apply()
+    }
+    AsyncFunction("status") { RadioService.snapshot.toString() }
   }
 }

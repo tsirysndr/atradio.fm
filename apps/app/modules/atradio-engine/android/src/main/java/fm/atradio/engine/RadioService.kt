@@ -104,7 +104,10 @@ class RadioService : Service() {
     if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) { error = "Another app is using audio. Try again."; publish(); return }
     error = null; nowTitle = ""; playing = true; buffering = true; startedAt = SystemClock.elapsedRealtime()
     if (!wake.isHeld) wake.acquire()
-    send(JSONObject().put("cmd", "open").put("paths", org.json.JSONArray().put(current.getString("streamUrl"))))
+    val original = current.getString("streamUrl")
+    val stream = if (Regex("\\.m3u8(?:\\?|$)", RegexOption.IGNORE_CASE).containsMatchIn(original)) original
+      else "https://media.atradio.fm/api/stream?url=" + java.net.URLEncoder.encode(original, "UTF-8")
+    send(JSONObject().put("cmd", "open").put("paths", org.json.JSONArray().put(stream)))
     publish()
   }
   private fun pause(abandon: Boolean = true) {

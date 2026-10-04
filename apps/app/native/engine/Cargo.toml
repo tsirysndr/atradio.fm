@@ -2,7 +2,7 @@
 name = "atradio-engine"
 version = "0.1.0"
 edition = "2021"
-description = "Native playback engine for the Rocksky mobile app — rockbox-playback behind a JSON-over-JNI command interface"
+description = "Native playback engine for the atradio.fm mobile app — rockbox-playback behind a JSON-over-JNI command interface"
 license = "GPL-2.0-or-later"
 publish = false
 
@@ -11,9 +11,6 @@ name = "atradio_engine"
 crate-type = ["cdylib"]
 
 [dependencies]
-atradio-sdk = { path = "../../../../crates/atradio-sdk" }
-jacquard = { version = "0.12", default-features = false, features = ["api", "dns", "derive", "cache", "loopback"] }
-tokio = { version = "1", features = ["rt-multi-thread", "time", "net", "sync", "macros"] }
 
 rockbox-playback = { version = "0.7", path = "vendor/rockbox-playback" }
 # Feature union: make reqwest (pulled by rockbox-playback's http feature)

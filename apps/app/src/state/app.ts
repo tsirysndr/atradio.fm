@@ -1,0 +1,14 @@
+import { atom } from "jotai";
+import type { AuthState, Playback } from "../native";
+import type { Station } from "../types";
+export type Tab = "Discover" | "Search" | "Library" | "Profile";
+export const tabAtom = atom<Tab>("Discover");
+export const authAtom = atom<AuthState>({ state: "signedOut" });
+export const playerAtom = atom<Playback>({ state: "stopped" });
+export const loginAtom = atom(false);
+export const playerExpandedAtom = atom(false);
+export const equalizerOpenAtom = atom(false);
+export const registrationOpenAtom = atom(false);
+export const directoryOpenAtom = atom(false);
+export const discussionAtom = atom<Station | null>(null);
+export const registeredStationsAtom = atom<Station[]>([]);
