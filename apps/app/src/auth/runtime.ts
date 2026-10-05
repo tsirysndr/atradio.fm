@@ -152,7 +152,7 @@ function task(gen: number, work: () => Promise<any>) {
 				return;
 			}
 			if (input.action === "saveEqualizer") {
-				// Read before merge: mobile only edits EQ; preserve the web's DSP controls.
+				// Read before merge: preserve fields not supplied by this device.
 				const existing = await agent.getAudioSettings();
 				if (actionGeneration !== generation)
 					throw new Error("Account changed; equalizer save canceled.");

@@ -1,3 +1,4 @@
+import { defaultDsp } from "./playback/equalizer";
 import type { EqSettings } from "./playback/equalizer";
 import { resolveStation } from "./playback/resolve";
 import { auth } from "./auth/client";
@@ -52,6 +53,8 @@ export const radio = {
 	getEqualizer: async (): Promise<EqSettings | null> =>
 		JSON.parse(await requireEngine().getEqualizer()),
 	setEqualizer: (settings: EqSettings) =>
-		requireEngine().setEqualizer(JSON.stringify(settings)),
+		requireEngine().setEqualizer(
+			JSON.stringify({ ...settings, dsp: { ...defaultDsp, ...settings.dsp } }),
+		),
 	auth,
 };

@@ -3,7 +3,15 @@ import {
 	EQ_BANDS_HZ,
 	type AudioSettingsData,
 } from "@atradio/lexicons";
+export type DspSettings = Omit<AudioSettingsData, "eqEnabled" | "eqGains">;
+export const {
+	eqEnabled: _enabled,
+	eqGains: _gains,
+	...defaultDsp
+} = DEFAULT_AUDIO_SETTINGS;
 export type EqSettings = {
+	dsp?: Partial<DspSettings>;
+	balance?: number;
 	enabled: boolean;
 	precut: number;
 	bands: { frequency: number; q: number; gain: number }[];
@@ -16,8 +24,16 @@ export const defaultEqualizer = (): EqSettings => ({
 export function fromRepoEqualizer(
 	data: AudioSettingsData,
 	precut = 0,
+	balance = 0,
 ): EqSettings {
 	return {
+		dsp: Object.fromEntries(
+			Object.keys(defaultDsp).map((key) => [
+				key,
+				data[key as keyof DspSettings],
+			]),
+		) as DspSettings,
+		balance,
 		enabled: data.eqEnabled,
 		precut,
 		bands: EQ_BANDS_HZ.map((frequency, i) => ({
@@ -44,6 +60,7 @@ export function mergeRepoEqualizer(
 		throw new Error("Invalid equalizer settings.");
 	return {
 		...(existing ?? DEFAULT_AUDIO_SETTINGS),
+		...eq.dsp,
 		eqEnabled: eq.enabled,
 		eqGains: EQ_BANDS_HZ.map((frequency, i) => {
 			if (eq.bands[i].frequency !== frequency)
@@ -52,3 +69,11 @@ export function mergeRepoEqualizer(
 		}),
 	};
 }
+
+// Only repository-supported fields participate in the save debounce.
+export const repoSettingsKey = (settings: EqSettings) =>
+	JSON.stringify({
+		enabled: settings.enabled,
+		bands: settings.bands,
+		dsp: settings.dsp,
+	});

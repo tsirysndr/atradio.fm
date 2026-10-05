@@ -8,7 +8,11 @@ import {
 	equalizerRevisionAtom,
 	equalizerSyncAtom,
 } from "../state/equalizer";
-import { defaultEqualizer, fromRepoEqualizer } from "../playback/equalizer";
+import {
+	defaultEqualizer,
+	fromRepoEqualizer,
+	repoSettingsKey,
+} from "../playback/equalizer";
 import { radio } from "../native";
 import { request } from "../auth/client";
 
@@ -47,7 +51,7 @@ export default function AudioSettingsSync() {
 		engineQueue.current = engineQueue.current
 			.catch(() => {})
 			.then(() => radio.setEqualizer(settings))
-			.catch(() => setStatus("Could not apply equalizer to the player."));
+			.catch(() => setStatus("Could not apply audio settings to the player."));
 	}, [settings]);
 	const remote = useQuery({
 		queryKey: ["audio-settings", did, auth.canSyncEqualizer],
@@ -68,7 +72,7 @@ export default function AudioSettingsSync() {
 		lastSaved.current = "";
 		setStatus(
 			did
-				? "Loading equalizer from your ATProto repo…"
+				? "Loading audio settings from your ATProto repo…"
 				: "Saved on this device.",
 		);
 	}, [did, auth.canSyncEqualizer]);
@@ -83,19 +87,20 @@ export default function AudioSettingsSync() {
 			return;
 		// Remote wins on login, as on web. Failed reads never authorize a save.
 		const next = remote.data
-			? fromRepoEqualizer(remote.data, current.current.precut)
+			? fromRepoEqualizer(
+					remote.data,
+					current.current.precut,
+					current.current.balance,
+				)
 			: current.current;
 		restored.current = did;
 		baseline.current = revision;
-		lastSaved.current = JSON.stringify({
-			enabled: next.enabled,
-			bands: next.bands,
-		});
+		lastSaved.current = repoSettingsKey(next);
 		setSettings(next);
 		setStatus(
 			auth.canSyncEqualizer
-				? "Equalizer synced with your ATProto repo."
-				: "Reconnect to sync equalizer changes to your ATProto repo.",
+				? "Audio settings synced with your ATProto repo."
+				: "Reconnect to sync audio changes to your ATProto repo.",
 		);
 	}, [
 		did,
@@ -107,7 +112,7 @@ export default function AudioSettingsSync() {
 	useEffect(() => {
 		if (remote.isError && did)
 			setStatus(
-				"Could not load your saved equalizer. Retrying; your repo settings will not be overwritten.",
+				"Could not load your saved audio settings. Retrying; your repo settings will not be overwritten.",
 			);
 	}, [remote.isError, did]);
 	useEffect(() => {
@@ -119,13 +124,10 @@ export default function AudioSettingsSync() {
 			revision === baseline.current
 		)
 			return;
-		const json = JSON.stringify({
-			enabled: settings.enabled,
-			bands: settings.bands,
-		});
+		const json = repoSettingsKey(settings);
 		if (json === lastSaved.current) return;
 		let live = true;
-		setStatus("Saving equalizer to your ATProto repo…");
+		setStatus("Saving audio settings to your ATProto repo…");
 		const timer = setTimeout(async () => {
 			if (writeBusy.current) {
 				if (live) setRetry((n) => n + 1);
@@ -139,12 +141,12 @@ export default function AudioSettingsSync() {
 				);
 				if (live) {
 					lastSaved.current = json;
-					setStatus("Equalizer synced with your ATProto repo.");
+					setStatus("Audio settings synced with your ATProto repo.");
 				}
 			} catch {
 				if (live)
 					setStatus(
-						"Equalizer saved on this device. Repo sync failed; retrying automatically.",
+						"Audio settings saved on this device. Repo sync failed; retrying automatically.",
 					);
 			} finally {
 				writeBusy.current = false;

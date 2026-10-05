@@ -1,7 +1,7 @@
 //! Wire settings use tenths of dB/Q and milliseconds; native DSP uses dB/Q.
 use rockbox_playback::{
-    ChannelMode, CrossfadeMode, CrossfadeSettings, EqBand, Equalizer, MixMode, Player,
-    ReplayGainMode, ToneControls,
+    BassEnhancement, ChannelMode, Compressor, CrossfadeMode, CrossfadeSettings, Crossfeed,
+    CrossfeedMode, EqBand, Equalizer, MixMode, Player, ReplayGainMode, Surround, ToneControls,
 };
 use serde_json::{json, Value};
 use std::time::Duration;
@@ -85,6 +85,54 @@ impl AudioSettings {
             _ => ReplayGainMode::Off,
         }
     }
+    fn crossfeed(&self) -> Crossfeed {
+        let d = &self.document["equalizer"]["dsp"];
+        Crossfeed {
+            mode: match d["crossfeedMode"].as_str().unwrap_or("off") {
+                "meier" => CrossfeedMode::Meier,
+                "custom" => CrossfeedMode::Custom,
+                _ => CrossfeedMode::Off,
+            },
+            direct_gain: (d["crossfeedDirect"]
+                .as_f64()
+                .unwrap_or(-1.5)
+                .clamp(-6.0, 0.0)
+                * 10.0)
+                .round() as i32,
+            ..Crossfeed::default()
+        }
+    }
+    fn pbe(&self) -> BassEnhancement {
+        let d = &self.document["equalizer"]["dsp"];
+        BassEnhancement {
+            strength: number(d, "pbe", 0, 100),
+            precut: -number(d, "pbePrecut", 0, 24) * 10,
+        }
+    }
+    fn surround(&self) -> Surround {
+        let d = &self.document["equalizer"]["dsp"];
+        Surround {
+            delay_ms: number(d, "surroundDelay", 0, 30),
+            balance: d["surroundBalance"].as_i64().unwrap_or(35).clamp(0, 100) as i32,
+            ..Surround::default()
+        }
+    }
+    fn compressor(&self) -> Compressor {
+        let d = &self.document["equalizer"]["dsp"];
+        Compressor {
+            threshold_db: number(d, "compThreshold", -30, 0),
+            makeup_gain: 1,
+            ratio: match d["compRatio"].as_i64().unwrap_or(2) {
+                n if n <= 2 => 0,
+                n if n <= 4 => 1,
+                n if n <= 6 => 2,
+                _ => 3,
+            },
+            knee: 2,
+            attack_ms: 5,
+            release_ms: 200,
+        }
+    }
     pub fn apply(&self, player: &Player, shuffle: bool) {
         player.set_equalizer(self.equalizer());
         let tone = &self.document["tone"];
@@ -97,8 +145,8 @@ impl AudioSettings {
         player.set_balance(number(tone, "balance", -100, 100));
         player.set_channel_mode(match tone["channels"].as_str().unwrap_or("stereo") {
             "mono" => ChannelMode::Mono,
-            "monoLeft" => ChannelMode::MonoLeft,
-            "monoRight" => ChannelMode::MonoRight,
+            "monoLeft" | "mono-left" => ChannelMode::MonoLeft,
+            "monoRight" | "mono-right" => ChannelMode::MonoRight,
             "karaoke" => ChannelMode::Karaoke,
             "custom" | "wide" => ChannelMode::Custom,
             "swap" => ChannelMode::Swap,
@@ -109,6 +157,31 @@ impl AudioSettings {
         } else {
             number(tone, "stereoWidth", 0, 250)
         });
+        // Mobile persists its web-compatible DSP values alongside the legacy EQ.
+        let dsp = &self.document["equalizer"]["dsp"];
+        if dsp.is_object() {
+            player.set_tone(ToneControls {
+                bass_db: number(dsp, "bass", -24, 24),
+                treble_db: number(dsp, "treble", -24, 24),
+                ..ToneControls::default()
+            });
+            player.set_channel_mode(match dsp["channelMode"].as_str().unwrap_or("stereo") {
+                "mono" => ChannelMode::Mono,
+                "monoLeft" | "mono-left" => ChannelMode::MonoLeft,
+                "monoRight" | "mono-right" => ChannelMode::MonoRight,
+                "custom" => ChannelMode::Custom,
+                "karaoke" => ChannelMode::Karaoke,
+                "swap" => ChannelMode::Swap,
+                _ => ChannelMode::Stereo,
+            });
+            player
+                .set_stereo_width(dsp["stereoWidth"].as_i64().unwrap_or(100).clamp(0, 255) as i32);
+        }
+        player.set_balance(number(&self.document["equalizer"], "balance", -100, 100));
+        player.set_crossfeed(self.crossfeed());
+        player.set_bass_enhancement(self.pbe());
+        player.set_surround(self.surround());
+        player.set_compressor(self.compressor());
         player.set_crossfade(self.crossfade(shuffle));
         let rg = &self.document["replayGain"];
         player.set_replaygain(
@@ -122,6 +195,28 @@ impl AudioSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn mobile_dsp_maps_web_units_and_defaults() {
+        let mut s = AudioSettings::default();
+        assert_eq!(s.crossfeed().mode, CrossfeedMode::Off);
+        assert_eq!(s.pbe().strength, 0);
+        assert_eq!(s.compressor().threshold_db, 0);
+        s.merge(json!({"equalizer":{"dsp":{"crossfeedMode":"custom","crossfeedDirect":-2.5,"pbe":45,"pbePrecut":3,"surroundDelay":12,"surroundBalance":60,"compThreshold":-18,"compRatio":6}}}));
+        assert_eq!(s.crossfeed().mode, CrossfeedMode::Custom);
+        assert_eq!(s.crossfeed().direct_gain, -25);
+        assert_eq!(s.pbe().strength, 45);
+        assert_eq!(s.pbe().precut, -30);
+        assert_eq!(s.surround().delay_ms, 12);
+        assert_eq!(s.surround().balance, 60);
+        assert_eq!(s.compressor().ratio, 2);
+        assert_eq!(s.compressor().makeup_gain, 1);
+        assert_eq!(s.compressor().attack_ms, 5);
+        s.merge(json!({"equalizer":{"dsp":{"crossfeedMode":"off","pbe":0,"surroundDelay":0,"compThreshold":0}}}));
+        assert_eq!(s.crossfeed().mode, CrossfeedMode::Off);
+        assert_eq!(s.pbe().strength, 0);
+        assert_eq!(s.surround().delay_ms, 0);
+        assert_eq!(s.compressor().threshold_db, 0);
+    }
     #[test]
     fn partial_patches_preserve_values_and_convert_units() {
         let mut settings = AudioSettings::default();

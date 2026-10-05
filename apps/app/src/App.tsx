@@ -529,7 +529,7 @@ function Main() {
 						onPress={() => setEqualizer(true)}
 					>
 						<Text style={{ color: c.cyan, fontWeight: "700" }}>
-							Equalizer settings
+							Audio settings
 						</Text>
 					</Pressable>
 					<Text style={s.small}>
@@ -1071,7 +1071,7 @@ function Main() {
 						</Pressable>
 						<Pressable
 							accessibilityRole="button"
-							accessibilityLabel="Equalizer settings"
+							accessibilityLabel="Audio settings"
 							onPress={() => {
 								setExpanded(false);
 								setEqualizer(true);

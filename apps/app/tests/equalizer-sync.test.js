@@ -52,3 +52,35 @@ test("a new EQ record has web defaults and malformed bands cannot be saved", () 
 	eq.bands[0].frequency = 1000;
 	expect(() => mergeRepoEqualizer(null, eq)).toThrow("order");
 });
+
+test("all web DSP settings round-trip while balance remains device-local", () => {
+	const data = {
+		...DEFAULT_AUDIO_SETTINGS,
+		bass: 8,
+		treble: -4,
+		crossfeedMode: "custom",
+		crossfeedDirect: -2.5,
+		pbe: 40,
+		pbePrecut: 3,
+		surroundDelay: 12,
+		surroundBalance: 60,
+		compThreshold: -18,
+		compRatio: 6,
+		channelMode: "mono-left",
+		stereoWidth: 150,
+	};
+	const eq = fromRepoEqualizer(data, -40, -25);
+	expect(eq.dsp.bass).toBe(8);
+	expect(eq.dsp.crossfeedDirect).toBe(-2.5);
+	expect(eq.balance).toBe(-25);
+	expect(mergeRepoEqualizer(null, eq)).toEqual(data);
+	eq.dsp.treble = 7;
+	expect(mergeRepoEqualizer(data, eq)).toEqual({ ...data, treble: 7 });
+	expect(mergeRepoEqualizer(data, eq)).not.toHaveProperty("balance");
+});
+test("editing one DSP field preserves unrelated remote settings", () => {
+	const remote = { ...DEFAULT_AUDIO_SETTINGS, pbe: 45, stereoWidth: 160 };
+	expect(
+		mergeRepoEqualizer(remote, { ...defaultEqualizer(), dsp: { bass: 3 } }),
+	).toEqual({ ...remote, bass: 3 });
+});

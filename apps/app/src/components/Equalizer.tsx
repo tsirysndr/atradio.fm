@@ -9,12 +9,15 @@ import {
 } from "react-native";
 import Slider from "@react-native-community/slider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AudioRange, AudioSelect, AudioSection } from "./AudioControls";
 import Feather from "@expo/vector-icons/Feather";
 import { c } from "../theme";
 export type { EqSettings } from "../playback/equalizer";
 import {
 	defaultEqualizer as defaults,
 	type EqSettings,
+	defaultDsp,
+	type DspSettings,
 } from "../playback/equalizer";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
@@ -34,6 +37,15 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 		setSettings(next);
 		setRevision((n) => n + 1);
 	};
+	const dsp = { ...defaultDsp, ...settings?.dsp };
+	const updateDsp = <K extends keyof DspSettings>(
+		key: K,
+		value: DspSettings[K],
+	) =>
+		apply({
+			...current.current,
+			dsp: { ...current.current.dsp, [key]: value },
+		});
 	return (
 		<View style={{ flex: 1, backgroundColor: c.bg, paddingTop: inset.top }}>
 			<View
@@ -44,7 +56,7 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 					gap: 18,
 				}}
 			>
-				<Pressable accessibilityLabel="Close equalizer" onPress={onClose}>
+				<Pressable accessibilityLabel="Close audio settings" onPress={onClose}>
 					<Feather name="chevron-down" size={26} color={c.text} />
 				</Pressable>
 				<Text
@@ -55,7 +67,7 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 						fontWeight: "800",
 					}}
 				>
-					Equalizer
+					Audio settings
 				</Text>
 			</View>
 			{!settings ? (
@@ -87,6 +99,9 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 						and are saved automatically.
 					</Text>
 					<Text style={{ color: c.muted }}>{syncStatus}</Text>
+					<Text style={{ color: c.text, fontFamily: "Lexend", fontSize: 20 }}>
+						10-band equalizer
+					</Text>
 					{settings.bands.map((band, index) => (
 						<View
 							key={band.frequency}
@@ -156,7 +171,11 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 					</Text>
 					<Pressable
 						onPress={() =>
-							apply({ ...defaults(), enabled: current.current.enabled })
+							apply({
+								...current.current,
+								...defaults(),
+								enabled: current.current.enabled,
+							})
 						}
 						style={{
 							borderWidth: 1,
@@ -169,6 +188,160 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 						<Text style={{ color: c.cyan, fontWeight: "700" }}>
 							Reset to flat
 						</Text>
+					</Pressable>
+
+					<AudioSection title="Tone">
+						<AudioRange
+							label="Bass"
+							value={dsp.bass}
+							min={-24}
+							max={24}
+							unit=" dB"
+							onChange={(v) => updateDsp("bass", v)}
+						/>
+						<AudioRange
+							label="Treble"
+							value={dsp.treble}
+							min={-24}
+							max={24}
+							unit=" dB"
+							onChange={(v) => updateDsp("treble", v)}
+						/>
+						<AudioRange
+							label="Balance (this device)"
+							value={settings.balance ?? 0}
+							min={-100}
+							max={100}
+							format={(v) =>
+								v === 0
+									? "Center"
+									: `${Math.abs(v)}% ${v < 0 ? "left" : "right"}`
+							}
+							onChange={(balance) => apply({ ...current.current, balance })}
+						/>
+					</AudioSection>
+					<AudioSection title="Headphone crossfeed">
+						<AudioSelect
+							label="Crossfeed mode"
+							value={dsp.crossfeedMode}
+							options={[
+								["off", "Off"],
+								["meier", "Meier"],
+								["custom", "Custom"],
+							]}
+							onChange={(v) =>
+								updateDsp("crossfeedMode", v as DspSettings["crossfeedMode"])
+							}
+						/>
+						<AudioRange
+							label="Direct gain"
+							value={dsp.crossfeedDirect}
+							min={-6}
+							max={0}
+							step={0.5}
+							unit=" dB"
+							disabled={dsp.crossfeedMode !== "custom"}
+							onChange={(v) => updateDsp("crossfeedDirect", v)}
+						/>
+					</AudioSection>
+					<AudioSection title="Perceptual bass enhancement (PBE)">
+						<AudioRange
+							label="PBE strength"
+							value={dsp.pbe}
+							min={0}
+							max={100}
+							unit="%"
+							onChange={(v) => updateDsp("pbe", v)}
+						/>
+						<AudioRange
+							label="PBE precut"
+							value={dsp.pbePrecut}
+							min={0}
+							max={24}
+							format={(v) => `−${v} dB`}
+							onChange={(v) => updateDsp("pbePrecut", v)}
+						/>
+					</AudioSection>
+					<AudioSection title="Surround">
+						<AudioRange
+							label="Surround delay"
+							value={dsp.surroundDelay}
+							min={0}
+							max={30}
+							unit=" ms"
+							onChange={(v) => updateDsp("surroundDelay", v)}
+						/>
+						<AudioRange
+							label="Surround balance"
+							value={dsp.surroundBalance}
+							min={0}
+							max={100}
+							unit="%"
+							onChange={(v) => updateDsp("surroundBalance", v)}
+						/>
+					</AudioSection>
+					<AudioSection title="Compressor">
+						<AudioRange
+							label="Threshold"
+							value={dsp.compThreshold}
+							min={-30}
+							max={0}
+							format={(v) => (v === 0 ? "Off" : `${v} dB`)}
+							onChange={(v) => updateDsp("compThreshold", v)}
+						/>
+						<AudioSelect
+							label="Compression ratio"
+							value={String(dsp.compRatio)}
+							options={[
+								["2", "2:1"],
+								["4", "4:1"],
+								["6", "6:1"],
+								["10", "10:1"],
+							]}
+							onChange={(v) => updateDsp("compRatio", Number(v))}
+						/>
+					</AudioSection>
+					<AudioSection title="Stereo">
+						<AudioSelect
+							label="Channels"
+							value={dsp.channelMode}
+							options={[
+								["stereo", "Stereo"],
+								["mono", "Mono"],
+								["custom", "Custom width"],
+								["mono-left", "Mono left"],
+								["mono-right", "Mono right"],
+								["karaoke", "Karaoke"],
+								["swap", "Swap left / right"],
+							]}
+							onChange={(v) =>
+								updateDsp("channelMode", v as DspSettings["channelMode"])
+							}
+						/>
+						<AudioRange
+							label="Stereo width"
+							value={dsp.stereoWidth}
+							min={0}
+							max={255}
+							unit="%"
+							disabled={dsp.channelMode !== "custom"}
+							onChange={(v) => updateDsp("stereoWidth", v)}
+						/>
+					</AudioSection>
+					<Pressable
+						accessibilityRole="button"
+						onPress={() =>
+							apply({ ...defaults(), dsp: { ...defaultDsp }, balance: 0 })
+						}
+						style={{
+							padding: 16,
+							borderRadius: 999,
+							borderWidth: 1,
+							borderColor: c.border,
+							alignItems: "center",
+						}}
+					>
+						<Text style={{ color: c.cyan }}>Reset all audio settings</Text>
 					</Pressable>
 				</ScrollView>
 			)}
