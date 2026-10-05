@@ -56,7 +56,7 @@ export function PrivacyPage() {
         </section>)}
         <section id="contact" className="scroll-mt-24 rounded-2xl border border-white/10 bg-synth-surface p-6">
           <h2 className="mb-3 font-display text-xl font-semibold">Contact and privacy requests</h2>
-          <p className="leading-7 text-foreground/80">For privacy questions or data-deletion requests, email <a href="mailto:hi@rocksky.app" className="text-synth-cyan underline underline-offset-4">hi@rocksky.app</a>. Include your handle or DID and describe your request. Never send passwords or access tokens.</p>
+          <p className="leading-7 text-foreground/80">For privacy questions or data-deletion requests, email <a href="mailto:hi@atradio.fm" className="text-synth-cyan underline underline-offset-4">hi@atradio.fm</a>. Include your handle or DID and describe your request. Never send passwords or access tokens.</p>
         </section>
         <section>
           <h2 className="mb-3 font-display text-xl font-semibold">Changes to this policy</h2>
