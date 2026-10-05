@@ -18,6 +18,7 @@ export type AuthState = {
 	offline?: boolean;
 	canPublishPlays?: boolean;
 	canSyncEqualizer?: boolean;
+	canFavorite?: boolean;
 };
 export type Playback = {
 	state: "playing" | "paused" | "stopped" | "buffering" | "error";

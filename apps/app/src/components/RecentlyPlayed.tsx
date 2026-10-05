@@ -6,6 +6,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { recentlyPlayed, timeAgo } from "../api/recent";
 import type { Station } from "../types";
+import FavoriteButton from "./FavoriteButton";
 import StationLoader from "./StationLoader";
 import { c } from "../theme";
 export default function RecentlyPlayed({
@@ -120,9 +121,12 @@ export default function RecentlyPlayed({
 									: item.actor?.displayName || "A listener"}
 							</Text>
 						</View>
-						<Text style={{ color: c.muted, fontSize: 12 }}>
-							{timeAgo(item.playedAt)}
-						</Text>
+						<View
+							style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+						>
+							<Text style={{ color: c.muted, fontSize: 12 }}>{timeAgo(item.playedAt)}</Text>
+							<FavoriteButton station={item.station} />
+						</View>
 					</Pressable>
 				)}
 				ListFooterComponent={

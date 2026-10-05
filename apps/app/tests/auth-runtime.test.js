@@ -1,4 +1,5 @@
-import { test, expect, mock } from "bun:test";
+import { test, expect, mock, spyOn } from "bun:test";
+import { AtradioAgent } from "@atradio/sdk";
 const messages = [];
 const deleted = [];
 let finalize;
@@ -34,6 +35,7 @@ mock.module("@atcute/oauth-browser-client", () => ({
 	listStoredSessions: () => storedSessions,
 	deleteStoredSession: (did) => deleted.push(did),
 	OAuthUserAgent: class {
+		async handle() { throw new Error("Unexpected network call"); }
 		async signOut() {}
 	},
 	TokenRefreshError,
@@ -78,6 +80,7 @@ test("cancelled OAuth cannot sign the user in when token exchange completes late
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 test("OAuth requests listening permission and refreshing preserves saved sessions offline", async () => {
 	expect(requestedScope).toContain("repo:fm.atradio.actor.status");
+	expect(requestedScope).toContain("repo:fm.atradio.favorite");
 	expect(requestedScope).toContain("repo:fm.atradio.audio.settings");
 	storedSessions = [session.info.sub];
 	await command(6, "authRestore");
@@ -137,4 +140,39 @@ test("Bluesky signup requests account creation and completes the in-app OAuth ca
 	expect(messages.at(-1).result.profile.did).toBe(session.info.sub);
 	expect(storage.get("atradio-mobile-handle")).toBe("");
 	expect(JSON.stringify(messages)).not.toContain("never-cross-the-bridge");
+});
+
+
+test("favorites read from the PDS; writes require consent and the current account", async () => {
+	sessionError = undefined;
+	const station = { id: "rb:test", name: "Test radio", source: "radio-browser", streamUrl: "https://radio.test/live" };
+	const favorite = mock(async () => "at://did:plc:test/fm.atradio.favorite/key");
+	const unfavorite = mock(async () => {});
+	const listFavorites = mock(async () => [{ station, rkey: "key" }]);
+	const agent = spyOn(AtradioAgent, "fromClient").mockReturnValue({ favorite, unfavorite, listFavorites });
+	const action = (name, actor = session.info.sub) => command(30, "stationAction", JSON.stringify({ action: name, actor, station }));
+	try {
+		await action("listFavorites");
+		expect(messages.at(-1)).toEqual({ id: 30, result: [station] });
+		await action("favorite");
+		expect(messages.at(-1).error).toContain("Sign in again");
+		expect(favorite).not.toHaveBeenCalled();
+		session.token.scope += " repo:fm.atradio.favorite";
+		await command(31, "authRefresh");
+		expect(messages.at(-1).result.canFavorite).toBe(true);
+		await action("favorite", "did:plc:other");
+		expect(messages.at(-1).error).toContain("Account changed");
+		expect(favorite).not.toHaveBeenCalled();
+		await action("favorite");
+		expect(favorite).toHaveBeenCalledWith(station);
+		expect(messages.at(-1).result.ok).toBe(true);
+		await action("unfavorite");
+		expect(unfavorite).toHaveBeenCalledWith(station);
+		favorite.mockRejectedValueOnce(new Error("PDS offline"));
+		await action("favorite");
+		expect(messages.at(-1).error).toBe("PDS offline");
+		expect(JSON.stringify(messages)).not.toContain("never-cross-the-bridge");
+	} finally {
+		agent.mockRestore();
+	}
 });

@@ -55,6 +55,8 @@ function signedIn(session: any, handle = currentHandle) {
 	return {
 		state: "signedIn",
 		profile: { did: session.info.sub, handle: handle || session.info.sub },
+		canFavorite:
+			session.token.scope?.split(/\s+/).includes("repo:fm.atradio.favorite") ?? false,
 		canSyncEqualizer:
 			session.token.scope
 				?.split(/\s+/)
@@ -100,6 +102,9 @@ function task(gen: number, work: () => Promise<any>) {
 					"playStatus",
 					"getAudioSettings",
 					"saveEqualizer",
+					"listFavorites",
+					"favorite",
+					"unfavorite",
 				].includes(input.action)
 			)
 				throw new Error("Unsupported station action");
@@ -126,17 +131,20 @@ function task(gen: number, work: () => Promise<any>) {
 			)
 				throw new Error("Account changed; action canceled.");
 			const needed =
-				input.action === "saveEqualizer"
-					? "repo:fm.atradio.audio.settings"
-					: input.action === "playStatus"
-						? "repo:fm.atradio.actor.status"
-						: input.action === "reaction"
-							? "repo:fm.atradio.reaction"
-							: input.action === "registerStation"
-								? "repo:fm.atradio.station"
-								: "repo:fm.atradio.comment";
+				input.action === "favorite" || input.action === "unfavorite"
+					? "repo:fm.atradio.favorite"
+					: input.action === "saveEqualizer"
+						? "repo:fm.atradio.audio.settings"
+						: input.action === "playStatus"
+							? "repo:fm.atradio.actor.status"
+							: input.action === "reaction"
+								? "repo:fm.atradio.reaction"
+								: input.action === "registerStation"
+									? "repo:fm.atradio.station"
+									: "repo:fm.atradio.comment";
 			if (
 				input.action !== "getAudioSettings" &&
+				input.action !== "listFavorites" &&
 				!session.token.scope.split(/\s+/).includes(needed)
 			)
 				throw new Error(
@@ -146,6 +154,17 @@ function task(gen: number, work: () => Promise<any>) {
 				new Client({ handler: new OAuthUserAgent(session) }),
 				session.info.sub,
 			);
+			if (input.action === "listFavorites") {
+				const result = (await agent.listFavorites()).map(({ station }) => station);
+				bridge.postMessage(JSON.stringify({ id, result }));
+				return;
+			}
+			if (input.action === "favorite" || input.action === "unfavorite") {
+				if (input.action === "favorite") await agent.favorite(input.station);
+				else await agent.unfavorite(input.station);
+				bridge.postMessage(JSON.stringify({ id, result: { ok: true } }));
+				return;
+			}
 			if (input.action === "getAudioSettings") {
 				const result = await agent.getAudioSettings();
 				bridge.postMessage(JSON.stringify({ id, result }));
@@ -232,7 +251,7 @@ function task(gen: number, work: () => Promise<any>) {
 							: { type: "account", identifier: argument as ActorIdentifier },
 					...(cmd === "authSignup" ? { prompt: "create" as const } : {}),
 					scope:
-						"atproto repo:fm.atradio.comment repo:fm.atradio.reaction repo:fm.atradio.station repo:fm.atradio.actor.status repo:fm.atradio.audio.settings",
+						"atproto repo:fm.atradio.favorite repo:fm.atradio.comment repo:fm.atradio.reaction repo:fm.atradio.station repo:fm.atradio.actor.status repo:fm.atradio.audio.settings",
 				});
 				return { state: "authorizing", url: url.toString() };
 			});

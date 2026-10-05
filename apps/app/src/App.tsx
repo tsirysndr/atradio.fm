@@ -69,6 +69,8 @@ import StationCollection from "./components/StationCollection";
 import StationDiscussion from "./components/StationDiscussion";
 import SignIn from "./components/SignIn";
 import AuthRuntime from "./components/AuthRuntime";
+import FavoriteButton from "./components/FavoriteButton";
+import { useFavorites, favoritesKey } from "./hooks/useFavorites";
 import RecentlyPlayed from "./components/RecentlyPlayed";
 import { c } from "./theme";
 import { request } from "./auth/client";
@@ -186,6 +188,7 @@ function Main() {
 			listener.remove();
 		};
 	}, [did]);
+	const favorites = useFavorites();
 	const account = useQuery({
 		queryKey: ["profile", did],
 		queryFn: () => profile(did!),
@@ -240,7 +243,7 @@ function Main() {
 	const results = useQuery({
 		queryKey: ["stations", tab, debounced, genre, did, searchGenre],
 		queryFn: ({ signal }) => {
-			if (tab === "Library") return appviewStations("favorites", did, signal);
+			if (tab === "Library") return [];
 			if (tab === "Search") {
 				if (debounced) return searchRadioBrowser(debounced, signal);
 				if (searchGenre)
@@ -264,9 +267,10 @@ function Main() {
 		},
 		enabled:
 			tab !== "Profile" &&
-			(tab !== "Library" || !!did) &&
+			tab !== "Library" &&
 			(tab !== "Search" || debounced.length > 0 || !!searchGenre),
 	});
+	const stationResults = tab === "Library" ? favorites : results;
 	const openProfileLink = async (destination: "bluesky" | "pdsls") => {
 		if (!did) return;
 		try {
@@ -298,6 +302,7 @@ function Main() {
 		try {
 			await Promise.allSettled([
 				client.invalidateQueries({ queryKey: ["profile", did], exact: true }),
+				client.invalidateQueries({ queryKey: favoritesKey(did), exact: true }),
 				client.invalidateQueries({ queryKey: ["profile-stations", did] }),
 			]);
 		} finally {
@@ -349,47 +354,47 @@ function Main() {
 	};
 	const playing = player.state === "playing" || player.state === "buffering";
 	const row = ({ item }: { item: Station }) => (
-		<Pressable
-			accessibilityRole="button"
-			accessibilityLabel={`Listen to ${item.name}`}
-			style={s.station}
-			onPress={() => void play(item)}
-		>
-			<Artwork station={item} />
-			<View style={{ flex: 1, gap: 5 }}>
-				<Text numberOfLines={1} style={s.stationName}>
-					{item.name}
-				</Text>
-				<Text numberOfLines={1} style={s.muted}>
-					{[item.genre || item.tags?.[0], item.country]
-						.filter(Boolean)
-						.join(" · ") || "Live radio"}
-				</Text>
-				{!!item.bitrate && (
-					<Text style={s.small}>
-						{item.codec} · {item.bitrate} kbps
+		<View style={s.station}>
+			<Pressable
+				accessibilityRole="button"
+				accessibilityLabel={`Listen to ${item.name}`}
+				style={{ flex: 1, flexDirection: "row", gap: 12, alignItems: "center" }}
+				onPress={() => void play(item)}
+			>
+				<Artwork station={item} />
+				<View style={{ flex: 1, gap: 5 }}>
+					<Text numberOfLines={1} style={s.stationName}>
+						{item.name}
 					</Text>
-				)}
-			</View>
+					<Text numberOfLines={1} style={s.muted}>
+						{[item.genre || item.tags?.[0], item.country]
+							.filter(Boolean)
+							.join(" · ") || "Live radio"}
+					</Text>
+					{!!item.bitrate && (
+						<Text style={s.small}>
+							{item.codec} · {item.bitrate} kbps
+						</Text>
+					)}
+				</View>
+				<Feather
+					name={
+						player.station?.id === item.id && playing ? "volume-2" : "play-circle"
+					}
+					size={26}
+					color={c.cyan}
+				/>
+			</Pressable>
+			<FavoriteButton station={item} />
 			<Pressable
 				accessibilityRole="button"
 				accessibilityLabel={`Comments and reactions for ${item.name}`}
-				onPress={(event) => {
-					event.stopPropagation();
-					setDiscussion(item);
-				}}
+				onPress={() => setDiscussion(item)}
 				style={{ padding: 10 }}
 			>
 				<Feather name="message-circle" size={23} color={c.muted} />
 			</Pressable>
-			<Feather
-				name={
-					player.station?.id === item.id && playing ? "volume-2" : "play-circle"
-				}
-				size={26}
-				color={c.cyan}
-			/>
-		</Pressable>
+		</View>
 	);
 	return (
 		<View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
@@ -499,6 +504,7 @@ function Main() {
 										setAuth({ state: "signedOut" });
 										setAdded([]);
 										client.removeQueries({ queryKey: ["audio-settings"] });
+										client.removeQueries({ queryKey: ["favorites"] });
 										client.removeQueries({ queryKey: ["profile-stations"] });
 										client.removeQueries({ queryKey: ["profile"] });
 										client.removeQueries({ queryKey: ["stations"] });
@@ -553,7 +559,7 @@ function Main() {
 					data={
 						tab === "Search" && !query.trim() && !searchGenre
 							? []
-							: (results.data ?? [])
+							: (stationResults.data ?? [])
 					}
 					keyExtractor={(x) => x.id}
 					renderItem={row}
@@ -567,9 +573,9 @@ function Main() {
 					refreshControl={
 						<RefreshControl
 							tintColor={c.cyan}
-							refreshing={results.isRefetching}
+							refreshing={stationResults.isRefetching}
 							onRefresh={() => {
-								void results.refetch();
+								void stationResults.refetch();
 								void client.invalidateQueries({
 									queryKey: ["global-recently-played"],
 								});
@@ -744,21 +750,21 @@ function Main() {
 							/>
 						) : (
 							<View
-								style={results.isLoading ? { paddingVertical: 12 } : s.empty}
+								style={stationResults.isLoading ? { paddingVertical: 12 } : s.empty}
 							>
-								{results.isLoading ? (
+								{stationResults.isLoading ? (
 									<StationLoader />
 								) : (
 									<>
 										<Text style={s.body}>
-											{results.isError
+											{stationResults.isError
 												? "Stations could not be loaded."
 												: tab === "Library"
 													? "Your saved stations will appear here."
 													: "No stations found."}
 										</Text>
 										{(tab !== "Search" || !!query.trim() || !!searchGenre) && (
-											<Pressable onPress={() => void results.refetch()}>
+											<Pressable onPress={() => void stationResults.refetch()}>
 												<Text style={{ color: c.cyan, padding: 14 }}>
 													Retry
 												</Text>
@@ -834,6 +840,7 @@ function Main() {
 							<ListenerCount stationId={player.station.id} compact />
 						</View>
 					</Pressable>
+					<FavoriteButton station={player.station} />
 					<Pressable
 						accessibilityLabel={playing ? "Pause radio" : "Play radio"}
 						onPress={() => void control(playing ? "pause" : "play")}
@@ -1070,6 +1077,7 @@ function Main() {
 						>
 							<Feather name="chevron-down" size={28} color={c.text} />
 						</Pressable>
+						{player.station && <FavoriteButton station={player.station} size={26} />}
 						<Pressable
 							accessibilityRole="button"
 							accessibilityLabel="Audio settings"
@@ -1240,7 +1248,7 @@ const s = StyleSheet.create({
 	},
 	station: {
 		flexDirection: "row",
-		gap: 14,
+		gap: 6,
 		alignItems: "center",
 		paddingVertical: 14,
 		borderBottomWidth: 1,

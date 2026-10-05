@@ -6,6 +6,10 @@ import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { stationPage } from "../api/stations";
 import type { Station } from "../types";
+import FavoriteButton from "./FavoriteButton";
+import { useFavorites } from "../hooks/useFavorites";
+import { useAtomValue } from "jotai";
+import { authAtom } from "../state/app";
 import StationLoader from "./StationLoader";
 import { c } from "../theme";
 const tabs = [
@@ -31,12 +35,20 @@ export default function StationCollection({
 	const [tab, setTab] = useState<"favorites" | "mine" | "recent">("favorites");
 	const [filter, setFilter] = useState("");
 	const kind = directory ? "registered" : tab;
+	const auth = useAtomValue(authAtom);
+	const ownFavorites =
+		!directory &&
+		tab === "favorites" &&
+		auth.state === "signedIn" &&
+		actor === auth.profile?.did;
+	const favorites = useFavorites();
 	const result = useInfiniteQuery({
 		queryKey: [
 			directory ? "registered-stations" : "profile-stations",
 			actor,
 			kind,
 		],
+		enabled: !ownFavorites,
 		initialPageParam: undefined as string | undefined,
 		queryFn: ({ pageParam, signal }) =>
 			stationPage(kind, directory ? undefined : actor, pageParam, signal),
@@ -44,10 +56,14 @@ export default function StationCollection({
 			last.cursor !== cursor ? last.cursor : undefined,
 		refetchInterval: 30000,
 	});
+	const loading = ownFavorites ? favorites.isPending : result.isPending;
+	const failed = ownFavorites ? favorites.isError : result.isError;
 	const seen = new Set<string>();
 	const items = [
 		...(directory || tab === "mine" ? added : []),
-		...(result.data?.pages.flatMap((page) => page.items) ?? []),
+		...(ownFavorites
+			? favorites.data ?? []
+			: result.data?.pages.flatMap((page) => page.items) ?? []),
 	].filter((station) => {
 		if (seen.has(station.id)) return false;
 		seen.add(station.id);
@@ -119,7 +135,7 @@ export default function StationCollection({
 					color: c.text,
 				}}
 			/>
-			{result.isPending && <StationLoader />}
+			{loading && <StationLoader />}
 			{items.map((station) => (
 				<View
 					key={station.id}
@@ -163,6 +179,7 @@ export default function StationCollection({
 						</View>
 						<Feather name="play-circle" size={24} color={c.cyan} />
 					</Pressable>
+					<FavoriteButton station={station} />
 					<Pressable
 						onPress={() => onDiscussion(station)}
 						accessibilityLabel={`Comments for ${station.name}`}
@@ -172,15 +189,17 @@ export default function StationCollection({
 					</Pressable>
 				</View>
 			))}
-			{!result.isPending && !result.isError && items.length === 0 && (
+			{!loading && !failed && items.length === 0 && (
 				<Text style={{ color: c.muted }}>No stations found.</Text>
 			)}
-			{result.isError && (
+			{failed && (
 				<Pressable
 					onPress={() =>
-						void (result.isFetchNextPageError
-							? result.fetchNextPage()
-							: result.refetch())
+						void (ownFavorites
+							? favorites.refetch()
+							: result.isFetchNextPageError
+								? result.fetchNextPage()
+								: result.refetch())
 					}
 				>
 					<Text style={{ color: c.cyan }}>
@@ -188,7 +207,7 @@ export default function StationCollection({
 					</Text>
 				</Pressable>
 			)}
-			{result.hasNextPage && (
+			{!ownFavorites && result.hasNextPage && (
 				<Pressable
 					disabled={result.isFetchingNextPage}
 					onPress={() => void result.fetchNextPage()}
