@@ -1018,6 +1018,29 @@ function Main() {
 						{ paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 },
 					]}
 				>
+					{expanded && !!player.station?.favicon && (
+						<View
+							pointerEvents="none"
+							accessibilityElementsHidden
+							importantForAccessibility="no-hide-descendants"
+							style={StyleSheet.absoluteFill}
+						>
+							<Image
+								key={player.station.favicon}
+								source={player.station.favicon}
+								style={StyleSheet.absoluteFill}
+								contentFit="cover"
+								blurRadius={40}
+								accessible={false}
+							/>
+							<View
+								style={[
+									StyleSheet.absoluteFill,
+									{ backgroundColor: "rgba(8, 13, 27, 0.78)" },
+								]}
+							/>
+						</View>
+					)}
 					<View
 						style={{
 							width: "100%",
