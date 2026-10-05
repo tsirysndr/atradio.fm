@@ -18,6 +18,7 @@ import {
 	Alert,
 	AppState,
 	FlatList,
+	Linking,
 	Modal,
 	PermissionsAndroid,
 	Platform,
@@ -54,6 +55,7 @@ import {
 } from "./native";
 import type { Station } from "./types";
 import { genres } from "./genres";
+import StationLoader from "./components/StationLoader";
 import GenreGrid from "./components/GenreGrid";
 import AudioSettingsSync from "./components/AudioSettingsSync";
 import Equalizer from "./components/Equalizer";
@@ -120,6 +122,8 @@ function Main() {
 	const [expanded, setExpanded] = useAtom(playerExpandedAtom);
 	const [playError, setPlayError] = useState("");
 	const [historyError, setHistoryError] = useState("");
+	const [refreshingProfile, setRefreshingProfile] = useState(false);
+	const profileRefreshBusy = useRef(false);
 	const playRequest = useRef<AbortController | null>(null);
 	const history = useRef<PlayHistorySync | null>(null);
 	if (!history.current)
@@ -256,6 +260,32 @@ function Main() {
 			(tab !== "Library" || !!did) &&
 			(tab !== "Search" || debounced.length > 0 || !!searchGenre),
 	});
+	const openProfileLink = async (destination: "bluesky" | "pdsls") => {
+		if (!did) return;
+		const url =
+			destination === "bluesky"
+				? `https://bsky.app/profile/${encodeURIComponent(did)}`
+				: `https://pdsls.dev/at://${did}`;
+		try {
+			await Linking.openURL(url);
+		} catch {
+			Alert.alert("Could not open link", "Please try again.");
+		}
+	};
+	const refreshProfile = async () => {
+		if (!did || profileRefreshBusy.current) return;
+		profileRefreshBusy.current = true;
+		setRefreshingProfile(true);
+		try {
+			await Promise.allSettled([
+				client.invalidateQueries({ queryKey: ["profile", did], exact: true }),
+				client.invalidateQueries({ queryKey: ["profile-stations", did] }),
+			]);
+		} finally {
+			profileRefreshBusy.current = false;
+			setRefreshingProfile(false);
+		}
+	};
 	const openRegister = () => {
 		if (did) setRegister(true);
 		else {
@@ -373,26 +403,62 @@ function Main() {
 				</Pressable>
 			</View>
 			{tab === "Profile" ? (
-				<ScrollView contentContainerStyle={{ padding: 24, gap: 20 }}>
+				<ScrollView
+					alwaysBounceVertical
+					contentContainerStyle={{ padding: 24, gap: 20, flexGrow: 1 }}
+					refreshControl={
+						did ? (
+							<RefreshControl
+								tintColor={c.cyan}
+								colors={[c.cyan]}
+								progressBackgroundColor={c.surface}
+								refreshing={refreshingProfile}
+								onRefresh={() => void refreshProfile()}
+							/>
+						) : undefined
+					}
+				>
 					<Text style={s.heading}>Your frequency.</Text>
 					{did ? (
 						<>
 							<View style={s.profile}>
-								<Image
-									source={account.data?.avatar}
+								<Pressable
+									accessibilityRole="link"
+									accessibilityLabel={`View ${account.data?.displayName || account.data?.handle || auth.profile?.handle || "your profile"} on Bluesky`}
+									onPress={() => void openProfileLink("bluesky")}
+									style={{ alignItems: "center", gap: 14 }}
+								>
+									<Image
+										source={account.data?.avatar}
+										style={{
+											width: 86,
+											height: 86,
+											borderRadius: 43,
+											backgroundColor: c.panel,
+										}}
+									/>
+									<Text style={s.heading}>
+										{account.data?.displayName || auth.profile?.handle}
+									</Text>
+									<Text style={s.muted}>
+										@{account.data?.handle || auth.profile?.handle}
+									</Text>
+								</Pressable>
+								<Pressable
+									accessibilityRole="link"
+									accessibilityLabel="View your ATProto repository on PDSls"
+									onPress={() => void openProfileLink("pdsls")}
 									style={{
-										width: 86,
-										height: 86,
-										borderRadius: 43,
-										backgroundColor: c.panel,
+										minHeight: 44,
+										paddingHorizontal: 12,
+										flexDirection: "row",
+										alignItems: "center",
+										gap: 8,
 									}}
-								/>
-								<Text style={s.heading}>
-									{account.data?.displayName || auth.profile?.handle}
-								</Text>
-								<Text style={s.muted}>
-									@{account.data?.handle || auth.profile?.handle}
-								</Text>
+								>
+									<Text style={{ color: c.cyan }}>View on PDSls</Text>
+									<Feather name="external-link" size={16} color={c.cyan} />
+								</Pressable>
 							</View>
 							<Text style={s.body}>
 								Connected with ATProto. Your stations and favorites are shared
@@ -652,9 +718,11 @@ function Main() {
 								}}
 							/>
 						) : (
-							<View style={s.empty}>
+							<View
+								style={results.isLoading ? { paddingVertical: 12 } : s.empty}
+							>
 								{results.isLoading ? (
-									<ActivityIndicator color={c.cyan} />
+									<StationLoader />
 								) : (
 									<>
 										<Text style={s.body}>

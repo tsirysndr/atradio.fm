@@ -1,17 +1,11 @@
 import React, { useState } from "react";
-import {
-	View,
-	Text,
-	Pressable,
-	TextInput,
-	ActivityIndicator,
-	ScrollView,
-} from "react-native";
+import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { stationPage } from "../api/stations";
 import type { Station } from "../types";
+import StationLoader from "./StationLoader";
 import { c } from "../theme";
 const tabs = [
 	{ key: "favorites", label: "Favorites" },
@@ -124,7 +118,7 @@ export default function StationCollection({
 					color: c.text,
 				}}
 			/>
-			{result.isPending && <ActivityIndicator color={c.cyan} />}
+			{result.isPending && <StationLoader />}
 			{items.map((station) => (
 				<View
 					key={station.id}
@@ -200,7 +194,7 @@ export default function StationCollection({
 					style={{ padding: 16 }}
 				>
 					{result.isFetchingNextPage ? (
-						<ActivityIndicator color={c.cyan} />
+						<StationLoader count={2} />
 					) : (
 						<Text style={{ color: c.cyan, textAlign: "center" }}>
 							Load more stations

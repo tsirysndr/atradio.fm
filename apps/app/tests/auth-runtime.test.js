@@ -5,6 +5,7 @@ let finalize;
 let sessionError;
 let storedSessions = [];
 let requestedScope;
+let requestedAuthorization;
 let sessionCalls = 0;
 class TokenRefreshError extends Error {}
 const session = {
@@ -16,8 +17,9 @@ const session = {
 };
 mock.module("@atcute/oauth-browser-client", () => ({
 	configureOAuth() {},
-	createAuthorizationUrl: async ({ scope }) => {
-		requestedScope = scope;
+	createAuthorizationUrl: async (options) => {
+		requestedAuthorization = options;
+		requestedScope = options.scope;
 		return new URL("https://provider.test/authorize");
 	},
 	finalizeAuthorization: () =>
@@ -107,5 +109,32 @@ test("revoked sessions require reconnect instead of remaining falsely signed in"
 	await command(13, "authRefresh");
 	expect(messages.at(-1).result.state).toBe("signedOut");
 	expect(messages.at(-1).result.error).toContain("Sign in again");
+	expect(JSON.stringify(messages)).not.toContain("never-cross-the-bridge");
+});
+
+test("Bluesky signup requests account creation and completes the in-app OAuth callback", async () => {
+	await command(20, "authSignup");
+	await settle();
+	expect(requestedAuthorization.target).toEqual({
+		type: "pds",
+		serviceUrl: "https://bsky.social",
+	});
+	expect(requestedAuthorization.prompt).toBe("create");
+	expect(requestedAuthorization.scope).toContain(
+		"repo:fm.atradio.audio.settings",
+	);
+	await command(21, "authStatus");
+	expect(messages.at(-1).result.url).toBe("https://provider.test/authorize");
+	await command(
+		22,
+		"authCallback",
+		"https://atradio.fm/oauth/callback#code=x&state=y",
+	);
+	finalize({ session });
+	await settle();
+	await command(23, "authStatus");
+	expect(messages.at(-1).result.state).toBe("signedIn");
+	expect(messages.at(-1).result.profile.did).toBe(session.info.sub);
+	expect(storage.get("atradio-mobile-handle")).toBe("");
 	expect(JSON.stringify(messages)).not.toContain("never-cross-the-bridge");
 });

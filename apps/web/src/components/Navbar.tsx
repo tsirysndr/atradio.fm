@@ -42,8 +42,8 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-white/10 bg-synth-bg/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <span className="synth-gradient-text font-display text-xl font-bold tracking-tight">
-            atradio.fm
+          <span className="font-display text-xl font-extrabold tracking-tight text-[#f1f5ff]">
+            atradio<span className="text-[#56f0db]">.fm</span>
           </span>
         </Link>
 

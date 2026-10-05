@@ -218,15 +218,19 @@ function task(gen: number, work: () => Promise<any>) {
 			bridge.postMessage(JSON.stringify({ id, result: { uri, ok: true } }));
 			return;
 		}
-		if (cmd === "authStart") {
+		if (cmd === "authStart" || cmd === "authSignup") {
 			const gen = ++generation;
 			previousState =
 				state.state === "signedIn" ? state : { state: "signedOut" };
-			currentHandle = argument;
+			currentHandle = cmd === "authSignup" ? "" : argument;
 			state = { state: "starting" };
 			task(gen, async () => {
 				const url = await createAuthorizationUrl({
-					target: { type: "account", identifier: argument as ActorIdentifier },
+					target:
+						cmd === "authSignup"
+							? { type: "pds", serviceUrl: "https://bsky.social" }
+							: { type: "account", identifier: argument as ActorIdentifier },
+					...(cmd === "authSignup" ? { prompt: "create" as const } : {}),
 					scope:
 						"atproto repo:fm.atradio.comment repo:fm.atradio.reaction repo:fm.atradio.station repo:fm.atradio.actor.status repo:fm.atradio.audio.settings",
 				});

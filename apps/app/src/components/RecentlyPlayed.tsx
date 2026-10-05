@@ -1,16 +1,11 @@
 import React from "react";
-import {
-	View,
-	Text,
-	FlatList,
-	Pressable,
-	ActivityIndicator,
-} from "react-native";
+import { View, Text, FlatList, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { recentlyPlayed, timeAgo } from "../api/recent";
 import type { Station } from "../types";
+import StationLoader from "./StationLoader";
 import { c } from "../theme";
 export default function RecentlyPlayed({
 	onPlay,
@@ -41,7 +36,7 @@ export default function RecentlyPlayed({
 			</Text>
 			<Text style={{ color: c.muted }}>What the community is listening to</Text>
 			{feed.isPending ? (
-				<ActivityIndicator color={c.cyan} />
+				<StationLoader cards count={3} />
 			) : items.length === 0 && !feed.isError ? (
 				<Text style={{ color: c.muted }}>No recent plays yet.</Text>
 			) : null}
@@ -119,7 +114,9 @@ export default function RecentlyPlayed({
 				)}
 				ListFooterComponent={
 					feed.isFetchingNextPage ? (
-						<ActivityIndicator color={c.cyan} style={{ margin: 20 }} />
+						<View style={{ width: 240 }}>
+							<StationLoader cards count={1} />
+						</View>
 					) : null
 				}
 			/>
