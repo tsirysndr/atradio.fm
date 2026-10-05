@@ -1,3 +1,4 @@
+import { mergeRepoEqualizer } from "../playback/equalizer";
 import { Client } from "@atcute/client";
 import { AtradioAgent } from "@atradio/sdk";
 import {
@@ -49,10 +50,19 @@ configureOAuth({
 let state: any = { state: "signedOut" };
 let generation = 0;
 let currentHandle = "";
+let previousState: any = { state: "signedOut" };
 function signedIn(session: any, handle = currentHandle) {
 	return {
 		state: "signedIn",
 		profile: { did: session.info.sub, handle: handle || session.info.sub },
+		canSyncEqualizer:
+			session.token.scope
+				?.split(/\s+/)
+				.includes("repo:fm.atradio.audio.settings") ?? false,
+		canPublishPlays:
+			session.token.scope
+				?.split(/\s+/)
+				.includes("repo:fm.atradio.actor.status") ?? false,
 	};
 }
 function task(gen: number, work: () => Promise<any>) {
@@ -79,28 +89,85 @@ function task(gen: number, work: () => Promise<any>) {
 			if (state.state !== "signedIn")
 				throw new Error("Sign in to join the conversation.");
 			const input = JSON.parse(argument);
+			if (input.actor && input.actor !== state.profile.did)
+				throw new Error("Account changed; listening update canceled.");
 			if (
-				!["comment", "reaction", "deleteComment", "registerStation"].includes(
-					input.action,
-				)
+				![
+					"comment",
+					"reaction",
+					"deleteComment",
+					"registerStation",
+					"playStatus",
+					"getAudioSettings",
+					"saveEqualizer",
+				].includes(input.action)
 			)
 				throw new Error("Unsupported station action");
-			const session = await getSession(state.profile.did);
+			const did = state.profile.did;
+			const actionGeneration = generation;
+			let session;
+			try {
+				session = await getSession(did);
+			} catch (e) {
+				if (e instanceof TokenRefreshError) {
+					deleteStoredSession(did);
+					state = {
+						state: "signedOut",
+						error: "Your session was revoked or expired. Sign in again.",
+					};
+					bridge.postMessage(JSON.stringify({ authState: state }));
+				}
+				throw e;
+			}
+			if (
+				actionGeneration !== generation ||
+				state.state !== "signedIn" ||
+				state.profile.did !== did
+			)
+				throw new Error("Account changed; action canceled.");
 			const needed =
-				input.action === "reaction"
-					? "repo:fm.atradio.reaction"
-					: input.action === "registerStation"
-						? "repo:fm.atradio.station"
-						: "repo:fm.atradio.comment";
-			if (!session.token.scope.split(/\s+/).includes(needed))
+				input.action === "saveEqualizer"
+					? "repo:fm.atradio.audio.settings"
+					: input.action === "playStatus"
+						? "repo:fm.atradio.actor.status"
+						: input.action === "reaction"
+							? "repo:fm.atradio.reaction"
+							: input.action === "registerStation"
+								? "repo:fm.atradio.station"
+								: "repo:fm.atradio.comment";
+			if (
+				input.action !== "getAudioSettings" &&
+				!session.token.scope.split(/\s+/).includes(needed)
+			)
 				throw new Error(
-					"Please sign out and sign in again to enable this station action.",
+					"Sign in again to grant permission for this station action.",
 				);
 			const agent = AtradioAgent.fromClient(
 				new Client({ handler: new OAuthUserAgent(session) }),
 				session.info.sub,
 			);
+			if (input.action === "getAudioSettings") {
+				const result = await agent.getAudioSettings();
+				bridge.postMessage(JSON.stringify({ id, result }));
+				return;
+			}
+			if (input.action === "saveEqualizer") {
+				// Read before merge: mobile only edits EQ; preserve the web's DSP controls.
+				const existing = await agent.getAudioSettings();
+				if (actionGeneration !== generation)
+					throw new Error("Account changed; equalizer save canceled.");
+				await agent.putAudioSettings(
+					mergeRepoEqualizer(existing, input.settings),
+				);
+				bridge.postMessage(JSON.stringify({ id, result: { ok: true } }));
+				return;
+			}
 			let uri;
+			if (input.action === "playStatus") {
+				await agent.setPlayStatus(input.station);
+				bridge.postMessage(JSON.stringify({ id, result: { ok: true } }));
+				return;
+			}
 			if (input.action === "registerStation") {
 				const { validateStation } = await import("../stationValidation");
 				const draft = validateStation(input.draft);
@@ -153,13 +220,15 @@ function task(gen: number, work: () => Promise<any>) {
 		}
 		if (cmd === "authStart") {
 			const gen = ++generation;
+			previousState =
+				state.state === "signedIn" ? state : { state: "signedOut" };
 			currentHandle = argument;
 			state = { state: "starting" };
 			task(gen, async () => {
 				const url = await createAuthorizationUrl({
 					target: { type: "account", identifier: argument as ActorIdentifier },
 					scope:
-						"atproto repo:fm.atradio.comment repo:fm.atradio.reaction repo:fm.atradio.station",
+						"atproto repo:fm.atradio.comment repo:fm.atradio.reaction repo:fm.atradio.station repo:fm.atradio.actor.status repo:fm.atradio.audio.settings",
 				});
 				return { state: "authorizing", url: url.toString() };
 			});
@@ -204,9 +273,34 @@ function task(gen: number, work: () => Promise<any>) {
 					};
 				}
 			});
+		} else if (cmd === "authRefresh") {
+			if (state.state === "signedIn") {
+				const gen = generation;
+				const did = state.profile.did;
+				try {
+					const session = await getSession(did);
+					if (gen === generation) state = signedIn(session);
+				} catch (e) {
+					if (gen === generation) {
+						if (e instanceof TokenRefreshError) {
+							deleteStoredSession(did);
+							state = {
+								state: "signedOut",
+								error: "Your session was revoked or expired. Sign in again.",
+							};
+						} else state = { ...state, offline: true };
+					}
+				}
+			}
 		} else if (cmd === "authCancel" || cmd === "authLogout") {
 			++generation;
-			state = { state: "signedOut" };
+			if (cmd === "authCancel") {
+				if (["starting", "authorizing", "error"].includes(state.state))
+					state = previousState;
+			} else {
+				state = { state: "signedOut" };
+				previousState = state;
+			}
 			if (cmd === "authLogout") {
 				for (const did of listStoredSessions()) {
 					const session = await getSession(did, { allowStale: true }).catch(

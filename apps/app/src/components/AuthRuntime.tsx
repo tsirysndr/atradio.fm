@@ -8,8 +8,13 @@ import {
 	detachAuthRuntime,
 	receiveAuthMessage,
 } from "../auth/client";
+import type { AuthState } from "../native";
 const source = { html: authHtml, baseUrl: "https://atradio.fm/native-oauth/" };
-export default function AuthRuntime() {
+export default function AuthRuntime({
+	onStateChange,
+}: {
+	onStateChange: (state: AuthState) => void;
+}) {
 	const ref = useRef<WebView>(null);
 	const owner = useRef(Symbol("oauth-runtime")).current;
 	const ready = useRef(false);
@@ -37,6 +42,10 @@ export default function AuthRuntime() {
 				onMessage={({ nativeEvent }) => {
 					try {
 						const message = JSON.parse(nativeEvent.data);
+						if (message.authState) {
+							onStateChange(message.authState);
+							return;
+						}
 						if (message.fatal) {
 							console.warn("OAuth runtime startup:", message.fatal);
 							detachAuthRuntime(

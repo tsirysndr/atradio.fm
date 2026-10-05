@@ -54,6 +54,8 @@ import {
 } from "./native";
 import type { Station } from "./types";
 import { genres } from "./genres";
+import GenreGrid from "./components/GenreGrid";
+import AudioSettingsSync from "./components/AudioSettingsSync";
 import Equalizer from "./components/Equalizer";
 import RegisterStation from "./components/RegisterStation";
 import StationCollection from "./components/StationCollection";
@@ -62,6 +64,8 @@ import SignIn from "./components/SignIn";
 import AuthRuntime from "./components/AuthRuntime";
 import RecentlyPlayed from "./components/RecentlyPlayed";
 import { c } from "./theme";
+import { request } from "./auth/client";
+import { PlayHistorySync } from "./playback/history";
 const client = new QueryClient({
 	defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });
@@ -105,6 +109,7 @@ function Main() {
 	const [query, setQuery] = useState("");
 	const [debounced, setDebounced] = useState("");
 	const [genre, setGenre] = useState("All");
+	const [searchGenre, setSearchGenre] = useState<string | null>(null);
 	const [player, setPlayer] = useAtom(playerAtom);
 	const [equalizer, setEqualizer] = useAtom(equalizerOpenAtom);
 	const [register, setRegister] = useAtom(registrationOpenAtom);
@@ -114,7 +119,62 @@ function Main() {
 	const [discussion, setDiscussion] = useAtom(discussionAtom);
 	const [expanded, setExpanded] = useAtom(playerExpandedAtom);
 	const [playError, setPlayError] = useState("");
+	const [historyError, setHistoryError] = useState("");
+	const playRequest = useRef<AbortController | null>(null);
+	const history = useRef<PlayHistorySync | null>(null);
+	if (!history.current)
+		history.current = new PlayHistorySync(
+			(actor, station) =>
+				request(
+					"stationAction",
+					JSON.stringify({ action: "playStatus", actor, station }),
+				),
+			() => {
+				setHistoryError("");
+				void client.invalidateQueries({ queryKey: ["global-recently-played"] });
+				void client.invalidateQueries({ queryKey: ["profile-stations"] });
+			},
+			(error) =>
+				setHistoryError(
+					`Could not update listening history: ${error instanceof Error ? error.message : String(error)}. Retrying automatically.`,
+				),
+		);
 	const did = auth.state === "signedIn" ? auth.profile?.did : undefined;
+	useEffect(() => {
+		history.current?.update(
+			auth.canPublishPlays ? did : undefined,
+			player.state,
+			player.station,
+		);
+	}, [auth.canPublishPlays, did, player]);
+	useEffect(() => {
+		setHistoryError("");
+		if (!did) return;
+		let active = true;
+		let busy = false;
+		const refresh = async () => {
+			if (busy || AppState.currentState !== "active") return;
+			busy = true;
+			try {
+				const next = await radio.auth("authRefresh");
+				if (active && (next.state === "signedIn" || next.state === "signedOut"))
+					setAuth(next);
+			} catch {
+				/* A suspended/offline WebView must not clear a saved session. */
+			} finally {
+				busy = false;
+			}
+		};
+		const timer = setInterval(() => void refresh(), 60000);
+		const listener = AppState.addEventListener("change", (state) => {
+			if (state === "active") void refresh();
+		});
+		return () => {
+			active = false;
+			clearInterval(timer);
+			listener.remove();
+		};
+	}, [did]);
 	const account = useQuery({
 		queryKey: ["profile", did],
 		queryFn: () => profile(did!),
@@ -167,10 +227,20 @@ function Main() {
 		};
 	}, []);
 	const results = useQuery({
-		queryKey: ["stations", tab, debounced, genre, did],
+		queryKey: ["stations", tab, debounced, genre, did, searchGenre],
 		queryFn: ({ signal }) => {
 			if (tab === "Library") return appviewStations("favorites", did, signal);
-			if (tab === "Search") return searchRadioBrowser(debounced, signal);
+			if (tab === "Search") {
+				if (debounced) return searchRadioBrowser(debounced, signal);
+				if (searchGenre)
+					return browseRadioBrowserByTag({
+						tag: genres.find((g) => g.label === searchGenre)!.term,
+						offset: 0,
+						limit: 60,
+						signal,
+					});
+				return [];
+			}
 			if (genre !== "All")
 				return browseRadioBrowserByTag({
 					tag:
@@ -184,7 +254,7 @@ function Main() {
 		enabled:
 			tab !== "Profile" &&
 			(tab !== "Library" || !!did) &&
-			(tab !== "Search" || debounced.length > 0),
+			(tab !== "Search" || debounced.length > 0 || !!searchGenre),
 	});
 	const openRegister = () => {
 		if (did) setRegister(true);
@@ -203,20 +273,26 @@ function Main() {
 		void client.invalidateQueries({ queryKey: ["stations"] });
 	}, []);
 	const play = async (station: Station) => {
+		playRequest.current?.abort();
+		const controller = new AbortController();
+		playRequest.current = controller;
 		try {
 			if (Platform.OS === "android" && Number(Platform.Version) >= 33)
 				await PermissionsAndroid.request(
 					PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
 				);
 			setPlayError("");
-			await radio.play(station);
+			await radio.play(station, controller.signal);
+			if (controller.signal.aborted) return;
 			setPlayer({ state: "buffering", station });
 		} catch (e) {
+			if (controller.signal.aborted) return;
 			setPlayError(String(e));
 		}
 	};
 	const control = async (action: "play" | "pause" | "stop") => {
 		try {
+			if (action !== "play") playRequest.current?.abort();
 			await radio.control(action);
 		} catch (e) {
 			setPlayError(String(e));
@@ -269,7 +345,8 @@ function Main() {
 	return (
 		<View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top }}>
 			<StatusBar style="light" />
-			<AuthRuntime />
+			<AuthRuntime onStateChange={setAuth} />
+			<AudioSettingsSync />
 			<View style={s.header}>
 				<View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
 					<Image
@@ -336,6 +413,7 @@ function Main() {
 										await radio.auth("authLogout");
 										setAuth({ state: "signedOut" });
 										setAdded([]);
+										client.removeQueries({ queryKey: ["audio-settings"] });
 										client.removeQueries({ queryKey: ["profile-stations"] });
 										client.removeQueries({ queryKey: ["profile"] });
 										client.removeQueries({ queryKey: ["stations"] });
@@ -381,7 +459,11 @@ function Main() {
 				</View>
 			) : (
 				<FlatList
-					data={tab === "Search" && !query.trim() ? [] : (results.data ?? [])}
+					data={
+						tab === "Search" && !query.trim() && !searchGenre
+							? []
+							: (results.data ?? [])
+					}
 					keyExtractor={(x) => x.id}
 					renderItem={row}
 					keyboardShouldPersistTaps="handled"
@@ -492,7 +574,10 @@ function Main() {
 											<TextInput
 												ref={searchInput}
 												value={query}
-												onChangeText={setQuery}
+												onChangeText={(text) => {
+													setSearchGenre(null);
+													setQuery(text);
+												}}
 												placeholder="Search Radio Browser"
 												placeholderTextColor={c.muted}
 												style={{
@@ -510,6 +595,7 @@ function Main() {
 													onPress={() => {
 														searchInput.current?.clear();
 														setQuery("");
+														setSearchGenre(null);
 														setDebounced("");
 														void client.cancelQueries({
 															queryKey: ["stations", "Search"],
@@ -536,34 +622,82 @@ function Main() {
 									)}
 								</>
 							)}
+							{tab === "Search" && searchGenre && !query.trim() && (
+								<View style={{ gap: 12, paddingVertical: 16 }}>
+									<Pressable
+										accessibilityRole="button"
+										onPress={() => setSearchGenre(null)}
+										style={{
+											flexDirection: "row",
+											alignItems: "center",
+											gap: 8,
+											minHeight: 44,
+										}}
+									>
+										<Feather name="arrow-left" size={20} color={c.cyan} />
+										<Text style={{ color: c.cyan }}>All genres</Text>
+									</Pressable>
+									<Text style={s.section}>{searchGenre} stations</Text>
+								</View>
+							)}
 						</View>
 					}
 					ListEmptyComponent={
-						<View style={s.empty}>
-							{results.isLoading ? (
-								<ActivityIndicator color={c.cyan} />
-							) : (
-								<>
-									<Text style={s.body}>
-										{tab === "Search" && !query.trim()
-											? "Search by station name."
-											: results.isError
+						tab === "Search" && !query.trim() && !searchGenre ? (
+							<GenreGrid
+								onSelect={(label) => {
+									setDebounced("");
+									setSearchGenre(label);
+									searchInput.current?.blur();
+								}}
+							/>
+						) : (
+							<View style={s.empty}>
+								{results.isLoading ? (
+									<ActivityIndicator color={c.cyan} />
+								) : (
+									<>
+										<Text style={s.body}>
+											{results.isError
 												? "Stations could not be loaded."
 												: tab === "Library"
 													? "Your saved stations will appear here."
 													: "No stations found."}
-									</Text>
-									{(tab !== "Search" || !!query.trim()) && (
-										<Pressable onPress={() => void results.refetch()}>
-											<Text style={{ color: c.cyan, padding: 14 }}>Retry</Text>
-										</Pressable>
-									)}
-								</>
-							)}
-						</View>
+										</Text>
+										{(tab !== "Search" || !!query.trim() || !!searchGenre) && (
+											<Pressable onPress={() => void results.refetch()}>
+												<Text style={{ color: c.cyan, padding: 14 }}>
+													Retry
+												</Text>
+											</Pressable>
+										)}
+									</>
+								)}
+							</View>
+						)
 					}
 				/>
 			)}
+			{!!did &&
+				(!auth.canPublishPlays || !auth.canSyncEqualizer || !!historyError) && (
+					<View style={{ padding: 12, backgroundColor: c.panel }}>
+						<Text style={{ color: c.muted }}>
+							{!auth.canPublishPlays || !auth.canSyncEqualizer
+								? "Allow atradio.fm to sync your listening history and equalizer."
+								: historyError}
+						</Text>
+						{(!auth.canPublishPlays || !auth.canSyncEqualizer) && (
+							<Pressable
+								onPress={() => setLogin(true)}
+								style={{ paddingVertical: 12 }}
+							>
+								<Text style={{ color: c.cyan }}>
+									Reconnect to enable account sync
+								</Text>
+							</Pressable>
+						)}
+					</View>
+				)}
 			{!!playError && (
 				<Pressable
 					onPress={() => setPlayError("")}

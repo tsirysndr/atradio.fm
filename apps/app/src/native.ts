@@ -1,4 +1,5 @@
-import type { EqSettings } from "./components/Equalizer";
+import type { EqSettings } from "./playback/equalizer";
+import { resolveStation } from "./playback/resolve";
 import { auth } from "./auth/client";
 import { requireOptionalNativeModule } from "expo";
 import type { Station } from "./types";
@@ -14,6 +15,8 @@ export type AuthState = {
 	error?: string;
 	profile?: { did: string; handle: string; display_name?: string };
 	offline?: boolean;
+	canPublishPlays?: boolean;
+	canSyncEqualizer?: boolean;
 };
 export type Playback = {
 	state: "playing" | "paused" | "stopped" | "buffering" | "error";
@@ -37,7 +40,11 @@ function requireEngine() {
 	return engine;
 }
 export const radio = {
-	play: (station: Station) => requireEngine().play(JSON.stringify(station)),
+	play: async (station: Station, signal?: AbortSignal) => {
+		const resolved = await resolveStation(station, signal);
+		if (signal?.aborted) return;
+		await requireEngine().play(JSON.stringify(resolved));
+	},
 	control: (action: "play" | "pause" | "stop") =>
 		requireEngine().control(action),
 	status: async (): Promise<Playback> =>

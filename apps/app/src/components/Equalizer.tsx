@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef } from "react";
 import {
 	View,
 	Text,
@@ -10,55 +10,29 @@ import {
 import Slider from "@react-native-community/slider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
-import { EQ_BANDS_HZ } from "@atradio/lexicons";
-import { radio } from "../native";
 import { c } from "../theme";
-export type EqSettings = {
-	enabled: boolean;
-	precut: number;
-	bands: { frequency: number; q: number; gain: number }[];
-};
-const defaults = (): EqSettings => ({
-	enabled: false,
-	precut: 0,
-	bands: EQ_BANDS_HZ.map((frequency) => ({ frequency, q: 10, gain: 0 })),
-});
+export type { EqSettings } from "../playback/equalizer";
+import {
+	defaultEqualizer as defaults,
+	type EqSettings,
+} from "../playback/equalizer";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import {
+	equalizerAtom,
+	equalizerRevisionAtom,
+	equalizerSyncAtom,
+} from "../state/equalizer";
 export default function Equalizer({ onClose }: { onClose: () => void }) {
 	const inset = useSafeAreaInsets();
-	const [settings, setSettings] = useState<EqSettings>();
-	const current = useRef(defaults());
-	const [error, setError] = useState("");
-	const sequence = useRef(Promise.resolve());
-	useEffect(() => {
-		let live = true;
-		void radio
-			.getEqualizer()
-			.then((saved) => {
-				if (live) {
-					current.current = saved?.bands?.length === 10 ? saved : defaults();
-					setSettings(current.current);
-				}
-			})
-			.catch((e) => {
-				if (live) {
-					setError(String(e));
-					setSettings(current.current);
-				}
-			});
-		return () => {
-			live = false;
-		};
-	}, []);
+	const [settings, setSettings] = useAtom(equalizerAtom);
+	const setRevision = useSetAtom(equalizerRevisionAtom);
+	const syncStatus = useAtomValue(equalizerSyncAtom);
+	const current = useRef(settings ?? defaults());
+	current.current = settings ?? defaults();
 	const apply = (next: EqSettings) => {
 		current.current = next;
 		setSettings(next);
-		setError("");
-		sequence.current = sequence.current
-			.catch(() => {})
-			.then(() => radio.setEqualizer(next))
-			.catch((e) => {
-				setError(String(e));
-			});
+		setRevision((n) => n + 1);
 	};
 	return (
 		<View style={{ flex: 1, backgroundColor: c.bg, paddingTop: inset.top }}>
@@ -105,11 +79,7 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 						Shape the sound on this device. Changes apply to the playing station
 						and are saved automatically.
 					</Text>
-					{!!error && (
-						<Text accessibilityRole="alert" style={{ color: c.error }}>
-							{error}
-						</Text>
-					)}
+					<Text style={{ color: c.muted }}>{syncStatus}</Text>
 					{settings.bands.map((band, index) => (
 						<View
 							key={band.frequency}
@@ -156,7 +126,7 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 						</View>
 					))}
 					<Text style={{ color: c.text }}>
-						Precut: {settings.precut / 10} dB
+						Precut (this device): {settings.precut / 10} dB
 					</Text>
 					<Slider
 						accessibilityLabel="Equalizer precut"
