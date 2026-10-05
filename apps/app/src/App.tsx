@@ -43,6 +43,7 @@ import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import Feather from "@expo/vector-icons/Feather";
 import { appviewStations, profile } from "./api/atradio";
+import { isValidHandle, normalizeHandle } from "./api/handleLookup";
 import {
 	searchRadioBrowser,
 	browseRadioBrowserByTag,
@@ -262,14 +263,26 @@ function Main() {
 	});
 	const openProfileLink = async (destination: "bluesky" | "pdsls") => {
 		if (!did) return;
-		const url =
-			destination === "bluesky"
-				? `https://bsky.app/profile/${encodeURIComponent(did)}`
-				: `https://pdsls.dev/at://${did}`;
 		try {
+			let url = `https://pdsls.dev/at://${did}`;
+			if (destination === "bluesky") {
+				let handle = [account.data?.handle, auth.profile?.handle]
+					.map((value) => normalizeHandle(value || ""))
+					.find(isValidHandle);
+				if (!handle) handle = normalizeHandle((await profile(did)).handle);
+				if (!isValidHandle(handle)) {
+					throw new Error(
+						"Your Bluesky handle is unavailable. Refresh your profile and try again.",
+					);
+				}
+				url = `https://bsky.app/profile/${encodeURIComponent(handle)}`;
+			}
 			await Linking.openURL(url);
-		} catch {
-			Alert.alert("Could not open link", "Please try again.");
+		} catch (error) {
+			Alert.alert(
+				"Could not open link",
+				error instanceof Error ? error.message : "Please try again.",
+			);
 		}
 	};
 	const refreshProfile = async () => {
