@@ -1,3 +1,7 @@
+import { useFonts } from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { appFonts } from "./fonts";
+import { Text, TextInput } from "./components/Typography";
 import { Provider as JotaiProvider, useAtom } from "jotai";
 import {
 	tabAtom,
@@ -26,8 +30,6 @@ import {
 	RefreshControl,
 	ScrollView,
 	StyleSheet,
-	Text,
-	TextInput,
 	View,
 } from "react-native";
 import {
@@ -57,6 +59,7 @@ import {
 import type { Station } from "./types";
 import { genres } from "./genres";
 import StationLoader from "./components/StationLoader";
+import ListenerCount from "./components/ListenerCount";
 import GenreGrid from "./components/GenreGrid";
 import AudioSettingsSync from "./components/AudioSettingsSync";
 import Equalizer from "./components/Equalizer";
@@ -69,6 +72,8 @@ import RecentlyPlayed from "./components/RecentlyPlayed";
 import { c } from "./theme";
 import { request } from "./auth/client";
 import { PlayHistorySync } from "./playback/history";
+void SplashScreen.preventAutoHideAsync().catch(() => {});
+
 const client = new QueryClient({
 	defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
 });
@@ -453,7 +458,7 @@ function Main() {
 									<Text style={s.heading}>
 										{account.data?.displayName || auth.profile?.handle}
 									</Text>
-									<Text style={s.muted}>
+									<Text style={[s.muted, { fontFamily: "JetBrainsMono" }]}>
 										@{account.data?.handle || auth.profile?.handle}
 									</Text>
 								</Pressable>
@@ -825,6 +830,7 @@ function Main() {
 										? "Connecting…"
 										: player.title || (playing ? "Live radio" : "Paused"))}
 							</Text>
+							<ListenerCount stationId={player.station.id} compact />
 						</View>
 					</Pressable>
 					<Pressable
@@ -1091,6 +1097,9 @@ function Main() {
 							player.station?.genre ||
 							"Live radio"}
 					</Text>
+					{expanded && player.station && (
+						<ListenerCount stationId={player.station.id} />
+					)}
 					<View style={{ flexDirection: "row", alignItems: "center", gap: 32 }}>
 						<Pressable
 							onPress={() => void control("stop")}
@@ -1137,6 +1146,11 @@ function Main() {
 	);
 }
 export default function App() {
+	const [fontsLoaded, fontError] = useFonts(appFonts);
+	useEffect(() => {
+		if (fontsLoaded || fontError) void SplashScreen.hideAsync().catch(() => {});
+	}, [fontsLoaded, fontError]);
+	if (!fontsLoaded && !fontError) return null;
 	return (
 		<JotaiProvider>
 			<SafeAreaProvider>
@@ -1155,7 +1169,13 @@ const s = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "space-between",
 	},
-	brand: { color: c.text, fontSize: 25, fontWeight: "800", letterSpacing: -1 },
+	brand: {
+		fontFamily: "Lexend",
+		color: c.text,
+		fontSize: 25,
+		fontWeight: "800",
+		letterSpacing: -1,
+	},
 	account: {
 		width: 40,
 		height: 40,
@@ -1175,6 +1195,7 @@ const s = StyleSheet.create({
 	eyebrow: { color: c.cyan, fontSize: 10, fontWeight: "800", letterSpacing: 2 },
 	heroTitle: {
 		color: c.text,
+		fontFamily: "Lexend",
 		fontSize: 46,
 		lineHeight: 50,
 		fontWeight: "800",
@@ -1196,8 +1217,15 @@ const s = StyleSheet.create({
 		borderWidth: 1,
 		borderColor: c.border,
 	},
-	section: { fontSize: 20, fontWeight: "800", color: c.text, marginBottom: 12 },
+	section: {
+		fontFamily: "Lexend",
+		fontSize: 20,
+		fontWeight: "800",
+		color: c.text,
+		marginBottom: 12,
+	},
 	heading: {
+		fontFamily: "Lexend",
 		fontSize: 28,
 		fontWeight: "800",
 		color: c.text,

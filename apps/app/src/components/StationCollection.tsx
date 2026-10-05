@@ -1,5 +1,6 @@
+import { Text, TextInput } from "./Typography";
 import React, { useState } from "react";
-import { View, Text, Pressable, TextInput, ScrollView } from "react-native";
+import { View, Pressable, ScrollView } from "react-native";
 import { Image } from "expo-image";
 import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";

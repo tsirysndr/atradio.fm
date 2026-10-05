@@ -1,5 +1,6 @@
+import { Text } from "./Typography";
 import React from "react";
-import { View, Text, FlatList, Pressable } from "react-native";
+import { View, FlatList, Pressable } from "react-native";
 import { Image } from "expo-image";
 import Feather from "@expo/vector-icons/Feather";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -31,7 +32,14 @@ export default function RecentlyPlayed({
 	);
 	return (
 		<View style={{ marginBottom: 24, gap: 12 }}>
-			<Text style={{ color: c.text, fontSize: 20, fontWeight: "800" }}>
+			<Text
+				style={{
+					color: c.text,
+					fontFamily: "Lexend",
+					fontSize: 20,
+					fontWeight: "800",
+				}}
+			>
 				Recently played on atradio.fm
 			</Text>
 			<Text style={{ color: c.muted }}>What the community is listening to</Text>
@@ -100,7 +108,12 @@ export default function RecentlyPlayed({
 							)}
 							<Text
 								numberOfLines={1}
-								style={{ flex: 1, color: c.muted, fontSize: 12 }}
+								style={{
+									flex: 1,
+									color: c.muted,
+									fontSize: 12,
+									fontFamily: item.actor?.handle ? "JetBrainsMono" : "Outfit",
+								}}
 							>
 								{item.actor?.handle
 									? `@${item.actor.handle}`

@@ -1,7 +1,7 @@
+import { Text } from "./Typography";
 import React, { useRef } from "react";
 import {
 	View,
-	Text,
 	ScrollView,
 	Pressable,
 	Switch,
@@ -47,7 +47,14 @@ export default function Equalizer({ onClose }: { onClose: () => void }) {
 				<Pressable accessibilityLabel="Close equalizer" onPress={onClose}>
 					<Feather name="chevron-down" size={26} color={c.text} />
 				</Pressable>
-				<Text style={{ color: c.text, fontSize: 24, fontWeight: "800" }}>
+				<Text
+					style={{
+						color: c.text,
+						fontFamily: "Lexend",
+						fontSize: 24,
+						fontWeight: "800",
+					}}
+				>
 					Equalizer
 				</Text>
 			</View>

@@ -1,8 +1,7 @@
+import { Text, TextInput } from "./Typography";
 import React, { useRef, useState } from "react";
 import {
 	View,
-	Text,
-	TextInput,
 	ScrollView,
 	Pressable,
 	KeyboardAvoidingView,
@@ -129,7 +128,14 @@ export default function RegisterStation({
 				<Pressable onPress={onClose} disabled={pending}>
 					<Text style={{ color: c.cyan, paddingVertical: 10 }}>Cancel</Text>
 				</Pressable>
-				<Text style={{ color: c.text, fontSize: 28, fontWeight: "800" }}>
+				<Text
+					style={{
+						color: c.text,
+						fontFamily: "Lexend",
+						fontSize: 28,
+						fontWeight: "800",
+					}}
+				>
 					Register a station
 				</Text>
 				<Text style={{ color: c.muted, lineHeight: 23 }}>

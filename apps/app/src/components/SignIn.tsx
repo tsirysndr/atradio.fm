@@ -1,8 +1,7 @@
+import { Text, TextInput } from "./Typography";
 import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
-	Text,
-	TextInput,
 	Pressable,
 	ScrollView,
 	KeyboardAvoidingView,
@@ -322,7 +321,9 @@ export default function SignIn({
 									<Text style={{ color: c.text }}>
 										{p.displayName || p.handle}
 									</Text>
-									<Text style={{ color: c.muted }}>@{p.handle}</Text>
+									<Text style={{ color: c.muted, fontFamily: "JetBrainsMono" }}>
+										@{p.handle}
+									</Text>
 								</View>
 							</Pressable>
 						))}
@@ -389,8 +390,19 @@ export default function SignIn({
 	);
 }
 const s = StyleSheet.create({
-	brand: { color: c.cyan, fontSize: 28, fontWeight: "800", marginBottom: 25 },
-	title: { color: c.text, fontSize: 32, fontWeight: "800" },
+	brand: {
+		color: c.cyan,
+		fontFamily: "Lexend",
+		fontSize: 28,
+		fontWeight: "800",
+		marginBottom: 25,
+	},
+	title: {
+		color: c.text,
+		fontFamily: "Lexend",
+		fontSize: 32,
+		fontWeight: "800",
+	},
 	help: { color: c.muted, fontSize: 15, lineHeight: 23, marginVertical: 18 },
 	label: {
 		color: c.muted,
@@ -409,8 +421,14 @@ const s = StyleSheet.create({
 		marginVertical: 12,
 		paddingLeft: 17,
 	},
-	prefix: { color: c.muted, fontSize: 20, marginRight: 8 },
+	prefix: {
+		fontFamily: "JetBrainsMono",
+		color: c.muted,
+		fontSize: 20,
+		marginRight: 8,
+	},
 	input: {
+		fontFamily: "JetBrainsMono",
 		flex: 1,
 		minWidth: 0,
 		color: c.text,

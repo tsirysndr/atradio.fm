@@ -1,0 +1,16 @@
+export const appFonts = {
+	Outfit_400Regular: require("@expo-google-fonts/outfit/400Regular/Outfit_400Regular.ttf"),
+	Outfit_500Medium: require("@expo-google-fonts/outfit/500Medium/Outfit_500Medium.ttf"),
+	Outfit_600SemiBold: require("@expo-google-fonts/outfit/600SemiBold/Outfit_600SemiBold.ttf"),
+	Outfit_700Bold: require("@expo-google-fonts/outfit/700Bold/Outfit_700Bold.ttf"),
+	Outfit_800ExtraBold: require("@expo-google-fonts/outfit/800ExtraBold/Outfit_800ExtraBold.ttf"),
+	Lexend_400Regular: require("@expo-google-fonts/lexend/400Regular/Lexend_400Regular.ttf"),
+	Lexend_500Medium: require("@expo-google-fonts/lexend/500Medium/Lexend_500Medium.ttf"),
+	Lexend_600SemiBold: require("@expo-google-fonts/lexend/600SemiBold/Lexend_600SemiBold.ttf"),
+	Lexend_700Bold: require("@expo-google-fonts/lexend/700Bold/Lexend_700Bold.ttf"),
+	Lexend_800ExtraBold: require("@expo-google-fonts/lexend/800ExtraBold/Lexend_800ExtraBold.ttf"),
+	JetBrainsMono_400Regular: require("@expo-google-fonts/jetbrains-mono/400Regular/JetBrainsMono_400Regular.ttf"),
+	JetBrainsMono_500Medium: require("@expo-google-fonts/jetbrains-mono/500Medium/JetBrainsMono_500Medium.ttf"),
+	JetBrainsMono_600SemiBold: require("@expo-google-fonts/jetbrains-mono/600SemiBold/JetBrainsMono_600SemiBold.ttf"),
+	JetBrainsMono_700Bold: require("@expo-google-fonts/jetbrains-mono/700Bold/JetBrainsMono_700Bold.ttf"),
+};

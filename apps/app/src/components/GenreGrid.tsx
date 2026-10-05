@@ -1,5 +1,6 @@
+import { Text } from "./Typography";
 import React from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Pressable } from "react-native";
 import Feather from "@expo/vector-icons/Feather";
 import { genres } from "../genres";
 import { c } from "../theme";
@@ -18,7 +19,14 @@ export default function GenreGrid({
 }) {
 	return (
 		<View style={{ paddingTop: 12, gap: 18 }}>
-			<Text style={{ color: c.text, fontSize: 20, fontWeight: "700" }}>
+			<Text
+				style={{
+					color: c.text,
+					fontFamily: "Lexend",
+					fontSize: 20,
+					fontWeight: "700",
+				}}
+			>
 				Browse genres
 			</Text>
 			<View

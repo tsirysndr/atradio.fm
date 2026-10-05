@@ -1,9 +1,8 @@
+import { Text, TextInput } from "./Typography";
 import React, { useEffect, useRef, useState } from "react";
 import {
 	View,
-	Text,
 	Pressable,
-	TextInput,
 	FlatList,
 	ScrollView,
 	KeyboardAvoidingView,
@@ -317,7 +316,14 @@ export default function StationDiscussion({
 								<View style={{ flexDirection: "row", gap: 8 }}>
 									<Text
 										numberOfLines={1}
-										style={{ color: c.text, fontWeight: "700", flex: 1 }}
+										style={{
+											color: c.text,
+											fontWeight: "700",
+											flex: 1,
+											fontFamily: item.author?.handle
+												? "JetBrainsMono"
+												: "Outfit",
+										}}
 									>
 										{item.author?.handle
 											? `@${item.author.handle}`
@@ -479,7 +485,12 @@ export default function StationDiscussion({
 }
 const s = StyleSheet.create({
 	header: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-	title: { fontSize: 20, color: c.text, fontWeight: "800" },
+	title: {
+		fontFamily: "Lexend",
+		fontSize: 20,
+		color: c.text,
+		fontWeight: "800",
+	},
 	muted: { color: c.muted, fontSize: 13 },
 	icon: { padding: 10 },
 	input: {
