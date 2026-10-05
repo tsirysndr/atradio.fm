@@ -1,8 +1,7 @@
 import { useAtomValue } from "jotai";
 import { useQuery } from "@tanstack/react-query";
 import { authAtom } from "../state/app";
-import { request } from "../auth/client";
-import type { Station } from "../types";
+import { loadFavorites } from "../api/favorites";
 
 export const favoritesKey = (actor?: string) => ["favorites", actor] as const;
 
@@ -13,15 +12,6 @@ export function useFavorites() {
 		queryKey: favoritesKey(actor),
 		enabled: !!actor,
 		staleTime: Infinity,
-		queryFn: async ({ signal }) => {
-			const stations = await request<Station[]>(
-				"stationAction",
-				JSON.stringify({ action: "listFavorites", actor }),
-			);
-			signal.throwIfAborted();
-			return [
-				...new Map(stations.map((station) => [station.id, station])).values(),
-			];
-		},
+		queryFn: ({ signal }) => loadFavorites(actor!, signal),
 	});
 }
