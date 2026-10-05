@@ -50,7 +50,9 @@ describe("app smoke", () => {
       ).toBeInTheDocument(),
     );
     // Brand + the search launcher button (search now lives in the palette).
-    expect(screen.getByText("atradio.fm")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /^atradio\s*\.fm$/ }),
+    ).toHaveAttribute("href", "/");
     expect(
       screen.getByRole("button", { name: /search stations/i }),
     ).toBeInTheDocument();
