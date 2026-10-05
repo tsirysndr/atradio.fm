@@ -60,6 +60,7 @@ import type { Station } from "./types";
 import { genres } from "./genres";
 import StationLoader from "./components/StationLoader";
 import ListenerCount from "./components/ListenerCount";
+import MarqueeText from "./components/MarqueeText";
 import GenreGrid from "./components/GenreGrid";
 import AudioSettingsSync from "./components/AudioSettingsSync";
 import Equalizer from "./components/Equalizer";
@@ -811,25 +812,25 @@ function Main() {
 					>
 						<Artwork station={player.station} size={44} />
 						<View style={{ flex: 1 }}>
-							<Text
+							<MarqueeText
 								style={{ color: c.text, fontWeight: "700" }}
-								numberOfLines={1}
+								active={!expanded}
 							>
 								{player.station.name}
-							</Text>
-							<Text
+							</MarqueeText>
+							<MarqueeText
 								style={{
 									color: player.error ? c.error : c.cyan,
 									fontSize: 12,
 									marginTop: 4,
 								}}
-								numberOfLines={1}
+								active={!expanded}
 							>
 								{player.error ||
 									(player.state === "buffering"
 										? "Connecting…"
 										: player.title || (playing ? "Live radio" : "Paused"))}
-							</Text>
+							</MarqueeText>
 							<ListenerCount stationId={player.station.id} compact />
 						</View>
 					</Pressable>
@@ -1088,15 +1089,21 @@ function Main() {
 						</Pressable>
 					</View>
 					{player.station && <Artwork station={player.station} size={270} />}
-					<Text style={[s.heading, { textAlign: "center" }]}>
-						{player.station?.name}
-					</Text>
-					<Text style={[s.body, { textAlign: "center" }]}>
+					<MarqueeText
+						active={expanded}
+						style={[s.heading, { textAlign: "center" }]}
+					>
+						{player.station?.name ?? ""}
+					</MarqueeText>
+					<MarqueeText
+						active={expanded}
+						style={[s.body, { textAlign: "center" }]}
+					>
 						{player.error ||
 							player.title ||
 							player.station?.genre ||
 							"Live radio"}
-					</Text>
+					</MarqueeText>
 					{expanded && player.station && (
 						<ListenerCount stationId={player.station.id} />
 					)}
