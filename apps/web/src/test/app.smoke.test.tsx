@@ -10,6 +10,7 @@ import {
 import { AppProviders } from "@/providers";
 import { Layout } from "@/components/Layout";
 import { SearchPage } from "@/routes/SearchPage";
+import { PrivacyPage } from "@/routes/PrivacyPage";
 import { ProfilePage } from "@/routes/ProfilePage";
 
 function renderApp(initialPath: string) {
@@ -24,8 +25,13 @@ function renderApp(initialPath: string) {
     path: "/profile",
     component: ProfilePage,
   });
+  const privacyRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/privacy",
+    component: PrivacyPage,
+  });
   const router = createRouter({
-    routeTree: rootRoute.addChildren([indexRoute, profileRoute]),
+    routeTree: rootRoute.addChildren([indexRoute, profileRoute, privacyRoute]),
     history: createMemoryHistory({ initialEntries: [initialPath] }),
   });
   return render(
@@ -42,6 +48,13 @@ afterEach(() => {
 });
 
 describe("app smoke", () => {
+  it("opens the privacy policy without authentication and links it in the footer", async () => {
+    renderApp("/privacy");
+    expect(await screen.findByRole("heading", { name: "Privacy Policy", level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("heading", { name: "Retention and deletion" })).toBeInTheDocument();
+  });
+
   it("renders the search page without crashing", async () => {
     renderApp("/");
     await waitFor(() =>

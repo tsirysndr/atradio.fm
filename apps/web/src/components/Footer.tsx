@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { Trans, useTranslation } from "react-i18next";
 import { useSetAtom } from "jotai";
 import {
@@ -35,7 +36,10 @@ export function Footer() {
           />
         </p>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex flex-wrap items-center justify-center gap-1">
+          <Link to="/privacy" className="mr-2 inline-flex min-h-11 items-center px-2 text-foreground/70 underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-4">
+            {t("privacyPolicy")}
+          </Link>
           {/* CLI only appears here on mobile; on desktop it lives in the
               topbar (Navbar). */}
           <button

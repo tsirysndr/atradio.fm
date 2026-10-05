@@ -9,6 +9,7 @@ import { BrowsePage } from "@/routes/BrowsePage";
 import { ProfilePage } from "@/routes/ProfilePage";
 import { ConnectPage } from "@/routes/ConnectPage";
 import { NotificationsPage } from "@/routes/NotificationsPage";
+import { PrivacyPage } from "@/routes/PrivacyPage";
 import { OAuthCallback } from "@/routes/OAuthCallback";
 
 const rootRoute = createRootRoute({
@@ -62,6 +63,12 @@ const oauthCallbackRoute = createRoute({
   component: OAuthCallback,
 });
 
+const privacyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/privacy",
+  component: PrivacyPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   browseRoute,
@@ -70,6 +77,7 @@ const routeTree = rootRoute.addChildren([
   connectRoute,
   notificationsRoute,
   oauthCallbackRoute,
+  privacyRoute,
 ]);
 
 export const router = createRouter({
