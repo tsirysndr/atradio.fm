@@ -405,7 +405,7 @@ const s = StyleSheet.create({
 		backgroundColor: c.surface,
 		borderWidth: 1,
 		borderColor: c.border,
-		borderRadius: 16,
+		borderRadius: 999,
 		marginVertical: 12,
 		paddingLeft: 17,
 	},
@@ -439,7 +439,7 @@ const s = StyleSheet.create({
 	button: {
 		backgroundColor: c.cyan,
 		padding: 18,
-		borderRadius: 16,
+		borderRadius: 999,
 		alignItems: "center",
 		marginTop: 20,
 	},

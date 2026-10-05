@@ -498,12 +498,18 @@ function Main() {
 							<Text style={s.body}>
 								Bring your ATProto identity and your saved stations with you.
 							</Text>
-							<Pressable style={s.button} onPress={() => setLogin(true)}>
+							<Pressable
+								style={[s.button, s.pill]}
+								onPress={() => setLogin(true)}
+							>
 								<Text style={s.buttonText}>Sign in with ATProto</Text>
 							</Pressable>
 						</>
 					)}
-					<Pressable style={s.outlineButton} onPress={() => setEqualizer(true)}>
+					<Pressable
+						style={[s.outlineButton, s.pill]}
+						onPress={() => setEqualizer(true)}
+					>
 						<Text style={{ color: c.cyan, fontWeight: "700" }}>
 							Equalizer settings
 						</Text>
@@ -519,7 +525,7 @@ function Main() {
 					<Text style={[s.body, { textAlign: "center" }]}>
 						Sign in to listen to the stations you’ve saved on atradio.fm.
 					</Text>
-					<Pressable style={s.button} onPress={() => setLogin(true)}>
+					<Pressable style={[s.button, s.pill]} onPress={() => setLogin(true)}>
 						<Text style={s.buttonText}>Sign in</Text>
 					</Pressable>
 				</View>
@@ -1211,6 +1217,7 @@ const s = StyleSheet.create({
 		padding: 17,
 		alignItems: "center",
 	},
+	pill: { borderRadius: 999 },
 	buttonText: { color: c.bg, fontWeight: "800", fontSize: 15 },
 	outlineButton: {
 		borderWidth: 1,
