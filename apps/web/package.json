@@ -5,9 +5,9 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && bun scripts/render-privacy.tsx",
     "preview": "vite preview",
-    "deploy": "tsc -b && vite build && wrangler deploy",
+    "deploy": "bun run build && wrangler deploy",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
