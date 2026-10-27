@@ -20,33 +20,6 @@
         "test": {
           "dependencies": []
         }
-      },
-      "dagger-sdk": {
-        "path": "dagger-sdk",
-        "core": {
-          "dependencies": [
-            "aff",
-            "argonaut-codecs",
-            "argonaut-core",
-            "arrays",
-            "console",
-            "effect",
-            "either",
-            "exceptions",
-            "foldable-traversable",
-            "foreign-object",
-            "maybe",
-            "newtype",
-            "nullable",
-            "prelude",
-            "strings",
-            "tuples",
-            "typelevel-prelude"
-          ]
-        },
-        "test": {
-          "dependencies": []
-        }
       }
     },
     "package_set": {
@@ -696,7 +669,11 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "dagger-sdk": {
+        "path": "dagger-sdk"
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -832,6 +809,29 @@
       "dependencies": [
         "newtype",
         "prelude"
+      ]
+    },
+    "dagger-sdk": {
+      "type": "local",
+      "path": "dagger-sdk",
+      "dependencies": [
+        "aff",
+        "argonaut-codecs",
+        "argonaut-core",
+        "arrays",
+        "console",
+        "effect",
+        "either",
+        "exceptions",
+        "foldable-traversable",
+        "foreign-object",
+        "maybe",
+        "newtype",
+        "nullable",
+        "prelude",
+        "strings",
+        "tuples",
+        "typelevel-prelude"
       ]
     },
     "datetime": {

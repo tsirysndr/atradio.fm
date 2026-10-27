@@ -14,3 +14,6 @@ package:
 workspace:
   packageSet:
     registry: 77.8.0
+  extraPackages:
+    dagger-sdk:
+      path: dagger-sdk

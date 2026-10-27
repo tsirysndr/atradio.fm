@@ -35,7 +35,10 @@ cache and skip uploads when no secret is available. Tokens use Dagger secrets.
 `CI.Runtime` reports complete engine errors. The SDK container installs the
 PureScript compiler and Spago; contributors do not need them for Dagger calls.
 The SDK bootstraps core bindings on clean checkouts and generates schema bindings
-when introspection is supplied. See `sdk/purescript/VENDORED.md` for provenance.
+when introspection is supplied. `ci/spago.yaml` explicitly maps `dagger-sdk`
+to the local `dagger-sdk/` path because Spago skips Git-ignored directories
+during automatic workspace discovery. Keep this mapping when updating the SDK.
+See `sdk/purescript/VENDORED.md` for provenance.
 
 Bun downloads and the Nix store use Dagger cache volumes. There are no GitHub
 Actions volume snapshot or restore steps. Native macOS/BSD release builds,
