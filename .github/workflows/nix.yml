@@ -5,12 +5,24 @@ on:
     branches: [main]
     paths:
       - "cli/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".dagger/**"
+      - "dagger.toml"
+      - "dagger.lock"
       - "flake.nix"
       - "flake.lock"
       - ".github/workflows/nix.yml"
   pull_request:
     paths:
       - "cli/**"
+      - "crates/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".dagger/**"
+      - "dagger.toml"
+      - "dagger.lock"
       - "flake.nix"
       - "flake.lock"
       - ".github/workflows/nix.yml"
@@ -22,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, ubuntu-24.04-arm]
+        os: [macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -49,3 +61,23 @@ jobs:
           echo "Build failed after retries"
           exit 1
 
+  linux:
+    name: nix build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dagger
+        uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77
+        with:
+          version: v1.0.0-beta.21
+
+      - name: Build with PureScript Dagger
+        working-directory: .dagger
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          WORKFLOW_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: dagger api call -m ci nix-build --source .. --cachix-token env://CACHIX_AUTH_TOKEN --run-id "$WORKFLOW_RUN"
