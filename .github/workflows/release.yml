@@ -26,6 +26,7 @@ jobs:
     defaults:
       run:
         working-directory: cli
+        shell: bash
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/cli/target
     strategy:
@@ -49,10 +50,16 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
         with:
-          targets: ${{ matrix.target }}
-
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
+      - name: Set up rust
+        run: fluentci run setup-rust setup --toolchain stable --targets '${{ matrix.target }}' | node "$GITHUB_WORKSPACE/.ci-tooling/.fluentci/github-env.mjs"
+        shell: bash
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: cli
@@ -141,6 +148,13 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -181,3 +195,6 @@ jobs:
             curl -fsS -F package=@"${pkg}" \
               "https://${FURY_TOKEN}@push.fury.io/${FURY_ACCOUNT}/"
           done
+    defaults:
+      run:
+        shell: bash

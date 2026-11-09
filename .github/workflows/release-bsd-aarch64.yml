@@ -54,6 +54,13 @@ jobs:
           # the workflow was dispatched from.
           ref: ${{ inputs.tag || github.ref }}
 
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
       - name: Start ${{ matrix.os }} ${{ matrix.arch }} VM
         uses: cross-platform-actions/action@v1.3.0
         with:
@@ -131,3 +138,6 @@ jobs:
             sleep 60
           done
           gh release upload "$version" dist/*.tar.gz* --clobber --repo "$GITHUB_REPOSITORY"
+    defaults:
+      run:
+        shell: bash

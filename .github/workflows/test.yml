@@ -14,6 +14,9 @@ on:
       - "bun.lock"
       - "turbo.json"
       - ".github/workflows/test.yml"
+      - .fluentci/**
+      - fluentci.toml
+      - .github/actions/fluentci-toolchain/**
   pull_request:
     paths:
       - "apps/**"
@@ -26,6 +29,9 @@ on:
       - "bun.lock"
       - "turbo.json"
       - ".github/workflows/test.yml"
+      - .fluentci/**
+      - fluentci.toml
+      - .github/actions/fluentci-toolchain/**
   workflow_dispatch:
 
 jobs:
@@ -35,11 +41,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Dagger
-        uses: dagger/dagger-for-github@27b130bf0f79a7f6fbbbe0fbca6760dc9bb40a77
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
         with:
-          version: v1.0.0-beta.21
-
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
+      - name: Set up the pinned Dagger beta with FluentCI
+        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci setup-dagger
+        shell: bash
       - name: Typecheck and test apps
         working-directory: .dagger
-        run: dagger api call -m ci apps --source ..
+        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci dagger --directory "$GITHUB_WORKSPACE/.dagger" --arguments '["api","call","-m","ci","apps","--source",".."]'
+    defaults:
+      run:
+        shell: bash

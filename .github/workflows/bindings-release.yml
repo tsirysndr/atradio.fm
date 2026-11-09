@@ -41,6 +41,13 @@ jobs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
       - name: Resolve release tag
         id: tag
         run: |
@@ -67,6 +74,9 @@ jobs:
               --target "$GITHUB_SHA" --prerelease
           fi
 
+    defaults:
+      run:
+        shell: bash
   build:
     needs: prepare-release
     name: build (${{ matrix.target }})
@@ -85,7 +95,16 @@ jobs:
             os: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
+      - name: Set up rust
+        run: fluentci run setup-rust setup --toolchain stable | node "$GITHUB_WORKSPACE/.ci-tooling/.fluentci/github-env.mjs"
+        shell: bash
       - name: Build native libs (${{ matrix.target }})
         run: bash "$WORKDIR/build-native.sh" "${{ matrix.target }}"
       - name: Upload to release
@@ -95,6 +114,9 @@ jobs:
 
   # BSDs — best-effort, built inside a cross-platform-actions VM. No system deps:
   # the SDK crates use rustls (no OpenSSL, no audio libs).
+    defaults:
+      run:
+        shell: bash
   build-bsd:
     needs: prepare-release
     name: build (${{ matrix.target }})
@@ -118,6 +140,13 @@ jobs:
           #  pkg: sudo pkg_add rust
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout FluentCI tooling
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .ci-tooling
+      - uses: fluentci-io/setup-fluentci@next
+      - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
       - name: Build native libs in ${{ matrix.os }} VM
         uses: cross-platform-actions/action@v1.3.0
         with:
@@ -135,3 +164,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ needs.prepare-release.outputs.tag }}" "$WORKDIR"/dist/* --clobber
+    defaults:
+      run:
+        shell: bash
