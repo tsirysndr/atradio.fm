@@ -60,18 +60,12 @@ jobs:
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
       - name: nix build
-        run: |
-          for i in {1..5}; do
-            if GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} nix build -L --accept-flake-config; then
-              echo "Build succeeded!"
-              exit 0
-            fi
-            echo "Attempt $i failed (likely GitHub 503/rate limit), retrying in $((i*10))s..."
-            sleep $((i*10))
-          done
-          echo "Build failed after retries"
-          exit 1
+        run: |-
+          fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci nix-build --source "$GITHUB_WORKSPACE" --target ".#default" --cache atradio
 
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Push result to Cachix
         run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci cachix --directory "$GITHUB_WORKSPACE" --operation push --cache atradio
         env:
@@ -95,15 +89,13 @@ jobs:
           path: .ci-tooling
       - uses: fluentci-io/setup-fluentci@next
       - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
-      - name: Set up the pinned Dagger beta with FluentCI
-        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci setup-dagger
-        shell: bash
+      - name: Set up Nix with FluentCI
+        run: fluentci run setup-determinate-nix setup --sudo --trusted-users '["runner"]' --extra-conf '["experimental-features = nix-command flakes"]' | node "$GITHUB_WORKSPACE/.ci-tooling/.fluentci/github-env.mjs"
       - name: Build with PureScript FluentCI
-        working-directory: .dagger
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
           WORKFLOW_RUN: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci dagger --directory "$GITHUB_WORKSPACE/.dagger" --arguments '["api","call","-m","ci","nix-build","--source","..","--cachix-token","env://CACHIX_AUTH_TOKEN","--run-id","$WORKFLOW_RUN"]'
+        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci nix-build --source "$GITHUB_WORKSPACE/.dagger/.." --target ".#default" --cache atradio
     defaults:
       run:
         shell: bash

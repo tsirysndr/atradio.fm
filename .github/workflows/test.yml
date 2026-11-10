@@ -48,12 +48,8 @@ jobs:
           path: .ci-tooling
       - uses: fluentci-io/setup-fluentci@next
       - uses: ./.ci-tooling/.github/actions/fluentci-toolchain
-      - name: Set up the pinned Dagger beta with FluentCI
-        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci setup-dagger
-        shell: bash
       - name: Typecheck and test apps
-        working-directory: .dagger
-        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci dagger --directory "$GITHUB_WORKSPACE/.dagger" --arguments '["api","call","-m","ci","apps","--source",".."]'
+        run: fluentci run --work-dir "$GITHUB_WORKSPACE/.ci-tooling" ci apps --source "$GITHUB_WORKSPACE/.dagger/.."
     defaults:
       run:
         shell: bash
